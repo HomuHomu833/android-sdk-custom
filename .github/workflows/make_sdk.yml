@@ -7,7 +7,11 @@ on:
       version:
         description: "Platform Tools Version"
         required: true
-        default: "35.0.2"
+        default: "36.0.0"
+      tag:
+        description: "Android Source Tag"
+        required: true
+        default: "android-platform-15.0.0_r9"
 
 permissions:
   contents: write
@@ -49,6 +53,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ inputs.version }}
+      tag: ${{ inputs.tag }}
       target_arch: ${{ matrix.target_arch }}
       target_triple: ${{ matrix.target_triple }}
 
