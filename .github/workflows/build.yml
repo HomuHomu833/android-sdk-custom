@@ -6,6 +6,9 @@ on:
       version:
         required: true
         type: string
+      tag:
+        required: true
+        type: string
       target_arch:
         required: true
         type: string
@@ -36,7 +39,7 @@ jobs:
           cp -R ${PWD}/patches/zig/* $(whereis zig | awk '{print $2}' | xargs dirname)
 
       - name: Get Sources
-        run: sed -i 's/"35\.0\.2"/"${{ inputs.version }}"/g' ${PWD}/CMakeLists.txt ${PWD}/patches/misc/platform_tools_version.h && python get_source.py --tags "platform-tools-${{ inputs.version }}"
+        run: sed -i 's/"35\.0\.2"/"${{ inputs.version }}"/g' ${PWD}/CMakeLists.txt ${PWD}/patches/misc/platform_tools_version.h && python get_source.py --tags "${{ inputs.tag }}"
 
       - name: Install Dependencies
         run: sudo apt update && sudo apt install -y ninja-build autogen autoconf autoconf-archive m4 libtool build-essential
