@@ -24,7 +24,11 @@ file(GLOB_RECURSE PROTO_FILES ${ADB_PROTO_DIR}/*.proto)
 foreach(proto ${PROTO_FILES})
     get_filename_component(FIL_WE ${proto} NAME_WE)
     if(DEFINED PROTOC_PATH)
-        # execute the protoc command to generate the proto targets for host arch
+        if(NOT TARGET_CPP_FILE STREQUAL "" AND NOT TARGET_HEAD_FILE STREQUAL "")
+            message(STATUS "Generating CXX object ${TARGET_CPP_FILE}")
+            message(STATUS "Generating C Header object ${TARGET_HEAD_FILE}")
+        endif()
+
         execute_process(
             COMMAND ${PROTOC_COMPILER} ${proto}
             --proto_path=${ADB_PROTO_DIR}
@@ -33,12 +37,6 @@ foreach(proto ${PROTO_FILES})
             RESULT_VARIABLE RESULT
             WORKING_DIRECTORY ${ADB_PROTO_DIR}
         )
-        
-        # check command result
-        if(RESULT EQUAL 0)
-            message(STATUS "generate cpp file ${TARGET_CPP_FILE}")
-            message(STATUS "generate head file ${TARGET_HEAD_FILE}")
-        endif()
     endif()
     
     set(TARGET_CPP_FILE "${ADB_PROTO_DIR}/${FIL_WE}.pb.cc")
