@@ -110,7 +110,7 @@ jobs:
         unzip -q commandlinetools.zip
         rm commandlinetools.zip
         yes | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
-        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;${{ inputs.version }}" "platform-tools;${{ inputs.version }}"
+        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;${{ inputs.version }}" "platform-tools"
 
     - name: Make Android SDK
       run: |
