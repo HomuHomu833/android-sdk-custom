@@ -110,7 +110,7 @@ jobs:
         unzip -q commandlinetools.zip
         rm commandlinetools.zip
         yes | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
-        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;35.0.1" "platform-tools"
+        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;${{ inputs.version }}" "platform-tools;${{ inputs.version }}"
 
     - name: Make Android SDK
       run: |
@@ -135,13 +135,13 @@ jobs:
 
         rm -rf ${HOST_SDK}/build-tools/35.0.1/lib64
         rm -rf ${HOST_SDK}/platform-tools/lib64
-        rm -rf ${HOST_SDK}/build-tools/35.0.1/*-ld ${HOST_SDK}/build-tools/35.0.1/lld* ${HOST_SDK}/build-tools/35.0.1/llvm-rs-cc ${HOST_SDK}/build-tools/35.0.1/bcc_compat ${HOST_SDK}/build-tools/35.0.1/renderscript
+        rm -rf ${HOST_SDK}/build-tools/35.0.1/*-ld ${HOST_SDK}/build-tools/35.0.1/lld* ${HOST_SDK}/build-tools/${{ inputs.version }}/llvm-rs-cc ${HOST_SDK}/build-tools/${{ inputs.version }}/bcc_compat ${HOST_SDK}/build-tools/${{ inputs.version }}/renderscript
         sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
                -e 's/^declare -a javaOpts=()/javaOpts=""/' \
                -e 's/javaOpts+=("-\${opt}")/javaOpts="\$javaOpts -\${opt}"/' \
                -e 's/javaOpts+=("\${defaultMx}")/javaOpts="\$javaOpts \${defaultMx}"/' \
-               -e 's|"\${javaOpts\[@\]}"|$javaOpts|' ${HOST_SDK}/build-tools/35.0.1/d8
-        sed -i '1s|^#!.*bash|#!/bin/sh|' ${HOST_SDK}/build-tools/35.0.1/apksigner
+               -e 's|"\${javaOpts\[@\]}"|$javaOpts|' ${HOST_SDK}/build-tools/${{ inputs.version }}/d8
+        sed -i '1s|^#!.*bash|#!/bin/sh|' ${HOST_SDK}/build-tools/${{ inputs.version }}/apksigner
 
     - name: Archive
       run: tar -cf - android-sdk | xz -T0 -9e --lzma2=dict=256MiB > android-sdk-${{matrix.target_triple}}.tar.xz
