@@ -117,7 +117,7 @@ jobs:
         HOST_SDK="${PWD}/android-sdk"
         BUILT_SDK="${PWD}/build-${{ matrix.target_triple }}"
 
-        find "${HOST_SDK}/build-tools/35.0.1" -type f | while IFS= read -r file; do
+        find "${HOST_SDK}/build-tools/${{ inputs.version }}" -type f | while IFS= read -r file; do
             bname="$(basename "${file}")"
             if [ -f "${BUILT_SDK}/${bname}" ] && file "${file}" | grep -q 'ELF'; then
                 echo "Replacing ${bname}"
@@ -133,9 +133,9 @@ jobs:
             fi
         done
 
-        rm -rf ${HOST_SDK}/build-tools/35.0.1/lib64
+        rm -rf ${HOST_SDK}/build-tools/${{ inputs.version }}/lib64
         rm -rf ${HOST_SDK}/platform-tools/lib64
-        rm -rf ${HOST_SDK}/build-tools/35.0.1/*-ld ${HOST_SDK}/build-tools/35.0.1/lld* ${HOST_SDK}/build-tools/${{ inputs.version }}/llvm-rs-cc ${HOST_SDK}/build-tools/${{ inputs.version }}/bcc_compat ${HOST_SDK}/build-tools/${{ inputs.version }}/renderscript
+        rm -rf ${HOST_SDK}/build-tools/${{ inputs.version }}/*-ld ${HOST_SDK}/build-tools/${{ inputs.version }}/lld* ${HOST_SDK}/build-tools/${{ inputs.version }}/llvm-rs-cc ${HOST_SDK}/build-tools/${{ inputs.version }}/bcc_compat ${HOST_SDK}/build-tools/${{ inputs.version }}/renderscript
         sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
                -e 's/^declare -a javaOpts=()/javaOpts=""/' \
                -e 's/javaOpts+=("-\${opt}")/javaOpts="\$javaOpts -\${opt}"/' \
