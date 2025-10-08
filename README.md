@@ -18,12 +18,12 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 ### 🔹 Zig-based Environment
 
 **Platforms**
-- Linux 
-- Android 
+- Linux
+- Android
 
 **Architectures**
-- **X86 Family**: `x86`, `x86_64` 
-- **ARM Family**: `armhf`, `armeb`, `aarch64`, `aarch64_be` 
+- **X86 Family**: `x86`, `x86_64`
+- **ARM Family**: `armhf`, `armeb`, `aarch64`, `aarch64_be`
 - **RISC-V**: `riscv32`, `riscv64` 
 - **Other**: `loongarch64`, `powerpc64le`, `s390x`
 
@@ -31,14 +31,14 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 
 ## 🧰 Usage
 
-This custom SDK works as a **drop-in replacement** for the standard Android NDK. 
+This custom SDK works as a **drop-in replacement** for the standard Android SDK.
 Simply extract the archive and use it in your build setup just as you would with the official version.
 
 ---
 
 ## ⚖️ License
 
-This project is licensed under the **MIT License**. 
+This project is licensed under the **MIT License**.
 See the [LICENSE](LICENSE) file for more details.
 
 ---
