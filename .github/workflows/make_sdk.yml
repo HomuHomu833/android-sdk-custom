@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Download Artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: "build-${{ matrix.target_triple }}"
 
@@ -147,7 +147,7 @@ jobs:
       run: tar -cf - android-sdk | xz -T0 -9e --lzma2=dict=256MiB > android-sdk-${{matrix.target_triple}}.tar.xz
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: android-sdk-${{matrix.target_triple}}
         path: android-sdk-${{matrix.target_triple}}.tar.xz
@@ -157,7 +157,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Download Artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         merge-multiple: true
 
@@ -167,7 +167,7 @@ jobs:
         name: android-sdk-*
 
     - name: Release
-      uses: ncipollo/release-action@v1.16.0
+      uses: ncipollo/release-action@v1.20.0
       with:
         tag: "${{inputs.version}}"
         artifacts: "android-sdk-*"
