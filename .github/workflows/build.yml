@@ -233,6 +233,8 @@ jobs:
           ' ${PWD}/src/art/libdexfile/dex/dex_file.cc
           sed -i 's/ \/\/__INSERT_HERE__//' ${PWD}/src/art/libdexfile/dex/dex_file.cc
 
+          sed -i "s/SOONG BUILD NUMBER PLACEHOLDER/$(date +%y%m%d%H%M%S)/" ${PWD}/src/soong/cc/libbuildversion/libbuildversion.cpp
+
       - name: Build Android SDK
         shell: bash
         run: |
