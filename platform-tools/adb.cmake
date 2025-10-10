@@ -112,7 +112,6 @@ add_library(libadb STATIC
     ${SRC}/adb/transport_fd.cpp
     ${SRC}/adb/types.cpp
     ${SRC}/adb/client/openscreen/mdns_service_info.cpp
-    ${SRC}/adb/client/openscreen/mdns_service_watcher.cpp
     ${SRC}/adb/client/openscreen/platform/logging.cpp
     ${SRC}/adb/client/openscreen/platform/task_runner.cpp
     ${SRC}/adb/client/openscreen/platform/udp_socket.cpp
@@ -256,7 +255,6 @@ add_executable(adb
     ${SRC}/adb/client/adb_install.cpp
     ${SRC}/adb/client/line_printer.cpp
     ${SRC}/adb/client/fastdeploy.cpp
-    ${SRC}/adb/client/fastdeploycallbacks.cpp
     ${SRC}/adb/client/incremental.cpp
     ${SRC}/adb/client/incremental_server.cpp
     ${SRC}/adb/client/incremental_utils.cpp
