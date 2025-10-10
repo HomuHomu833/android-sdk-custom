@@ -7,11 +7,11 @@ on:
       version:
         description: "Platform Tools Version"
         required: true
-        default: "36.0.0"
+        default: "35.0.2"
       tag:
         description: "Android Source Tag"
         required: true
-        default: "android-platform-15.0.0_r9"
+        default: "platform-tools-35.0.2"
 
 permissions:
   contents: write
@@ -110,7 +110,7 @@ jobs:
         unzip -q commandlinetools.zip
         rm commandlinetools.zip
         yes | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
-        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;${{ inputs.version }}" "platform-tools"
+        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;35.0.0" "platform-tools"
 
     - name: Make Android SDK
       run: |
