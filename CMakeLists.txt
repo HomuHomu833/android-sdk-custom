@@ -18,8 +18,7 @@ cmake_minimum_required(VERSION 3.14.2)
 project(sdk-tools)
 
 set(CMAKE_C_STANDARD 11)
-## set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD 20 CACHE STRING "C++ standard" FORCE)
+set(CMAKE_CXX_STANDARD 20)
 enable_language(ASM)
 
 # set global cflags and cxxflags
