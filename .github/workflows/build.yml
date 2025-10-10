@@ -235,6 +235,8 @@ jobs:
 
           sed -i "s/SOONG BUILD NUMBER PLACEHOLDER/$(date +%y%m%d%H%M%S)/" ${PWD}/src/soong/cc/libbuildversion/libbuildversion.cpp
 
+          sed -i 's/set(CMAKE_CXX_STANDARD *14)/set(CMAKE_CXX_STANDARD 17)/' src/boringssl/CMakeLists.txt
+
       - name: Build Android SDK
         shell: bash
         run: |
