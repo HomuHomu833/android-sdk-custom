@@ -147,7 +147,7 @@ jobs:
       run: tar -cf - android-sdk | xz -T0 -9e --lzma2=dict=256MiB > android-sdk-${{matrix.target_triple}}.tar.xz
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v4.6.2
       with:
         name: android-sdk-${{matrix.target_triple}}
         path: android-sdk-${{matrix.target_triple}}.tar.xz
