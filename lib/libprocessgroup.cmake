@@ -19,9 +19,10 @@ add_library(libprocessgroup STATIC
     ${SRC}/core/libprocessgroup/processgroup.cpp
     ${SRC}/core/libprocessgroup/sched_policy.cpp
     ${SRC}/core/libprocessgroup/task_profiles.cpp
-    ${SRC}/core/libprocessgroup/cgrouprc_format/cgroup_controller.cpp
-    ${SRC}/core/libprocessgroup/cgrouprc/cgroup_controller.cpp
-    ${SRC}/core/libprocessgroup/cgrouprc/cgroup_file.cpp
+    ${SRC}/core/libprocessgroup/util/cgroup_controller.cpp
+    ${SRC}/core/libprocessgroup/util/cgroup_descriptor.cpp
+    ${SRC}/core/libprocessgroup/cgrouprc/a_cgroup_file.cpp
+    ${SRC}/core/libprocessgroup/cgrouprc/a_cgroup_controller.cpp
     )
 
 target_include_directories(libprocessgroup PRIVATE 
