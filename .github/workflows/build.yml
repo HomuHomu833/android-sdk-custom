@@ -244,8 +244,8 @@ jobs:
           TOOLCHAIN="${{ github.workspace }}/zig-as-llvm"
           export CC=${TOOLCHAIN}/bin/cc
           export CXX=${TOOLCHAIN}/bin/c++
-          export CFLAGS="-fstack-protector-strong -Wno-error=date-time -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -D__INTRODUCED_IN\(\)=\(\(void\)0\) -DANDROID_HOST_MUSL -static"
-          export CXXFLAGS="-fstack-protector-strong -Wno-error=date-time -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -D__INTRODUCED_IN\(\)=\(\(void\)0\) -DANDROID_HOST_MUSL -static"
+          export CFLAGS="-fstack-protector-strong -Wno-error=date-time -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -D'__INTRODUCED_IN(...)=(void)0' -DANDROID_HOST_MUSL -static"
+          export CXXFLAGS="-fstack-protector-strong -Wno-error=date-time -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -D'__INTRODUCED_IN(...)=(void)0' -DANDROID_HOST_MUSL -static"
           export LD=${TOOLCHAIN}/bin/ld
           export OBJCOPY=${TOOLCHAIN}/bin/objcopy
           export AR=${TOOLCHAIN}/bin/ar
