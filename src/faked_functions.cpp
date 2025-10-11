@@ -31,4 +31,11 @@ extern "C" {
 
         callback(cookie, pi->name, pi->value, pi->serial);
     }
+
+    int cacheflush(long start, long end, long flags) {
+    #if defined(__linux__)
+        __builtin___clear_cache((char*)start, (char*)end);
+    #endif
+        return 0;
+    }
 }
