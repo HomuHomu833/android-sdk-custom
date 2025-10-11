@@ -17,6 +17,8 @@ extern "C" {
         const prop_info* pi,
         void (*callback)(void* cookie, const char* name, const char* value, uint32_t serial),
         void* cookie);
+
+    int cacheflush(long start, long end, long flags);
 }
 
 #endif  // FAKED_FUNCTIONS_H
