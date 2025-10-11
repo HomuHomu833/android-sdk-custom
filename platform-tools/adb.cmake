@@ -117,6 +117,7 @@ add_library(libadb STATIC
     ${SRC}/adb/client/openscreen/platform/udp_socket.cpp
     ${SRC}/adb/client/auth.cpp
     ${SRC}/adb/client/adb_wifi.cpp
+    ${SRC}/adb/client/detach.cpp
     ${SRC}/adb/client/usb_libusb.cpp
     ${SRC}/adb/client/transport_emulator.cpp
     ${SRC}/adb/client/transport_mdns.cpp
