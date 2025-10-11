@@ -87,6 +87,7 @@ target_include_directories(aidl PRIVATE
     ${SRC}/libbase/include
     ${SRC}/fmtlib/include
     ${SRC}/googletest/googletest/include
+    ${SRC}/aidl/include
     )
     
 target_link_libraries(aidl
