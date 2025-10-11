@@ -116,6 +116,9 @@ jobs:
           #define __BEGIN_DECLS\
           #define __END_DECLS\
           #endif\
+          #endif\
+          #ifndef __INTRODUCED_IN\
+          #define __INTRODUCED_IN(version)\
           #endif' {} +
 
           sed -i 's/__BEGIN_DECLS/#ifdef __cplusplus\nextern "C" {\n#endif/g; s/__END_DECLS/#ifdef __cplusplus\n}\n#endif/g' ${PWD}/src/core/libpackagelistparser/include/packagelistparser/packagelistparser.h
