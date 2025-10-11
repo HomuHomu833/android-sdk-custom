@@ -104,20 +104,22 @@ jobs:
 
     - name: Setup Host Android SDK
       run: |
+        export BUILD_TOOLS_VERSION="36.1.0"
+        echo BUILD_TOOLS_VERSION=${BUILD_TOOLS_VERSION} >> $GITHUB_ENV
         mkdir android-sdk
         cd android-sdk
         curl -LkSs -o commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
         unzip -q commandlinetools.zip
         rm commandlinetools.zip
         yes | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
-        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;${{ inputs.version }}" "platform-tools"
+        cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;$BUILD_TOOLS_VERSION" "platform-tools"
 
     - name: Make Android SDK
       run: |
         HOST_SDK="${PWD}/android-sdk"
         BUILT_SDK="${PWD}/build-${{ matrix.target_triple }}"
 
-        find "${HOST_SDK}/build-tools/${{ inputs.version }}" -type f | while IFS= read -r file; do
+        find "${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION"" -type f | while IFS= read -r file; do
             bname="$(basename "${file}")"
             if [ -f "${BUILT_SDK}/${bname}" ] && file "${file}" | grep -q 'ELF'; then
                 echo "Replacing ${bname}"
@@ -133,15 +135,15 @@ jobs:
             fi
         done
 
-        rm -rf ${HOST_SDK}/build-tools/${{ inputs.version }}/lib64
+        rm -rf ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/lib64
         rm -rf ${HOST_SDK}/platform-tools/lib64
-        rm -rf ${HOST_SDK}/build-tools/${{ inputs.version }}/*-ld ${HOST_SDK}/build-tools/${{ inputs.version }}/lld* ${HOST_SDK}/build-tools/${{ inputs.version }}/llvm-rs-cc ${HOST_SDK}/build-tools/${{ inputs.version }}/bcc_compat ${HOST_SDK}/build-tools/${{ inputs.version }}/renderscript
+        rm -rf ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION"/*-ld ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/lld* ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/llvm-rs-cc ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/bcc_compat ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/renderscript
         sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
                -e 's/^declare -a javaOpts=()/javaOpts=""/' \
                -e 's/javaOpts+=("-\${opt}")/javaOpts="\$javaOpts -\${opt}"/' \
                -e 's/javaOpts+=("\${defaultMx}")/javaOpts="\$javaOpts \${defaultMx}"/' \
-               -e 's|"\${javaOpts\[@\]}"|$javaOpts|' ${HOST_SDK}/build-tools/${{ inputs.version }}/d8
-        sed -i '1s|^#!.*bash|#!/bin/sh|' ${HOST_SDK}/build-tools/${{ inputs.version }}/apksigner
+               -e 's|"\${javaOpts\[@\]}"|$javaOpts|' ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/d8
+        sed -i '1s|^#!.*bash|#!/bin/sh|' ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/apksigner
 
     - name: Archive
       run: tar -cf - android-sdk | xz -T0 -9e --lzma2=dict=256MiB > android-sdk-${{matrix.target_triple}}.tar.xz
