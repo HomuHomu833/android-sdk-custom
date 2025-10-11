@@ -33,8 +33,10 @@ extern "C" {
     }
 
     int cacheflush(long start, long end, long flags) {
-    #if defined(__linux__)
-        __builtin___clear_cache((char*)start, (char*)end);
+        (void)flags;
+    #if defined(__GNUC__)
+        __builtin___clear_cache(reinterpret_cast<char*>(start),
+                                reinterpret_cast<char*>(end));
     #endif
         return 0;
     }
