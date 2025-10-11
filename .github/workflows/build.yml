@@ -234,8 +234,8 @@ jobs:
           sed -i 's/ \/\/__INSERT_HERE__//' ${PWD}/src/art/libdexfile/dex/dex_file.cc
 
           sed -i "s/SOONG BUILD NUMBER PLACEHOLDER/$(date +%y%m%d%H%M%S)/" ${PWD}/src/soong/cc/libbuildversion/libbuildversion.cpp
-
           sed -i 's/set(CMAKE_CXX_STANDARD *14)/set(CMAKE_CXX_STANDARD 17)/' src/boringssl/CMakeLists.txt
+          sed -i '/packLocale/s/constexpr //;/packScript/s/constexpr //' src/base/libs/androidfw/include/androidfw/LocaleDataLookup.h
 
       - name: Build Android SDK
         shell: bash
