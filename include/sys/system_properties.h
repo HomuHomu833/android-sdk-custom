@@ -254,7 +254,7 @@ int __system_properties_zygote_reload(void); //__INTRODUCED_IN(35);
  * testable class, there is never a reason to call this function and its
  * implementation simply returns -1.
  */
-int __system_property_set_filename(const char* _Nullable __unused __filename);
+int __system_property_set_filename(const char* _Nullable __filename __attribute__((unused)));
 
 #ifdef __cplusplus
 }
