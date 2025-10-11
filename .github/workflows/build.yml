@@ -39,7 +39,7 @@ jobs:
           cp -R ${PWD}/patches/zig/* $(whereis zig | awk '{print $2}' | xargs dirname)
 
       - name: Get Sources
-        run: sed -i 's/"36\.0\.0"/"${{ inputs.version }}"/g' ${PWD}/CMakeLists.txt ${PWD}/patches/misc/platform_tools_version.h && python get_source.py --tags "${{ inputs.tag }}"
+        run: python get_source.py --tags "${{ inputs.tag }}"
 
       - name: Install Dependencies
         run: sudo apt update && sudo apt install -y ninja-build autogen autoconf autoconf-archive m4 libtool build-essential
