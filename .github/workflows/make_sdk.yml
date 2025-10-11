@@ -104,7 +104,7 @@ jobs:
 
     - name: Setup Host Android SDK
       run: |
-        export BUILD_TOOLS_VERSION="$BUILD_TOOLS_VERSION"
+        export BUILD_TOOLS_VERSION="35.0.0"
         echo BUILD_TOOLS_VERSION=${BUILD_TOOLS_VERSION} >> $GITHUB_ENV
         mkdir android-sdk
         cd android-sdk
