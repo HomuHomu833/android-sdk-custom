@@ -268,6 +268,7 @@ target_include_directories(adb PRIVATE
     ${SRC}/adb/proto
     ${SRC}/adb/fastdeploy/deployagent
     ${SRC}/openscreen
+    ${SRC}/libusb/include
     ${SRC}/lz4/lib
     ${SRC}/zstd/lib
     ${SRC}/libbase/include 
