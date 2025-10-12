@@ -35,12 +35,22 @@ extern "C" {
     int cacheflush(long start, long end, long flags) {
         (void)flags;
     
-    #if !defined(__s390x__) && !defined(__ppc64__)
+    #if defined(__has_builtin)
+    #if __has_builtin(__builtin___clear_cache)
         __builtin___clear_cache(reinterpret_cast<char*>(start),
                                 reinterpret_cast<char*>(end));
     #else
         (void)start; 
         (void)end;
+    #endif
+    #else
+    #if defined(__GNUC__)
+        __builtin___clear_cache(reinterpret_cast<char*>(start),
+                                reinterpret_cast<char*>(end));
+    #else
+        (void)start;
+        (void)end;
+    #endif
     #endif
     
         return 0;
