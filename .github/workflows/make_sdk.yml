@@ -119,7 +119,7 @@ jobs:
         HOST_SDK="${PWD}/android-sdk"
         BUILT_SDK="${PWD}/build-${{ matrix.target_triple }}"
 
-        find "${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION"" -type f | while IFS= read -r file; do
+        find "${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION" -type f | while IFS= read -r file; do
             bname="$(basename "${file}")"
             if [ -f "${BUILT_SDK}/${bname}" ] && file "${file}" | grep -q 'ELF'; then
                 echo "Replacing ${bname}"
@@ -137,7 +137,7 @@ jobs:
 
         rm -rf ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/lib64
         rm -rf ${HOST_SDK}/platform-tools/lib64
-        rm -rf ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION"/*-ld ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/lld* ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/llvm-rs-cc ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/bcc_compat ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/renderscript
+        rm -rf ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/*-ld ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/lld* ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/llvm-rs-cc ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/bcc_compat ${HOST_SDK}/build-tools/$BUILD_TOOLS_VERSION/renderscript
         sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
                -e 's/^declare -a javaOpts=()/javaOpts=""/' \
                -e 's/javaOpts+=("-\${opt}")/javaOpts="\$javaOpts -\${opt}"/' \
