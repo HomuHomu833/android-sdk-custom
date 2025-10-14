@@ -34,4 +34,5 @@ target_include_directories(libusb PRIVATE
 target_compile_options(libusb PRIVATE
     -fvisibility=hidden 
     -pthread
+    -DANDROID_OS
     )

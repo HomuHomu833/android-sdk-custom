@@ -58,6 +58,7 @@ add_library(libartbase STATIC
     ${SRC}/art/libartbase/base/zip_archive.cc
     ${SRC}/art/libartbase/base/globals_unix.cc
     ${SRC}/art/libartbase/base/mem_map_unix.cc
+    ${SRC}/faked_functions.cpp
     )
 target_include_directories(libartbase PRIVATE ${INCLUDES})
 
@@ -102,6 +103,7 @@ target_link_libraries(dexdump
     libziparchive
     liblog
     dl
+    fmt::fmt
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
     

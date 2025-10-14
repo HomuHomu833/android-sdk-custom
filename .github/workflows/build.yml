@@ -29,7 +29,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v2.0.5
         with:
-          version: 0.14.1
+          version: 0.15.1
           use-cache: false
 
       - name: Setup Zig Toolchain
@@ -39,7 +39,7 @@ jobs:
           cp -R ${PWD}/patches/zig/* $(whereis zig | awk '{print $2}' | xargs dirname)
 
       - name: Get Sources
-        run: sed -i 's/"35\.0\.2"/"${{ inputs.version }}"/g' ${PWD}/CMakeLists.txt ${PWD}/patches/misc/platform_tools_version.h && python get_source.py --tags "${{ inputs.tag }}"
+        run: python get_source.py --tags "${{ inputs.tag }}"
 
       - name: Install Dependencies
         run: sudo apt update && sudo apt install -y ninja-build autogen autoconf autoconf-archive m4 libtool build-essential
@@ -116,6 +116,9 @@ jobs:
           #define __BEGIN_DECLS\
           #define __END_DECLS\
           #endif\
+          #endif\
+          #ifndef __INTRODUCED_IN\
+          #define __INTRODUCED_IN(version)\
           #endif' {} +
 
           sed -i 's/__BEGIN_DECLS/#ifdef __cplusplus\nextern "C" {\n#endif/g; s/__END_DECLS/#ifdef __cplusplus\n}\n#endif/g' ${PWD}/src/core/libpackagelistparser/include/packagelistparser/packagelistparser.h
@@ -186,7 +189,6 @@ jobs:
           #define ART_FRAME_SIZE_LIMIT 10000' ${PWD}/src/art/libartbase/arch/instruction_set.h
 
           sed -i '/#include "os.h"/a #include <sys/cachectl.h>' ${PWD}/src/art/libartbase/base/utils.cc
-
           sed -i '/int r = cacheflush(start, limit, kCacheFlushFlags);/{
           s/.*/#if defined(__arm__) \&\& !defined(__aarch64__)\
           \
@@ -196,6 +198,10 @@ jobs:
           #else\
             int r = cacheflush(start, limit, kCacheFlushFlags);\
           #endif/
+          }' ${PWD}/src/art/libartbase/base/utils.cc
+          sed -i '/FlushCpuCaches/,/}/ {
+            /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/i #if !defined(__s390x__) && !defined(__ppc__)
+            /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/a #endif
           }' ${PWD}/src/art/libartbase/base/utils.cc
 
           sed -i '/#if __has_feature(cxx_exceptions)/,/^#endif/ c\using Task = std::packaged_task<void()>;' ${PWD}/src/openscreen/platform/api/task_runner.h
@@ -234,6 +240,10 @@ jobs:
           sed -i 's/ \/\/__INSERT_HERE__//' ${PWD}/src/art/libdexfile/dex/dex_file.cc
 
           sed -i "s/SOONG BUILD NUMBER PLACEHOLDER/$(date +%y%m%d%H%M%S)/" ${PWD}/src/soong/cc/libbuildversion/libbuildversion.cpp
+          sed -i 's/set(CMAKE_CXX_STANDARD *14)/set(CMAKE_CXX_STANDARD 17)/' src/boringssl/CMakeLists.txt
+          sed -i '/packLocale/s/constexpr //;/packScript/s/constexpr //' src/base/libs/androidfw/include/androidfw/LocaleDataLookup.h
+          sed -i '/utf8.resize_and_overwrite/{N;N;N; s/utf8.resize_and_overwrite(utf8_length,.*{[^}]*});/utf8.resize(utf8_length);\n  utf16_to_utf8(utf16.data(), utf16.length(), utf8.data(), utf8_length + 1);/}' src/base/libs/androidfw/Util.cpp
+          sed -i 's/libusb::usb_init();/usb_init();/g' ${PWD}/src/adb/client/main.cpp
 
       - name: Build Android SDK
         shell: bash

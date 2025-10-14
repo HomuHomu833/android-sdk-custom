@@ -112,14 +112,16 @@ add_library(libadb STATIC
     ${SRC}/adb/transport_fd.cpp
     ${SRC}/adb/types.cpp
     ${SRC}/adb/client/openscreen/mdns_service_info.cpp
-    ${SRC}/adb/client/openscreen/mdns_service_watcher.cpp
     ${SRC}/adb/client/openscreen/platform/logging.cpp
     ${SRC}/adb/client/openscreen/platform/task_runner.cpp
     ${SRC}/adb/client/openscreen/platform/udp_socket.cpp
     ${SRC}/adb/client/auth.cpp
     ${SRC}/adb/client/adb_wifi.cpp
+    ${SRC}/adb/client/detach.cpp
     ${SRC}/adb/client/usb_libusb.cpp
-    ${SRC}/adb/client/transport_local.cpp
+    ${SRC}/adb/client/transport_emulator.cpp
+    ${SRC}/adb/client/transport_mdns.cpp
+    ${SRC}/adb/client/transport_usb.cpp
     ${SRC}/adb/client/mdnsresponder_client.cpp
     ${SRC}/adb/client/mdns_utils.cpp
     ${SRC}/adb/client/transport_mdns.cpp
@@ -256,7 +258,6 @@ add_executable(adb
     ${SRC}/adb/client/adb_install.cpp
     ${SRC}/adb/client/line_printer.cpp
     ${SRC}/adb/client/fastdeploy.cpp
-    ${SRC}/adb/client/fastdeploycallbacks.cpp
     ${SRC}/adb/client/incremental.cpp
     ${SRC}/adb/client/incremental_server.cpp
     ${SRC}/adb/client/incremental_utils.cpp
@@ -267,6 +268,8 @@ target_include_directories(adb PRIVATE
     ${SRC}/adb
     ${SRC}/adb/proto
     ${SRC}/adb/fastdeploy/deployagent
+    ${SRC}/openscreen
+    ${SRC}/libusb/include
     ${SRC}/lz4/lib
     ${SRC}/zstd/lib
     ${SRC}/libbase/include 
