@@ -243,7 +243,6 @@ jobs:
           sed -i 's/set(CMAKE_CXX_STANDARD *14)/set(CMAKE_CXX_STANDARD 17)/' src/boringssl/CMakeLists.txt
           sed -i '/packLocale/s/constexpr //;/packScript/s/constexpr //' src/base/libs/androidfw/include/androidfw/LocaleDataLookup.h
           sed -i '/utf8.resize_and_overwrite/{N;N;N; s/utf8.resize_and_overwrite(utf8_length,.*{[^}]*});/utf8.resize(utf8_length);\n  utf16_to_utf8(utf16.data(), utf16.length(), utf8.data(), utf8_length + 1);/}' src/base/libs/androidfw/Util.cpp
-          sed -i '/if (!getenv("ADB_USB") || strcmp(getenv("ADB_USB"), "0") != 0) {/,/} else {/c\
           sed -i 's/libusb::usb_init();/usb_init();/g' ${PWD}/src/adb/client/main.cpp
 
       - name: Build Android SDK
