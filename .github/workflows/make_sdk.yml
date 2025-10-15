@@ -24,6 +24,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target_arch: aarch64
+            target_triple: aarch64-linux-musl
+          - target_arch: aarch64_be
+            target_triple: aarch64_be-linux-musl
           - target_arch: armel
             target_triple: arm-linux-musleabi
           - target_arch: armhf
@@ -32,10 +36,6 @@ jobs:
             target_triple: armeb-linux-musleabi
           - target_arch: armhf
             target_triple: armeb-linux-musleabihf
-          - target_arch: aarch64
-            target_triple: aarch64-linux-musl
-          - target_arch: aarch64_be
-            target_triple: aarch64_be-linux-musl
           - target_arch: loongarch64
             target_triple: loongarch64-linux-musl
           - target_arch: powerpc64le
