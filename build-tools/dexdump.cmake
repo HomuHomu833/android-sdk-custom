@@ -70,8 +70,6 @@ target_include_directories(libartpalette PRIVATE ${INCLUDES})
 
 add_library(libdexfile STATIC
     ${SRC}/art/libdexfile/dex/art_dex_file_loader.cc
-    ${SRC}/art/libdexfile/dex/compact_dex_file.cc
-    ${SRC}/art/libdexfile/dex/compact_offset_table.cc
     ${SRC}/art/libdexfile/dex/descriptors_names.cc
     ${SRC}/art/libdexfile/dex/dex_file.cc
     ${SRC}/art/libdexfile/dex/dex_file_exception_helpers.cc
