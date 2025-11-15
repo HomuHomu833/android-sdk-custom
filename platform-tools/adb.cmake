@@ -122,7 +122,6 @@ add_library(libadb STATIC
     ${SRC}/adb/client/transport_emulator.cpp
     ${SRC}/adb/client/transport_mdns.cpp
     ${SRC}/adb/client/transport_usb.cpp
-    ${SRC}/adb/client/mdnsresponder_client.cpp
     ${SRC}/adb/client/mdns_utils.cpp
     ${SRC}/adb/client/transport_mdns.cpp
     ${SRC}/adb/client/transport_usb.cpp
