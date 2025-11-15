@@ -39,7 +39,7 @@ add_library(libartbase STATIC
     ${SRC}/art/libartbase/base/flags.cc
     ${SRC}/art/libartbase/base/hex_dump.cc
     ${SRC}/art/libartbase/base/logging.cc
-    ${SRC}/art/libartbase/base/malloc_arena_pool.cc
+    ${SRC}/art/libartbase/base/calloc_arena_pool.cc
     ${SRC}/art/libartbase/base/membarrier.cc
     ${SRC}/art/libartbase/base/memfd.cc
     ${SRC}/art/libartbase/base/memory_region.cc
