@@ -152,6 +152,7 @@ add_library(libext2fs STATIC
     ${SRC}/e2fsprogs/lib/ext2fs/gen_bitmap64.c
     ${SRC}/e2fsprogs/lib/ext2fs/get_num_dirs.c
     ${SRC}/e2fsprogs/lib/ext2fs/get_pathname.c
+    ${SRC}/e2fsprogs/lib/ext2fs/getenv.c
     ${SRC}/e2fsprogs/lib/ext2fs/getsize.c
     ${SRC}/e2fsprogs/lib/ext2fs/getsectsize.c
     ${SRC}/e2fsprogs/lib/ext2fs/hashmap.c
@@ -175,6 +176,7 @@ add_library(libext2fs STATIC
     ${SRC}/e2fsprogs/lib/ext2fs/native.c
     ${SRC}/e2fsprogs/lib/ext2fs/newdir.c
     ${SRC}/e2fsprogs/lib/ext2fs/nls_utf8.c
+    ${SRC}/e2fsprogs/lib/ext2fs/orphan.c
     ${SRC}/e2fsprogs/lib/ext2fs/openfs.c
     ${SRC}/e2fsprogs/lib/ext2fs/progress.c
     ${SRC}/e2fsprogs/lib/ext2fs/punch.c
@@ -201,6 +203,7 @@ target_include_directories(libext2fs PRIVATE ${INCLUDES})
 # libext2_misc
 add_library(libext2_misc STATIC 
     ${SRC}/e2fsprogs/misc/create_inode.c
+    ${SRC}/e2fsprogs/misc/create_inode_libarchive.c
     )
 target_include_directories(libext2_misc PRIVATE ${INCLUDES})
 

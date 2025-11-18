@@ -97,13 +97,6 @@ jobs:
               hdr.msg_control = static_cast<void*>(control);\
               hdr.msg_controllen = sizeof(control);
           ' ${PWD}/src/core/libcutils/uevent.cpp
-          sed -i '/#include "uio.h"/a #include <atomic>' ${PWD}/src/logging/liblog/logger.h
-          sed -i 's/static atomic_int pmsg_fd;/static std::atomic<int> pmsg_fd{0};/' ${PWD}/src/logging/liblog/pmsg_writer.cpp
-          sed -i 's|#include <stdatomic.h>|#include <atomic>|' ${PWD}/src/logging/liblog/logd_reader.cpp ${PWD}/src/logging/liblog/logd_writer.cpp ${PWD}/src/logging/liblog/logger.h
-          sed -i 's/\batomic_int\b/std::atomic<int>/g' ${PWD}/src/logging/liblog/logger.h
-          sed -i 's/^ *atomic_int \([^=;]*\)= *\([^;]*\);/std::atomic<int> \1{\2};/g' ${PWD}/src/logging/liblog/logd_writer.cpp
-          sed -i 's/static atomic_int dropped;/static std::atomic<int> dropped{0};/' ${PWD}/src/logging/liblog/logd_writer.cpp
-          sed -i 's/\bmemory_order_relaxed\b/std::memory_order_relaxed/g' ${PWD}/src/logging/liblog/logd_writer.cpp
 
           find ${PWD}/src -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i '/#include <sys\/cdefs.h>/c\
           #ifdef __cplusplus\
