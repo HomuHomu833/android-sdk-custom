@@ -49,6 +49,7 @@ jobs:
           if ! test -f "${PROTOBUF}"; then
               cd src/protobuf/third_party
               git clone https://github.com/abseil/abseil-cpp.git -b lts_2023_08_02 --recursive
+              git clone https://github.com/open-source-parsers/jsoncpp.git --recursive
               cd ../../..
 
               patch -up1 <"${{ github.workspace }}/patches/protobuf_CMakeLists.txt.patch"
