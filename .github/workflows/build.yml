@@ -54,8 +54,13 @@ jobs:
               patch -up1 <"${{ github.workspace }}/patches/protobuf_CMakeLists.txt.patch"
               BUILD="${{ github.workspace }}/src/protobuf/build"
               rm -rf "${BUILD}" && mkdir -p "${BUILD}"
-              cmake -S"${{ github.workspace }}/src/protobuf" -B"${BUILD}" -GNinja -Dprotobuf_BUILD_TESTS=OFF
-              ninja -C "${BUILD}" -j"$(nproc --all)"
+              cmake -S"${{ github.workspace }}/src/protobuf" \
+                -B"${BUILD}" \
+                -GNinja \
+                -Dprotobuf_BUILD_TESTS=OFF \
+                -Dprotobuf_ABSL_PROVIDER=module \
+                -DABSL_PROPAGATE_CXX_STD=ON \
+                -Dprotobuf_BUILD_SHARED_LIBS=OFF
           fi
 
           TOOLCHAIN="${{ github.workspace }}/zig-as-llvm"
@@ -323,7 +328,9 @@ jobs:
                   -DCMAKE_C_FLAGS="$CFLAGS" \
                   -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
                   -Dprotobuf_BUILD_TESTS=OFF \
+                  -Dprotobuf_ABSL_PROVIDER=module \
                   -DABSL_PROPAGATE_CXX_STD=ON \
+                  -Dprotobuf_BUILD_SHARED_LIBS=OFF \
                   -DCMAKE_BUILD_TYPE=MinSizeRel \
                   -DPROTOC_PATH="$protoc"
 
