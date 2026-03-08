@@ -7,11 +7,11 @@ on:
       version:
         description: "Platform Tools Version"
         required: true
-        default: "36.0.0"
+        default: "36.0.2"
       tag:
         description: "Android Source Tag"
         required: true
-        default: "android-16.0.0_r3"
+        default: "android-16.0.0_r4"
 
 permissions:
   contents: write
