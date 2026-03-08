@@ -102,6 +102,7 @@ add_library(libadb STATIC
     ${SRC}/adb/adb_trace.cpp
     ${SRC}/adb/adb_unique_fd.cpp
     ${SRC}/adb/adb_utils.cpp
+    ${SRC}/adb/apacket_reader.cpp
     ${SRC}/adb/fdevent/fdevent.cpp
     ${SRC}/adb/services.cpp
     ${SRC}/adb/sockets.cpp
@@ -111,7 +112,7 @@ add_library(libadb STATIC
     ${SRC}/adb/transport.cpp
     ${SRC}/adb/transport_fd.cpp
     ${SRC}/adb/types.cpp
-    ${SRC}/adb/client/openscreen/mdns_service_info.cpp
+    ${SRC}/adb/client/openscreen/mdns_service.cpp
     ${SRC}/adb/client/openscreen/platform/logging.cpp
     ${SRC}/adb/client/openscreen/platform/task_runner.cpp
     ${SRC}/adb/client/openscreen/platform/udp_socket.cpp
@@ -125,8 +126,6 @@ add_library(libadb STATIC
     ${SRC}/adb/client/transport_usb.cpp
     ${SRC}/adb/client/mdns_tracker.cpp
     ${SRC}/adb/client/mdns_utils.cpp
-    ${SRC}/adb/client/transport_mdns.cpp
-    ${SRC}/adb/client/transport_usb.cpp
     ${SRC}/adb/client/pairing/pairing_client.cpp
     ${SRC}/adb/client/usb_linux.cpp
     ${SRC}/adb/fdevent/fdevent_epoll.cpp
