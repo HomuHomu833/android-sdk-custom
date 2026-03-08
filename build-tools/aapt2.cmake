@@ -124,7 +124,7 @@ add_library(libaapt2 STATIC
     ${SRC}/base/tools/aapt2/io/ZipArchive.cpp
     ${SRC}/base/tools/aapt2/link/AutoVersioner.cpp
     ${SRC}/base/tools/aapt2/link/FeatureFlagsFilter.cpp
-    ${SRC}/base/tools/aapt2/link/FlagDisabledResourceRemover.cpp
+    ${SRC}/base/tools/aapt2/link/FlagNotEnabledResourceRemover.cpp
     ${SRC}/base/tools/aapt2/link/FlaggedXmlVersioner.cpp
     ${SRC}/base/tools/aapt2/link/ManifestFixer.cpp
     ${SRC}/base/tools/aapt2/link/NoDefaultResourceRemover.cpp
