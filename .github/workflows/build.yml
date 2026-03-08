@@ -47,6 +47,10 @@ jobs:
       - name: Build Extra Dependencies
         run: |
           if ! test -f "${PROTOBUF}"; then
+              cd src/protobuf/third_party
+              git clone https://github.com/abseil/abseil-cpp.git -b lts_2023_08_02 --recursive
+              cd ../../..
+
               patch -up1 <"${{ github.workspace }}/patches/protobuf_CMakeLists.txt.patch"
               BUILD="${{ github.workspace }}/src/protobuf/build"
               rm -rf "${BUILD}" && mkdir -p "${BUILD}"
