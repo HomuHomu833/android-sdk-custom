@@ -323,9 +323,7 @@ jobs:
                   -DCMAKE_C_FLAGS="$CFLAGS" \
                   -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
                   -Dprotobuf_BUILD_TESTS=OFF \
-                  -Dprotobuf_ABSL_PROVIDER=module \
                   -DABSL_PROPAGATE_CXX_STD=ON \
-                  -Dprotobuf_BUILD_SHARED_LIBS=OFF \
                   -DCMAKE_BUILD_TYPE=MinSizeRel \
                   -DPROTOC_PATH="$protoc"
 
