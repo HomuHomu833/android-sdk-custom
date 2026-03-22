@@ -1,7 +1,7 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 4537cdd..8265ddc 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
+--- a/src/protobuf/CMakeLists.txt
++++ b/src/protobuf/CMakeLists.txt
 @@ -24,7 +24,7 @@ if(protobuf_DEPRECATED_CMAKE_SUBDIRECTORY_USAGE)
  endif()
  
@@ -23,8 +23,8 @@ index 4537cdd..8265ddc 100644
  set_property(CACHE protobuf_ABSL_PROVIDER PROPERTY STRINGS "module" "package")
 diff --git a/cmake/libprotobuf-lite.cmake b/cmake/libprotobuf-lite.cmake
 index f343458..d881215 100644
---- a/cmake/libprotobuf-lite.cmake
-+++ b/cmake/libprotobuf-lite.cmake
+--- a/src/protobuf/cmake/libprotobuf-lite.cmake
++++ b/src/protobuf/cmake/libprotobuf-lite.cmake
 @@ -21,7 +21,7 @@ if(protobuf_LINK_LIBATOMIC)
    target_link_libraries(libprotobuf-lite PRIVATE atomic)
  endif()
@@ -36,8 +36,8 @@ index f343458..d881215 100644
  target_link_libraries(libprotobuf-lite PUBLIC ${protobuf_ABSL_USED_TARGETS})
 diff --git a/cmake/libprotobuf.cmake b/cmake/libprotobuf.cmake
 index 422754a..04f8449 100644
---- a/cmake/libprotobuf.cmake
-+++ b/cmake/libprotobuf.cmake
+--- a/src/protobuf/cmake/libprotobuf.cmake
++++ b/src/protobuf/cmake/libprotobuf.cmake
 @@ -24,7 +24,7 @@ if(protobuf_LINK_LIBATOMIC)
    target_link_libraries(libprotobuf PRIVATE atomic)
  endif()
