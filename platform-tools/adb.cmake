@@ -283,6 +283,7 @@ target_include_directories(adb PRIVATE
     ${SRC}/core/libcutils/include
     ${SRC}/core/libcrypto_utils/include 
     ${SRC}/boringssl/include
+    ${SRC}/brotli/c/include
     ${SRC}/googletest/googletest/include
     )
 target_compile_definitions(adb PRIVATE 
