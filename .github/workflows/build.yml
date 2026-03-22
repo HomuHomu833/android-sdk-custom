@@ -48,8 +48,8 @@ jobs:
         run: |
           if ! test -f "${PROTOBUF}"; then
               cd src/protobuf/third_party
-              git clone https://github.com/abseil/abseil-cpp.git -b lts_2023_08_02 --recursive
-              git clone https://github.com/open-source-parsers/jsoncpp.git --recursive
+              git clone https://android.googlesource.com/platform/external/abseil-cpp.git -b ${{ inputs.tag }} --recursive
+              git clone https://android.googlesource.com/platform/external/jsoncpp.git -b ${{ inputs.tag }} --recursive
               cd ../../..
 
               patch -up1 <"${{ github.workspace }}/patches/protobuf_CMakeLists.txt.patch"
