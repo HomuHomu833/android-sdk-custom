@@ -1,0 +1,52 @@
+From 51c261da27ae782e3c27fd3745d78a204a6ba400 Mon Sep 17 00:00:00 2001
+From: Homura <egzozu.be.bas@gmail.com>
+Date: Sun, 22 Mar 2026 20:57:54 +0300
+Subject: [PATCH] add static support back to brotli
+
+---
+ CMakeLists.txt | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 61378cd..bef0a65 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -106,6 +106,7 @@ set(BROTLI_LIBRARIES_CORE brotlienc brotlidec brotlicommon)
+ set(BROTLI_LIBRARIES ${BROTLI_LIBRARIES_CORE} ${LIBM_LIBRARY})
+ mark_as_advanced(BROTLI_LIBRARIES)
+ 
++
+ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+   add_definitions(-DOS_LINUX)
+ elseif(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+@@ -152,6 +153,27 @@ foreach(lib ${BROTLI_LIBRARIES_CORE})
+   set_property(TARGET ${lib} APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${BROTLI_INCLUDE_DIRS}>")
+ endforeach()
+ 
++set(BROTLI_STATIC_LIBS brotlicommon-static brotlidec-static brotlienc-static)
++
++add_library(brotlicommon-static STATIC ${BROTLI_COMMON_SOURCES})
++add_library(brotlidec-static STATIC ${BROTLI_DEC_SOURCES})
++add_library(brotlienc-static STATIC ${BROTLI_ENC_SOURCES})
++
++foreach(lib IN LISTS BROTLI_STATIC_LIBS)
++  target_link_libraries(${lib} ${LIBM_LIBRARY})
++  set_property(TARGET ${lib} APPEND PROPERTY INCLUDE_DIRECTORIES ${BROTLI_INCLUDE_DIRS})
++  set_target_properties(${lib} PROPERTIES
++    VERSION "${BROTLI_ABI_COMPATIBILITY}.${BROTLI_ABI_AGE}.${BROTLI_ABI_REVISION}"
++    SOVERSION "${BROTLI_ABI_COMPATIBILITY}")
++  if(NOT BROTLI_EMSCRIPTEN)
++    set_target_properties(${lib} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
++  endif()
++  set_property(TARGET ${lib} APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${BROTLI_INCLUDE_DIRS}")
++endforeach()
++
++target_link_libraries(brotlidec-static brotlicommon-static)
++target_link_libraries(brotlienc-static brotlicommon-static)
++
+ if(NOT BROTLI_EMSCRIPTEN)
+ target_link_libraries(brotlidec brotlicommon)
+ target_link_libraries(brotlienc brotlicommon)
+-- 
+2.53.0.windows.1
+
