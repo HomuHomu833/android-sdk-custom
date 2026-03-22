@@ -102,6 +102,7 @@ add_library(libadb STATIC
     ${SRC}/adb/adb_trace.cpp
     ${SRC}/adb/adb_unique_fd.cpp
     ${SRC}/adb/adb_utils.cpp
+    ${SRC}/adb/apacket_reader.cpp
     ${SRC}/adb/fdevent/fdevent.cpp
     ${SRC}/adb/services.cpp
     ${SRC}/adb/sockets.cpp
@@ -111,7 +112,7 @@ add_library(libadb STATIC
     ${SRC}/adb/transport.cpp
     ${SRC}/adb/transport_fd.cpp
     ${SRC}/adb/types.cpp
-    ${SRC}/adb/client/openscreen/mdns_service_info.cpp
+    ${SRC}/adb/client/openscreen/mdns_service.cpp
     ${SRC}/adb/client/openscreen/platform/logging.cpp
     ${SRC}/adb/client/openscreen/platform/task_runner.cpp
     ${SRC}/adb/client/openscreen/platform/udp_socket.cpp
@@ -125,8 +126,6 @@ add_library(libadb STATIC
     ${SRC}/adb/client/transport_usb.cpp
     ${SRC}/adb/client/mdns_tracker.cpp
     ${SRC}/adb/client/mdns_utils.cpp
-    ${SRC}/adb/client/transport_mdns.cpp
-    ${SRC}/adb/client/transport_usb.cpp
     ${SRC}/adb/client/pairing/pairing_client.cpp
     ${SRC}/adb/client/usb_linux.cpp
     ${SRC}/adb/fdevent/fdevent_epoll.cpp
@@ -151,6 +150,7 @@ target_include_directories(libadb PRIVATE
     ${SRC}/libziparchive/include
     ${SRC}/native/include
     ${SRC}/protobuf/src
+    ${SRC}/abseil-cpp
     ${SRC}/zstd/lib
     ${SRC}/libusb/include
     ${SRC}/brotli/c/include
@@ -181,6 +181,7 @@ target_include_directories(libadb_crypto PRIVATE
     ${SRC}/core/libcrypto_utils/include
     ${SRC}/libbase/include
     ${SRC}/protobuf/src
+    ${SRC}/abseil-cpp
     )
 
 add_library(libadb_tls_connection STATIC
@@ -205,6 +206,7 @@ target_include_directories(libadb_pairing_connection PRIVATE
     ${SRC}/libbase/include
     ${SRC}/boringssl/include
     ${SRC}/protobuf/src
+    ${SRC}/abseil-cpp
     )
 
 add_library(libadb_pairing_auth STATIC
@@ -216,6 +218,7 @@ target_include_directories(libadb_pairing_auth PRIVATE
     ${SRC}/libbase/include
     ${SRC}/boringssl/include
     ${SRC}/protobuf/src
+    ${SRC}/abseil-cpp
     )
 
 add_library(libadb_sysdeps STATIC
@@ -238,6 +241,7 @@ target_include_directories(libfastdeploy PRIVATE
     ${SRC}/core/libcutils/include
     ${SRC}/libbase/include
     ${SRC}/protobuf/src
+    ${SRC}/abseil-cpp
     ${SRC}/boringssl/include
     )
 
@@ -247,6 +251,7 @@ add_library(libcrypto STATIC
 target_include_directories(libcrypto PRIVATE
     ${SRC}/core/libcrypto_utils/include 
     ${SRC}/boringssl/include
+    ${SRC}/abseil-cpp
     )
 
 add_executable(adb
@@ -278,6 +283,7 @@ target_include_directories(adb PRIVATE
     ${SRC}/core/libcutils/include
     ${SRC}/core/libcrypto_utils/include 
     ${SRC}/boringssl/include
+    ${SRC}/brotli/c/include
     ${SRC}/googletest/googletest/include
     )
 target_compile_definitions(adb PRIVATE 
