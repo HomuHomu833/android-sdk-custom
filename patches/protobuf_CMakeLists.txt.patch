@@ -1,8 +1,17 @@
-diff --git a/src/protobuf/CMakeLists.txt b/src/protobuf/CMakeLists.txt
-index 08cb330..85882a2 100644
---- a/src/protobuf/CMakeLists.txt 2023-09-20 13:56:08.461395523 +0800
-+++ b/src/protobuf/CMakeLists.txt 2023-09-20 13:57:08.561395525 +0800
-@@ -298,7 +298,8 @@ endif (MSVC)
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4537cdd..8265ddc 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,7 +24,7 @@ if(protobuf_DEPRECATED_CMAKE_SUBDIRECTORY_USAGE)
+ endif()
+ 
+ # Options
+-option(protobuf_INSTALL "Install protobuf binaries and files" ON)
++option(protobuf_INSTALL "Install protobuf binaries and files" OFF)
+ option(protobuf_BUILD_TESTS "Build tests" ON)
+ option(protobuf_BUILD_CONFORMANCE "Build conformance tests" OFF)
+ option(protobuf_BUILD_EXAMPLES "Build examples" OFF)
+@@ -279,7 +279,8 @@ endif (MSVC)
  include_directories(
    ${ZLIB_INCLUDE_DIRECTORIES}
    ${protobuf_BINARY_DIR}
@@ -10,13 +19,13 @@ index 08cb330..85882a2 100644
 +  ${protobuf_SOURCE_DIR}/src
 +  ${protobuf_SOURCE_DIR}/config)
  
- if (protobuf_UNICODE)
-   add_definitions(-DUNICODE -D_UNICODE)
-diff --git a/src/protobuf/cmake/libprotobuf-lite.cmake b/src/protobuf/cmake/libprotobuf-lite.cmake
-index 08cb330..85882a2 100644
---- a/src/protobuf/cmake/libprotobuf-lite.cmake 2023-09-20 13:56:08.461395523 +0800
-+++ b/src/protobuf/cmake/libprotobuf-lite.cmake 2023-09-20 13:57:08.561395525 +0800
-@@ -102,7 +102,7 @@ if(protobuf_LINK_LIBATOMIC)
+ set(protobuf_ABSL_PROVIDER "module" CACHE STRING "Provider of absl library")
+ set_property(CACHE protobuf_ABSL_PROVIDER PROPERTY STRINGS "module" "package")
+diff --git a/cmake/libprotobuf-lite.cmake b/cmake/libprotobuf-lite.cmake
+index f343458..d881215 100644
+--- a/cmake/libprotobuf-lite.cmake
++++ b/cmake/libprotobuf-lite.cmake
+@@ -21,7 +21,7 @@ if(protobuf_LINK_LIBATOMIC)
    target_link_libraries(libprotobuf-lite PRIVATE atomic)
  endif()
  if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
@@ -24,17 +33,17 @@ index 08cb330..85882a2 100644
 +  target_include_directories(libprotobuf-lite PUBLIC ${protobuf_SOURCE_DIR}/android)
  endif()
  target_include_directories(libprotobuf-lite PUBLIC ${protobuf_SOURCE_DIR}/src)
- if(protobuf_BUILD_SHARED_LIBS)
-diff --git a/src/protobuf/cmake/libprotobuf.cmake b/src/protobuf/cmake/libprotobuf.cmake
-index 08cb330..85882a2 100644
---- a/src/protobuf/cmake/libprotobuf.cmake 2023-09-20 13:56:08.461395523 +0800
-+++ b/src/protobuf/cmake/libprotobuf.cmake 2023-09-20 13:57:08.561395525 +0800
-@@ -118,7 +118,7 @@ if(protobuf_LINK_LIBATOMIC)
+ target_link_libraries(libprotobuf-lite PUBLIC ${protobuf_ABSL_USED_TARGETS})
+diff --git a/cmake/libprotobuf.cmake b/cmake/libprotobuf.cmake
+index 422754a..04f8449 100644
+--- a/cmake/libprotobuf.cmake
++++ b/cmake/libprotobuf.cmake
+@@ -24,7 +24,7 @@ if(protobuf_LINK_LIBATOMIC)
    target_link_libraries(libprotobuf PRIVATE atomic)
  endif()
  if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
 -  target_link_libraries(libprotobuf PRIVATE log)
-+  target_include_directories(libprotobuf PRIVATE ${protobuf_SOURCE_DIR}/android)
++   target_include_directories(libprotobuf PRIVATE ${protobuf_SOURCE_DIR}/android)
  endif()
  target_include_directories(libprotobuf PUBLIC ${protobuf_SOURCE_DIR}/src)
- if(protobuf_BUILD_SHARED_LIBS)
+ target_link_libraries(libprotobuf PUBLIC ${protobuf_ABSL_USED_TARGETS})
