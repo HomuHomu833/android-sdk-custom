@@ -244,6 +244,9 @@ jobs:
           sed -i 's/libusb::usb_init();/usb_init();/g' ${PWD}/src/adb/client/main.cpp
           sed -i 's/path_data\.name\.contains('\''\.'\'')/path_data.name.find('\''.'\'') != std::string::npos/g' src/base/tools/aapt2/cmd/Compile.cpp
 
+          cd ${PWD}/src/brotli
+          git apply ../../patches/0001-add-static-support-back-to-brotli.patch
+
       - name: Build Android SDK
         shell: bash
         run: |
