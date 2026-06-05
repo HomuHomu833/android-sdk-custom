@@ -68,7 +68,14 @@ if [ ! -f "$PROTOC" ]; then
   ninja -C "$ROOTDIR/src/protobuf/build" -j"$JOBS"
 fi
 
-# --- extra deps (zlib + bzip2, static, cross-compiled for the target) -------
+# --- extra deps (zlib + bzip2, static archives, cross-compiled for target) --
+# We only consume the static .a archives, so -static is only meaningful for the
+# tools' throwaway test binaries. Pass it for musl (proven path); never for gnu,
+# since zig refuses to statically link glibc ("libc ... requires dynamic linking").
+case "$TARGET" in
+  *musl*) DEP_STATIC="-static" ;;
+  *)      DEP_STATIC="" ;;
+esac
 mkdir -p "$EXTRA_PREFIX"
 if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
   log "Building zlib (static, $TARGET)"
@@ -83,7 +90,7 @@ if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
   ( cd "$ROOTDIR"
     curl -LkSs https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz | gzip -d | tar -x
     cd bzip2-1.0.8
-    make CC="$CROSS_CC" AR="$CROSS_AR" PREFIX="$EXTRA_PREFIX" CFLAGS="-static" LDFLAGS="-static" install )
+    make CC="$CROSS_CC" AR="$CROSS_AR" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" install )
 fi
 
 # --- the SDK host tools -----------------------------------------------------
