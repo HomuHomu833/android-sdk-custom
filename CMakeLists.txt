@@ -24,7 +24,10 @@ enable_language(ASM)
 # set global cflags and cxxflags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fcolor-diagnostics -Wno-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics -Wno-attributes")
-set(CMAKE_EXE_LINKER_FLAGS "-static")
+# Linkage is driven by the build script's CROSS_LDFLAGS (musl -> -static,
+# gnu -> -static-libstdc++ -static-libgcc), passed in via CMAKE_EXE_LINKER_FLAGS;
+# append here instead of forcing -static so the gnu targets can link dynamically.
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 
 # platform tools version
 # see the patches/other/platform_tools_version.h
