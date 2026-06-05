@@ -163,6 +163,30 @@ double UnscaledCycleClock::Frequency() {
   return base_internal::NominalCPUFrequency();
 }
 
+#elif defined(__loongarch__)
+
+int64_t UnscaledCycleClock::Now() {
+  uint64_t cnt;
+  asm volatile("rdtime.d %0, $zero" : "=r"(cnt));
+  return static_cast<int64_t>(cnt);
+}
+
+double UnscaledCycleClock::Frequency() {
+  return base_internal::NominalCPUFrequency();
+}
+
+#elif defined(__s390x__)
+
+int64_t UnscaledCycleClock::Now() {
+  uint64_t clk;
+  asm volatile("stckf %0" : "=Q"(clk) : : "cc");
+  return static_cast<int64_t>(clk);
+}
+
+double UnscaledCycleClock::Frequency() {
+  return base_internal::NominalCPUFrequency();
+}
+
 #elif defined(_M_IX86) || defined(_M_X64)
 
 #pragma intrinsic(__rdtsc)

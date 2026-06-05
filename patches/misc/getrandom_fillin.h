@@ -41,6 +41,18 @@
 #define EXPECTED_NR_getrandom 349
 #elif defined(OPENSSL_PPC)
 #define EXPECTED_NR_getrandom 359
+#elif defined(__riscv) && __SIZEOF_POINTER__ == 4
+#define EXPECTED_NR_getrandom 278
+#elif defined(__hexagon__)
+#define EXPECTED_NR_getrandom 347
+#elif defined(OPENSSL_MIPS64)
+#if defined(_MIPS_SIM) && _MIPS_SIM == 2
+#define EXPECTED_NR_getrandom 5353
+#else
+#define EXPECTED_NR_getrandom 6353
+#endif
+#elif defined(OPENSSL_MIPS)
+#define EXPECTED_NR_getrandom 4353
 #endif
 
 #if defined(EXPECTED_NR_getrandom)

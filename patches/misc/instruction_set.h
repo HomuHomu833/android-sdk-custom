@@ -393,7 +393,7 @@ constexpr size_t GetStackOverflowReservedBytes(InstructionSet isa) {
 //            when the garbage collector can move objects concurrently. Ensure that required locks
 //            are held when using!
 
-#if defined(__i386__) || defined(__arm__)
+#if defined(__i386__) || defined(__arm__) || (defined(__mips__) && !defined(__mips64)) || defined(__hexagon__)
 using TwoWordReturn = uint64_t;
 
 // Encodes method_ptr==nullptr and code_ptr==nullptr
@@ -409,7 +409,7 @@ static inline constexpr TwoWordReturn GetTwoWordSuccessValue(uintptr_t hi, uintp
   return ((hi64 << 32) | lo32);
 }
 
-#elif defined(__x86_64__) || defined(__aarch64__) || defined(__riscv) || defined(__loongarch__) || defined(__powerpc__) || defined(__s390x__)
+#elif defined(__x86_64__) || defined(__aarch64__) || defined(__riscv) || defined(__loongarch__) || defined(__powerpc__) || defined(__s390x__) || defined(__mips64)
 
 // Note: TwoWordReturn can't be constexpr for 64-bit targets. We'd need a constexpr constructor,
 //       which would violate C-linkage in the entrypoint functions.
