@@ -32,7 +32,7 @@ rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
   curl -LkSs -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
   unzip -q commandlinetools.zip
   rm commandlinetools.zip
-  yes | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses >/dev/null
+  yes | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
   cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;$BUILD_TOOLS_VERSION" "platform-tools" )
 
 # --- splice our ELF host tools over the official ones -----------------------
