@@ -46,7 +46,9 @@ cp patches/misc/instruction_set_test.cc  src/art/libartbase/arch/instruction_set
 cp patches/misc/mem_map.h                src/art/libartbase/base/mem_map.h
 
 cp patches/misc/target.h            src/boringssl/src/include/openssl/target.h
-cp patches/misc/getrandom_fillin.h  src/boringssl/src/crypto/fipsmodule/rand/getrandom_fillin.h
+# getrandom_fillin.h moved between boringssl releases (crypto/fipsmodule/rand ->
+# crypto/rand), so overwrite it wherever it currently lives.
+find src/boringssl -name getrandom_fillin.h -exec cp patches/misc/getrandom_fillin.h {} \;
 
 cp patches/misc/unscaledcycleclock.cc  src/abseil-cpp/absl/base/internal/unscaledcycleclock.cc
 

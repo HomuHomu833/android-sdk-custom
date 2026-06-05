@@ -22,7 +22,12 @@
 
 #include <sys/syscall.h>
 
-#if defined(OPENSSL_X86_64)
+#if defined(OPENSSL_X86_64) && defined(__ILP32__)
+// x32 ABI: the x86_64 instruction set with 32-bit pointers. Its syscalls carry
+// the x32 bit (__X32_SYSCALL_BIT, 0x40000000) on top of the x86_64 number, so
+// __NR_getrandom from <sys/syscall.h> is 0x40000000 | 318, not plain 318.
+#define EXPECTED_NR_getrandom (0x40000000 | 318)
+#elif defined(OPENSSL_X86_64)
 #define EXPECTED_NR_getrandom 318
 #elif defined(OPENSSL_X86)
 #define EXPECTED_NR_getrandom 355
