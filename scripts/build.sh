@@ -46,7 +46,20 @@ case "$PLATFORM" in
         CROSS_LDFLAGS="-static" ;;
       *)
         CROSS_CFLAGS="-Wno-error=date-time"
-        CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
+        CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
+        # AOSP host code (e.g. liblog) uses strlcpy/strlcat, which glibc only
+        # declares from 2.38. zig defaults to an older baseline, so pin the
+        # glibc version on the gnu triple to pull in the modern string.h.
+        export ZIG_TARGET="${TARGET}.2.39" ;;
+    esac
+    # libpng ships SIMD code that doesn't build/link on every target: the 32-bit
+    # Thumb encodings lack the Neon asm impl (undefined png_*_neon symbols), and
+    # 32-bit/BE PowerPC lacks the VSX/AltiVec the intrinsics require. Disable the
+    # relevant SIMD path so libpng falls back to portable C. (aarch64 Neon and
+    # ppc64le VSX build fine and are left enabled.)
+    case "$TARGET" in
+      thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0" ;;
+      powerpc-*|powerpc64-*)    CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_POWERPC_VSX_OPT=0" ;;
     esac
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
