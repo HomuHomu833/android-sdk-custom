@@ -57,8 +57,9 @@ RUN arch="$(uname -m)"; \
             *dev*) zig_base="https://ziglang.org/builds" ;;        \
             *)     zig_base="https://ziglang.org/download/${ZIG_VERSION}" ;; \
         esac; \
-        aria2c --max-tries=20 --retry-wait=2 --connect-timeout=15 --dir=/tmp -o zig.tar.xz \
-            "${zig_base}/zig-${zig_arch}-linux-${ZIG_VERSION}.tar.xz" \
+        ( i=0; until aria2c --max-tries=20 --retry-wait=2 --connect-timeout=15 --dir=/tmp -o zig.tar.xz \
+            "${zig_base}/zig-${zig_arch}-linux-${ZIG_VERSION}.tar.xz"; \
+          do i=$((i+1)); [ "$i" -ge 5 ] && exit 1; echo "aria2c retry $i/5" >&2; sleep 2; done ) \
         && tar -xJf /tmp/zig.tar.xz -C /opt \
         && rm /tmp/zig.tar.xz \
         && mv "/opt/zig-${zig_arch}-linux-${ZIG_VERSION}" /opt/zig \

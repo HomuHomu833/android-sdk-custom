@@ -27,6 +27,18 @@ cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
+# Download with retries: re-run aria2c on any failure so transient GitHub 501/504
+# (and the like) recover. Doesn't rely on aria2's --retry-on-unknown, which older
+# aria2 builds don't have. Pass aria2c args, e.g. fetch --dir=/tmp -o f.zip URL.
+fetch() {
+  local i=0
+  until aria2c --console-log-level=error --check-certificate=false \
+               --max-tries=5 --retry-wait=2 --connect-timeout=15 "$@"; do
+    i=$((i + 1)); [ "$i" -ge 5 ] && { echo "fetch: giving up after $i attempts" >&2; return 1; }
+    echo "fetch: aria2c failed, retry $i/5 in 2s..." >&2; sleep 2
+  done
+}
+
 # --- toolchain selection ----------------------------------------------------
 # Structured as a per-PLATFORM case so windows (llvm-mingw) / macos (osxcross) /
 # bionic (NDK clang) can be added the same way the sibling repos do.
@@ -90,8 +102,7 @@ case "$PLATFORM" in
     NDK_DIR="$ROOTDIR/$NDK_NAME"
     if [ ! -d "$NDK_DIR" ]; then
       log "Downloading official NDK ($NDK_NAME)"
-      aria2c --console-log-level=error --check-certificate=false --max-tries=20 --retry-wait=2 --retry-on-unknown=true --connect-timeout=15 \
-        --dir="$ROOTDIR" -o ndk.zip "https://dl.google.com/android/repository/${NDK_NAME}-linux.zip"
+      fetch --dir="$ROOTDIR" -o ndk.zip "https://dl.google.com/android/repository/${NDK_NAME}-linux.zip"
       unzip -qq "$ROOTDIR/ndk.zip" -d "$ROOTDIR"
       rm -f "$ROOTDIR/ndk.zip"
     fi
@@ -134,7 +145,7 @@ mkdir -p "$EXTRA_PREFIX"
 if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
   log "Building zlib (static, $TARGET)"
   ( cd "$ROOTDIR"
-    aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --retry-on-unknown=true --connect-timeout=15 --dir=/tmp -o zlib-1.3.1.tar.xz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz && xz -d < /tmp/zlib-1.3.1.tar.xz | tar -x && rm /tmp/zlib-1.3.1.tar.xz
+    fetch --dir=/tmp -o zlib-1.3.1.tar.xz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz && xz -d < /tmp/zlib-1.3.1.tar.xz | tar -x && rm /tmp/zlib-1.3.1.tar.xz
     cd zlib-1.3.1
     CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" ./configure --prefix="$EXTRA_PREFIX" --static
     make -j"$JOBS" install )
@@ -142,7 +153,7 @@ fi
 if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
   log "Building bzip2 (static, $TARGET)"
   ( cd "$ROOTDIR"
-    aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --retry-on-unknown=true --connect-timeout=15 --dir=/tmp -o bzip2-1.0.8.tar.gz https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz && gzip -d < /tmp/bzip2-1.0.8.tar.gz | tar -x && rm /tmp/bzip2-1.0.8.tar.gz
+    fetch --dir=/tmp -o bzip2-1.0.8.tar.gz https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz && gzip -d < /tmp/bzip2-1.0.8.tar.gz | tar -x && rm /tmp/bzip2-1.0.8.tar.gz
     cd bzip2-1.0.8
     make CC="$CROSS_CC" AR="$CROSS_AR" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" install )
 fi

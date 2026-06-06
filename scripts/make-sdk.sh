@@ -22,6 +22,18 @@ cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
+# Download with retries: re-run aria2c on any failure so transient GitHub 501/504
+# (and the like) recover. Doesn't rely on aria2's --retry-on-unknown, which older
+# aria2 builds don't have. Pass aria2c args, e.g. fetch --dir=. -o f.zip URL.
+fetch() {
+  local i=0
+  until aria2c --console-log-level=error --check-certificate=false \
+               --max-tries=5 --retry-wait=2 --connect-timeout=15 "$@"; do
+    i=$((i + 1)); [ "$i" -ge 5 ] && { echo "fetch: giving up after $i attempts" >&2; return 1; }
+    echo "fetch: aria2c failed, retry $i/5 in 2s..." >&2; sleep 2
+  done
+}
+
 [ -d "$BUILT_BIN" ] || { echo "built binaries not found at $BUILT_BIN" >&2; exit 1; }
 
 # --- fetch the official SDK (build-tools + platform-tools) -------------------
@@ -29,7 +41,7 @@ log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"
 HOST_SDK="$ROOTDIR/android-sdk"
 rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
 ( cd "$HOST_SDK"
-  aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --retry-on-unknown=true --connect-timeout=15 --dir=. -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
+  fetch --dir=. -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
   unzip -q commandlinetools.zip
   rm commandlinetools.zip
   # Feed a bounded stream of "y" rather than `yes`: under `set -o pipefail`, the
