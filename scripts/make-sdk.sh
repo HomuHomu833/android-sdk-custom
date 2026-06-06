@@ -29,7 +29,7 @@ log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"
 HOST_SDK="$ROOTDIR/android-sdk"
 rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
 ( cd "$HOST_SDK"
-  aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --connect-timeout=15 --dir=. -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
+  aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --retry-on-unknown=true --connect-timeout=15 --dir=. -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
   unzip -q commandlinetools.zip
   rm commandlinetools.zip
   # Feed a bounded stream of "y" rather than `yes`: under `set -o pipefail`, the
