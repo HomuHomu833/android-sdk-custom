@@ -216,6 +216,11 @@ sed -i '/^static_assert(std::is_same<std::underlying_type<log_id_t>::type, uint3
 sed -i '/^static_assert(std::is_same<std::underlying_type<android_LogPriority>::type, uint32_t>::value,$/i #ifndef __hexagon__' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
 sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
 
+# selinux libsepol cil_verify.c: struct field is uint32_t* but local is
+# enum cil_flavor — Clang (unlike GCC) rejects the implicit conversion in C.
+sed -i 's/extra_args\.flavor = \&flavor;/extra_args.flavor = (uint32_t *)\&flavor;/' \
+  ${PWD_SRC}/src/selinux/libsepol/cil/src/cil_verify.c
+
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
