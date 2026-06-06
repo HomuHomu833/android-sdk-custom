@@ -187,6 +187,18 @@ double UnscaledCycleClock::Frequency() {
   return base_internal::NominalCPUFrequency();
 }
 
+#elif defined(__hexagon__)
+
+int64_t UnscaledCycleClock::Now() {
+  int64_t cycle;
+  asm volatile("%0 = CYCLE" : "=r"(cycle));
+  return cycle;
+}
+
+double UnscaledCycleClock::Frequency() {
+  return base_internal::NominalCPUFrequency();
+}
+
 #elif defined(_M_IX86) || defined(_M_X64)
 
 #pragma intrinsic(__rdtsc)

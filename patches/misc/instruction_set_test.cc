@@ -30,6 +30,7 @@ TEST(InstructionSetTest, GetInstructionSetFromString) {
   EXPECT_EQ(InstructionSet::kLoongArch64, GetInstructionSetFromString("loong64"));
   EXPECT_EQ(InstructionSet::kPowerPC, GetInstructionSetFromString("ppc64le"));
   EXPECT_EQ(InstructionSet::kS390X, GetInstructionSetFromString("s390x"));
+  EXPECT_EQ(InstructionSet::kHexagon, GetInstructionSetFromString("hexagon"));
   EXPECT_EQ(InstructionSet::kNone, GetInstructionSetFromString("none"));
   EXPECT_EQ(InstructionSet::kNone, GetInstructionSetFromString("random-string"));
 }
@@ -43,6 +44,7 @@ TEST(InstructionSetTest, GetInstructionSetString) {
   EXPECT_STREQ("loong64", GetInstructionSetString(InstructionSet::kLoongArch64));
   EXPECT_STREQ("ppc64le", GetInstructionSetString(InstructionSet::kPowerPC));
   EXPECT_STREQ("s390x", GetInstructionSetString(InstructionSet::kS390X));
+  EXPECT_STREQ("hexagon", GetInstructionSetString(InstructionSet::kHexagon));
   EXPECT_STREQ("none", GetInstructionSetString(InstructionSet::kNone));
 }
 
@@ -61,6 +63,8 @@ TEST(InstructionSetTest, GetInstructionSetInstructionAlignment) {
             kPowerPCInstructionAlignment);
   EXPECT_EQ(GetInstructionSetInstructionAlignment(InstructionSet::kS390X),
             kS390XInstructionAlignment);
+  EXPECT_EQ(GetInstructionSetInstructionAlignment(InstructionSet::kHexagon),
+            kHexagonInstructionAlignment);
 }
 
 TEST(InstructionSetTest, TestRoundTrip) {

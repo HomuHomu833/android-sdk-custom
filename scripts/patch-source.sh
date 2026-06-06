@@ -84,54 +84,6 @@ case "$TARGET" in
     ;;
 esac
 
-# fml 2
-sed -i '/# Set definitions and sources for ARM./i\
-if(TARGET_ARCH MATCHES "^(thumb|thumbeb)$")\
-    add_definitions(-DPNG_ARM_NEON_OPT=0)\
-    add_definitions(-DPNG_ARM_NEON_IMPLEMENTATION=0)\
-endif()
-' ${PWD_SRC}/src/libpng/CMakeLists.txt
-sed -i '/^namespace art {/i\
-\// see aosp/art/build/art.go\
-\// We need larger stack overflow guards for ASAN, as the compiled code will hav\
-\// larger frame sizes. For simplicity, just use global not-target-specific cflags.\
-\// Note: We increase this for both debug and non-debug, as the overflow gap will\
-\//       be compiled into managed code. We always preopt (and build core images) with\
-\//       the debug version. So make the gap consistent (and adjust for the worst).\
-\
-/*\
-if len(ctx.Config().SanitizeDevice()) > 0 || len(ctx.Config().SanitizeHost()) > 0 {\
-    cflags = append(cflags,\
-        "-DART_STACK_OVERFLOW_GAP_arm=8192",\
-        "-DART_STACK_OVERFLOW_GAP_arm64=16384",\
-        "-DART_STACK_OVERFLOW_GAP_riscv64=16384",\
-        "-DART_STACK_OVERFLOW_GAP_x86=16384",\
-        "-DART_STACK_OVERFLOW_GAP_x86_64=20480")\
-} else {\
-    cflags = append(cflags,\
-        "-DART_STACK_OVERFLOW_GAP_arm=8192",\
-        "-DART_STACK_OVERFLOW_GAP_arm64=8192",\
-        "-DART_STACK_OVERFLOW_GAP_riscv64=8192",\
-        "-DART_STACK_OVERFLOW_GAP_x86=8192",\
-        "-DART_STACK_OVERFLOW_GAP_x86_64=8192")\
-}\
-*/\
-\
-#define ART_STACK_OVERFLOW_GAP_arm 16384\
-#define ART_STACK_OVERFLOW_GAP_arm64 16384\
-#define ART_STACK_OVERFLOW_GAP_riscv64 16384\
-#define ART_STACK_OVERFLOW_GAP_x86 16384\
-#define ART_STACK_OVERFLOW_GAP_x86_64 20480\
-#define ART_STACK_OVERFLOW_GAP_loongarch64 16384\
-#define ART_STACK_OVERFLOW_GAP_powerpc 16384\
-#define ART_STACK_OVERFLOW_GAP_s390x 16384\
-\
-\// see aosp/art/build/art.go\
-\// default frame size limit: 1736\
-\// device limit: 7400\
-\// host limit: 10000\
-#define ART_FRAME_SIZE_LIMIT 10000' ${PWD_SRC}/src/art/libartbase/arch/instruction_set.h
-
 # cacheflush() (and thus <sys/cachectl.h>) is only used in utils.cc's __arm__
 # branch; every other arch uses __builtin___clear_cache(). zig's generic-glibc
 # <sys/cachectl.h> #include <asm/cachectl.h>, which zig doesn't ship for any of
