@@ -111,10 +111,6 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    # Newer-than-minSdk bionic APIs (e.g. libbase unique_fd.h's fdsan calls, API 29)
-    # are handled with targeted weak forward-declarations in patch-source.sh, not a
-    # blanket -D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__ (which would weaken *every*
-    # post-25 symbol and risk unguarded calls crashing on old devices).
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
