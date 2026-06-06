@@ -17,6 +17,8 @@
 // <sys/system_properties.h> (added to the include path for bionic in build.sh)
 // supplies the matching declarations so the rest of the tree compiles.
 #include <sys/system_properties.h>
+#include <android/fdsan.h>
+#include <unistd.h>
 
 #if __ANDROID_API__ < 26
 extern "C" {
@@ -44,6 +46,25 @@ extern "C" {
     }
 }
 #endif  // __ANDROID_API__ < 26
+
+// fdsan (file-descriptor sanitizer, API 29) owner-tag helpers. libcutils
+// native_handle.cpp calls some of these *unguarded*, so they can't be weak-linked
+// (null call -> crash on pre-29 devices). fdsan is a debug-only aid, so stub it out
+// to no-ops: always present, safe on every API. <android/fdsan.h> is the ungated
+// shim that supplies the matching declarations + the owner_type enum.
+#if __ANDROID_API__ < 29
+extern "C" {
+    uint64_t android_fdsan_create_owner_tag(enum android_fdsan_owner_type /*type*/,
+                                            uint64_t /*tag*/) { return 0; }
+
+    void android_fdsan_exchange_owner_tag(int /*fd*/, uint64_t /*expected_tag*/,
+                                          uint64_t /*new_tag*/) {}
+
+    int android_fdsan_close_with_tag(int fd, uint64_t /*tag*/) { return close(fd); }
+
+    uint64_t android_fdsan_get_owner_tag(int /*fd*/) { return 0; }
+}
+#endif  // __ANDROID_API__ < 29
 
 #else  // !__BIONIC__ -- host builds back the property API with a fake store
 
