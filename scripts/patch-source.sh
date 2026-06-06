@@ -128,12 +128,17 @@ if len(ctx.Config().SanitizeDevice()) > 0 || len(ctx.Config().SanitizeHost()) > 
 #define ART_FRAME_SIZE_LIMIT 10000' ${PWD_SRC}/src/art/libartbase/arch/instruction_set.h
 
 # cacheflush() (and thus <sys/cachectl.h>) is only used in utils.cc's __arm__
-# branch; every other arch uses __builtin___clear_cache(). Guard the include so
-# it isn't pulled in elsewhere — glibc's generic <sys/cachectl.h> includes
-# <asm/cachectl.h>, which doesn't exist for non-arm arches like x86_64.
+# branch; every other arch uses __builtin___clear_cache(). zig's generic-glibc
+# <sys/cachectl.h> #include <asm/cachectl.h>, which zig doesn't ship for any of
+# our targets (arm included), so on glibc forward-declare cacheflush instead;
+# musl's header is self-contained, so keep including it there.
 sed -i '/#include "os.h"/a\
 #if defined(__arm__)\
+#if defined(__GLIBC__)\
+extern "C" int cacheflush(void*, int, int);\
+#else\
 #include <sys/cachectl.h>\
+#endif\
 #endif' ${PWD_SRC}/src/art/libartbase/base/utils.cc
 sed -i '/int r = cacheflush(start, limit, kCacheFlushFlags);/{
 s/.*/#if defined(__arm__) \&\& !defined(__aarch64__)\
