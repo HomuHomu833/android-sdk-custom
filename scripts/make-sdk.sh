@@ -32,7 +32,10 @@ rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
   curl -LkSs -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
   unzip -q commandlinetools.zip
   rm commandlinetools.zip
-  yes | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
+  # Feed a bounded stream of "y" rather than `yes`: under `set -o pipefail`, the
+  # infinite `yes` gets SIGPIPE (exit 141) when sdkmanager closes stdin after the
+  # last prompt, which would abort the script even though licenses were accepted.
+  printf 'y\n%.0s' {1..100} | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
   cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;$BUILD_TOOLS_VERSION" "platform-tools" )
 
 # --- splice our ELF host tools over the official ones -----------------------
