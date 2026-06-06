@@ -11,7 +11,7 @@
 #   JOBS       parallelism (default: nproc)
 #   NDK_VERSION   official NDK to pull for the bionic clang, e.g. 27 (bionic only)
 #   NDK_REVISION  optional NDK revision letter, e.g. c (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 29, riscv64 forced to 35; bionic only)
+#   ANDROID_PLATFORM  bionic API level (default 25, riscv64 forced to 35; bionic only)
 #
 # Expects fetch-source.sh to have run first (sources + patches in place).
 set -euo pipefail
@@ -97,10 +97,7 @@ case "$PLATFORM" in
     # over with its own NDK toolchain machinery — mirrors the sibling NDK repo.
     : "${NDK_VERSION:?set NDK_VERSION for the bionic build}"
     NDK_REVISION="${NDK_REVISION:-}"
-    # API 29 floor: libbase's unique_fd.h uses the fdsan APIs (android_fdsan_*)
-    # that <android/fdsan.h> only declares for __ANDROID_API__ >= 29. riscv64
-    # exists only from API 35.
-    API="${ANDROID_PLATFORM:-29}"; [ "$TARGET" = riscv64-linux-android ] && API=35
+    API="${ANDROID_PLATFORM:-25}"; [ "$TARGET" = riscv64-linux-android ] && API=35
     NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
     NDK_DIR="$ROOTDIR/$NDK_NAME"
     if [ ! -d "$NDK_DIR" ]; then
@@ -114,7 +111,13 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined"
+    # __ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__: keep the API floor low (25) yet let
+    # code reference newer bionic APIs as weak symbols, resolved at runtime via a
+    # null check. libbase's unique_fd.h needs this for the fdsan APIs (android_fdsan_*,
+    # API 29) — otherwise <android/fdsan.h> doesn't declare them at API 25 and the
+    # build fails with "use of undeclared identifier". On pre-29 devices the symbols
+    # are null and unique_fd falls back to a plain close().
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
