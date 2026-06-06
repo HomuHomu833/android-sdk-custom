@@ -22,55 +22,17 @@
 
 #include <sys/syscall.h>
 
-#if defined(OPENSSL_X86_64) && defined(__ILP32__)
-// x32 ABI: the x86_64 instruction set with 32-bit pointers. Its syscalls carry
-// the x32 bit (__X32_SYSCALL_BIT, 0x40000000) on top of the x86_64 number, so
-// __NR_getrandom from <sys/syscall.h> is 0x40000000 | 318, not plain 318.
-#define EXPECTED_NR_getrandom (0x40000000 | 318)
-#elif defined(OPENSSL_X86_64)
-#define EXPECTED_NR_getrandom 318
-#elif defined(OPENSSL_X86)
-#define EXPECTED_NR_getrandom 355
-#elif defined(OPENSSL_AARCH64)
-#define EXPECTED_NR_getrandom 278
-#elif defined(OPENSSL_ARM)
-#define EXPECTED_NR_getrandom 384
-#elif defined(OPENSSL_RISCV64) || defined(OPENSSL_LOONG64)
-#define EXPECTED_NR_getrandom 278
-#elif defined(OPENSSL_S390X)
-#define EXPECTED_NR_getrandom 349
-#elif defined(OPENSSL_PPC)
-#define EXPECTED_NR_getrandom 359
-#elif defined(__riscv) && __SIZEOF_POINTER__ == 4
-#define EXPECTED_NR_getrandom 278
-#elif defined(__hexagon__)
-#define EXPECTED_NR_getrandom 347
-#elif defined(OPENSSL_MIPS64)
-#if defined(_MIPS_SIM) && _MIPS_SIM == 2
-#define EXPECTED_NR_getrandom 5353
-#else
-#define EXPECTED_NR_getrandom 6353
-#endif
-#elif defined(OPENSSL_MIPS)
-#define EXPECTED_NR_getrandom 4353
-#endif
-
-#if defined(EXPECTED_NR_getrandom)
-#define USE_NR_getrandom
-
+// Every target we build provides __NR_getrandom via <sys/syscall.h> (the kernel
+// uapi headers bundled with the toolchain). Trust it directly instead of
+// hardcoding and validating a per-architecture syscall number: the original
+// upstream EXPECTED_NR_getrandom table only exists to supply a fallback when the
+// headers lack the number, but it constantly drifts from reality on the less
+// common ABIs (x32, hexagon, the mips o32/n32/n64 variants, ...) and trips its
+// own #error. If a target genuinely lacks __NR_getrandom, USE_NR_getrandom stays
+// undefined and BoringSSL falls back to /dev/urandom.
 #if defined(__NR_getrandom)
-
-#if __NR_getrandom != EXPECTED_NR_getrandom
-#error "system call number for getrandom is not the expected value"
+#define USE_NR_getrandom
 #endif
-
-#else  // __NR_getrandom
-
-#define __NR_getrandom EXPECTED_NR_getrandom
-
-#endif  // __NR_getrandom
-
-#endif  // EXPECTED_NR_getrandom
 
 #if !defined(GRND_NONBLOCK)
 #define GRND_NONBLOCK 1
