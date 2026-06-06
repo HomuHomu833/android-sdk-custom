@@ -185,9 +185,12 @@ sed -i '/utf8.resize_and_overwrite/{N;N;N; s/utf8.resize_and_overwrite(utf8_leng
 sed -i 's/libusb::usb_init();/usb_init();/g' ${PWD_SRC}/src/adb/client/main.cpp
 sed -i 's/path_data\.name\.contains('\''\.'\'')/path_data.name.find('\''.'\'') != std::string::npos/g' src/base/tools/aapt2/cmd/Compile.cpp
 
-# libbase posix_strerror_r.cpp expects the XSI strerror_r (returns int), but with
-# _GNU_SOURCE (set for the gnu builds) glibc hands out the GNU variant returning
-# char*. Handle that variant under glibc; musl is always XSI and keeps the #else.
+# libbase posix_strerror_r.cpp expects the XSI strerror_r (returns int), but on
+# gnu builds (-include strl_compat.h pulls in <string.h> with _GNU_SOURCE
+# defined, locking in the GNU char* variant). The original file's #undef
+# _GNU_SOURCE would then defeat the __GLIBC__+_GNU_SOURCE guard below, so
+# remove it first. musl builds omit -D_GNU_SOURCE and keep the #else.
+sed -i '/\/\* Undefine _GNU_SOURCE/,/#undef _GNU_SOURCE/d' ${PWD_SRC}/src/libbase/posix_strerror_r.cpp
 sed -i '/return strerror_r(errnum, buf, buflen);/c\
 #if defined(__GLIBC__) \&\& defined(_GNU_SOURCE)\
   char* msg = strerror_r(errnum, buf, buflen);\
