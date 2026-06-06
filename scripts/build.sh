@@ -45,12 +45,11 @@ case "$PLATFORM" in
         CROSS_CFLAGS="-Wno-error=date-time -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
-        CROSS_CFLAGS="-Wno-error=date-time"
-        CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
         # AOSP host code (e.g. liblog) uses strlcpy/strlcat, which glibc only
-        # declares from 2.38. zig defaults to an older baseline, so pin the
-        # glibc version on the gnu triple to pull in the modern string.h.
-        export ZIG_TARGET="${TARGET}.2.39" ;;
+        # declares from 2.38. Force-include a shim that supplies them on older
+        # glibc instead of raising the binaries' runtime glibc requirement.
+        CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/strl_compat.h"
+        CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
     # libpng ships SIMD code that doesn't build/link on every target: the 32-bit
     # Thumb encodings lack the Neon asm impl (undefined png_*_neon symbols), and
