@@ -243,6 +243,13 @@ esac
 sed -i 's@^\([[:space:]]*\)static_assert(sizeof(unsigned long) == 8, "Platform is not 64-bit");@#if !defined(__LP64__)\n\1return mmap(start, length, prot, flags, fd, offset);\n#endif@' \
   "${PWD_SRC}/src/abseil-cpp/absl/base/internal/direct_mmap.h"
 
+# abseil examine_stack.cc: add hexagon support to GetProgramCounter().
+# hexagon musl defines mcontext_t as struct sigcontext with a .pc field.
+# Replace the `#else` / `#error` pair with the hexagon case followed by the
+# original fallthrough so the file compiles on hexagon targets.
+sed -i '/^#else$/{N;s/^#else\n#error "Undefined Architecture."/#elif defined(__hexagon__)\n    return reinterpret_cast<void*>(context->uc_mcontext.pc);\n#else\n#error "Undefined Architecture."/;}' \
+  "${PWD_SRC}/src/abseil-cpp/absl/debugging/internal/examine_stack.cc"
+
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
