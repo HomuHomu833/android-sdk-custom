@@ -45,10 +45,13 @@ case "$PLATFORM" in
         CROSS_CFLAGS="-Wno-error=date-time -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
-        # AOSP host code (e.g. liblog) uses strlcpy/strlcat, which glibc only
-        # declares from 2.38. Force-include a shim that supplies them on older
-        # glibc instead of raising the binaries' runtime glibc requirement.
-        CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/strl_compat.h"
+        # _GNU_SOURCE: AOSP/host code (and bundled deps like zstd's cover.c, which
+        # calls qsort_r) assume GNU extensions that glibc hides behind it; musl
+        # exposes them unconditionally, so this only matters for gnu.
+        # strlcpy/strlcat shim: glibc only declares them from 2.38. Force-include
+        # a shim that supplies them on older glibc instead of raising the
+        # binaries' runtime glibc requirement.
+        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
     # libpng ships SIMD code that doesn't build/link on every target: the 32-bit
