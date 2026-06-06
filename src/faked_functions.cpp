@@ -34,15 +34,15 @@ extern "C" {
 
     int cacheflush(long start, long end, long flags) {
         (void)flags;
-    
-    #if !defined(__s390x__) && !defined(__ppc__)
+
+    #if !defined(__s390x__) && !defined(__ppc__) && !defined(__hexagon__)
         __builtin___clear_cache(reinterpret_cast<char*>(start),
                                 reinterpret_cast<char*>(end));
     #else
-        (void)start; 
+        (void)start;
         (void)end;
     #endif
-    
+
         return 0;
     }
 }
