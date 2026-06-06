@@ -2,12 +2,16 @@
 # Cross-build the Android SDK host tools for one target. Driven entirely by env
 # vars so it runs identically in CI and in `docker run`.
 #
-#   PLATFORM   linux            (only platform wired today; see case below)
-#   TARGET     target triple, e.g. x86_64-linux-musl / aarch64-linux-gnu
+#   PLATFORM   linux | bionic   (see the per-PLATFORM case below)
+#   TARGET     target triple, e.g. x86_64-linux-musl / aarch64-linux-gnu (linux)
+#                                  aarch64-linux-android                  (bionic)
 #   ARCH       CMAKE_SYSTEM_PROCESSOR (default: triple's arch field)
 #   ROOTDIR    checkout root (default: cwd)
 #   OUT        where the stripped host tools land (default: $ROOTDIR/out)
 #   JOBS       parallelism (default: nproc)
+#   NDK_VERSION   official NDK to pull for the bionic clang, e.g. 27 (bionic only)
+#   NDK_REVISION  optional NDK revision letter, e.g. c (bionic only)
+#   ANDROID_PLATFORM  bionic API level (default 25, riscv64 forced to 35; bionic only)
 #
 # Expects fetch-source.sh to have run first (sources + patches in place).
 set -euo pipefail
@@ -72,6 +76,32 @@ case "$PLATFORM" in
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
     esac
+    ;;
+  bionic)
+    # Android host tools built against bionic with the official NDK's clang, so the
+    # binaries run on-device. The NDK ships its own sysroot + libc, so none of the
+    # musl/glibc LFS juggling from the linux case applies. SYSTEM_NAME stays Linux
+    # (not Android) so CMake just uses the clang we point it at instead of taking
+    # over with its own NDK toolchain machinery — mirrors the sibling NDK repo.
+    : "${NDK_VERSION:?set NDK_VERSION for the bionic build}"
+    NDK_REVISION="${NDK_REVISION:-}"
+    API="${ANDROID_PLATFORM:-25}"; [ "$TARGET" = riscv64-linux-android ] && API=35
+    NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
+    NDK_DIR="$ROOTDIR/$NDK_NAME"
+    if [ ! -d "$NDK_DIR" ]; then
+      log "Downloading official NDK ($NDK_NAME)"
+      aria2c --console-log-level=error --check-certificate=false --max-tries=20 --retry-wait=2 --retry-on-unknown=true --connect-timeout=15 \
+        --dir="$ROOTDIR" -o ndk.zip "https://dl.google.com/android/repository/${NDK_NAME}-linux.zip"
+      unzip -qq "$ROOTDIR/ndk.zip" -d "$ROOTDIR"
+      rm -f "$ROOTDIR/ndk.zip"
+    fi
+    TC="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64"
+    CROSS_CC="$TC/bin/${TARGET}${API}-clang"; CROSS_CXX="${CROSS_CC}++"
+    CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
+    CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
+    SYSTEM_NAME=Linux
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined"
+    CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac

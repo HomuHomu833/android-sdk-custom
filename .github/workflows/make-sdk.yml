@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       platform:
-        description: "linux (only platform wired today)"
+        description: "linux | bionic"
         required: true
         type: string
       targets:
@@ -23,6 +23,16 @@ on:
         required: false
         type: string
         default: "36.1.0"
+      ndk_version:
+        description: "Official NDK version for the bionic clang (bionic only)"
+        required: false
+        type: string
+        default: ""
+      ndk_revision:
+        description: "Official NDK revision letter (bionic only)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -83,6 +93,8 @@ jobs:
             -e TARGET='${{ matrix.target }}' \
             -e TAG='${{ inputs.tag }}' \
             -e BUILD_TOOLS_VERSION='${{ inputs.build_tools_version }}' \
+            -e NDK_VERSION='${{ inputs.ndk_version }}' \
+            -e NDK_REVISION='${{ inputs.ndk_revision }}' \
             -e ROOTDIR=/work \
             "$IMAGE" \
             bash -c 'scripts/fetch-source.sh && scripts/build.sh && scripts/make-sdk.sh'

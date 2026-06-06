@@ -2,10 +2,11 @@
 # and the zig / zig-as-llvm toolchain so CI only pulls (fast). zig drives the
 # linux musl/gnu host-tool cross builds.
 #
-# Only the linux platform is wired up today. The image is laid out like the
-# sibling android-ndk-custom / llvm-custom images so the windows (llvm-mingw),
-# macos (osxcross) and bionic (NDK clang) toolchains can be dropped in later
-# without reshaping anything — see the "FUTURE" markers below.
+# The linux and bionic platforms are wired up today (bionic pulls the official
+# NDK clang at run time, so it needs no baked-in toolchain). The image is laid
+# out like the sibling android-ndk-custom / llvm-custom images so the windows
+# (llvm-mingw) and macos (osxcross) toolchains can be dropped in later without
+# reshaping anything — see the "FUTURE" markers below.
 #
 # The build scripts are NOT copied in — they are bind-mounted from the checkout
 # at run time, so editing scripts/ needs no image rebuild.
@@ -73,9 +74,10 @@ RUN if [ ! -f /opt/.no-zig ]; then \
 # zig on PATH so the zig-as-llvm wrappers resolve it.
 ENV PATH="/opt/zig:${PATH}"
 
+# bionic targets: the official NDK (clang + sysroot) is downloaded by build.sh at
+#                 run time, so no image change is needed — only aria2/unzip, which
+#                 are already installed above.
 # FUTURE: windows targets — install llvm-mingw under /opt/llvm-mingw here.
 # FUTURE: macos targets   — build osxcross under /opt/osxcross here.
-# FUTURE: bionic targets  — the NDK clang is downloaded by the build script at
-#                           run time (no image change needed).
 
 WORKDIR /work
