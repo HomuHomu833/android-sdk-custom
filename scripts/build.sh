@@ -11,7 +11,7 @@
 #   JOBS       parallelism (default: nproc)
 #   NDK_VERSION   official NDK to pull for the bionic clang, e.g. 27 (bionic only)
 #   NDK_REVISION  optional NDK revision letter, e.g. c (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 25, riscv64 forced to 35; bionic only)
+#   ANDROID_PLATFORM  bionic API level (default 29, riscv64 forced to 35; bionic only)
 #
 # Expects fetch-source.sh to have run first (sources + patches in place).
 set -euo pipefail
@@ -97,7 +97,10 @@ case "$PLATFORM" in
     # over with its own NDK toolchain machinery — mirrors the sibling NDK repo.
     : "${NDK_VERSION:?set NDK_VERSION for the bionic build}"
     NDK_REVISION="${NDK_REVISION:-}"
-    API="${ANDROID_PLATFORM:-25}"; [ "$TARGET" = riscv64-linux-android ] && API=35
+    # API 29 floor: libbase's unique_fd.h uses the fdsan APIs (android_fdsan_*)
+    # that <android/fdsan.h> only declares for __ANDROID_API__ >= 29. riscv64
+    # exists only from API 35.
+    API="${ANDROID_PLATFORM:-29}"; [ "$TARGET" = riscv64-linux-android ] && API=35
     NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
     NDK_DIR="$ROOTDIR/$NDK_NAME"
     if [ ! -d "$NDK_DIR" ]; then
