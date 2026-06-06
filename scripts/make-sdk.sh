@@ -3,7 +3,6 @@
 # (build-tools + platform-tools) and archive the result — the sh port of the
 # "make" job in the old make_sdk.yml.
 #
-#   PLATFORM             linux | bionic (default linux)
 #   TARGET               target triple (names the artifact, locates the binaries)
 #   BUILT_BIN            dir holding the built host tools (default: $OUT/bin-$TARGET)
 #   BUILD_TOOLS_VERSION  sdkmanager build-tools package (default: 36.1.0)
@@ -14,7 +13,6 @@ set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
 : "${TARGET:?set TARGET}"
-PLATFORM="${PLATFORM:-linux}"
 OUT="${OUT:-$ROOTDIR/out}"
 BUILT_BIN="${BUILT_BIN:-$OUT/bin-$TARGET}"
 BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-36.1.0}"
@@ -25,19 +23,6 @@ cd "$ROOTDIR"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
 [ -d "$BUILT_BIN" ] || { echo "built binaries not found at $BUILT_BIN" >&2; exit 1; }
-
-# --- bionic: ship the raw on-device tools -----------------------------------
-# Android binaries can't be spliced over a desktop host SDK (they don't run on
-# the build host), so the bionic deliverable is just the cross-built tool set.
-if [ "$PLATFORM" = bionic ]; then
-  mkdir -p "$DEST"
-  ARCHIVE="$DEST/android-sdk-$TARGET.tar.xz"
-  log "Archiving bionic host tools -> $ARCHIVE"
-  tar -cf - -C "$(dirname "$BUILT_BIN")" "$(basename "$BUILT_BIN")" \
-    | xz -T0 -9e --lzma2=dict=256MiB > "$ARCHIVE"
-  log "Done -> $ARCHIVE"
-  exit 0
-fi
 
 # --- fetch the official SDK (build-tools + platform-tools) -------------------
 log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"
