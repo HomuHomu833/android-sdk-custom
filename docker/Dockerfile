@@ -31,7 +31,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # - openjdk-21-jre-headless: sdkmanager (make-sdk.sh) needs a JRE to fetch the
 #   official build-tools/platform-tools that the built host tools are spliced into.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates aria2 curl xz-utils unzip zip git make cmake ninja-build \
+        ca-certificates aria2 xz-utils unzip zip git make cmake ninja-build \
         build-essential clang lld file tree jq openjdk-21-jre-headless \
         golang-go bison flex m4 \
         autoconf automake libtool autoconf-archive pkg-config \

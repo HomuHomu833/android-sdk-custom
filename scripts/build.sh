@@ -104,7 +104,7 @@ mkdir -p "$EXTRA_PREFIX"
 if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
   log "Building zlib (static, $TARGET)"
   ( cd "$ROOTDIR"
-    curl -LkSs https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz | xz -d | tar -x
+    aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --connect-timeout=15 --dir=/tmp -o zlib-1.3.1.tar.xz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz && xz -d < /tmp/zlib-1.3.1.tar.xz | tar -x && rm /tmp/zlib-1.3.1.tar.xz
     cd zlib-1.3.1
     CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" ./configure --prefix="$EXTRA_PREFIX" --static
     make -j"$JOBS" install )
@@ -112,7 +112,7 @@ fi
 if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
   log "Building bzip2 (static, $TARGET)"
   ( cd "$ROOTDIR"
-    curl -LkSs https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz | gzip -d | tar -x
+    aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --connect-timeout=15 --dir=/tmp -o bzip2-1.0.8.tar.gz https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz && gzip -d < /tmp/bzip2-1.0.8.tar.gz | tar -x && rm /tmp/bzip2-1.0.8.tar.gz
     cd bzip2-1.0.8
     make CC="$CROSS_CC" AR="$CROSS_AR" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" install )
 fi
