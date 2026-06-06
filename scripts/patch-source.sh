@@ -73,11 +73,6 @@ sed -i '/#define LOG_TAG "cutils-trace"/a\
 ' ${PWD_SRC}/src/core/libcutils/trace-dev.inc
 
 # fml
-# ART metrics.h asserts std::atomic<uint64_t>::is_always_lock_free, which fails on
-# 32-bit arches without native 64-bit atomics (riscv32, ppc32 incl. glibc); there
-# the atomic lowers to libatomic/compiler-rt calls (still correct, just not
-# lock-free). Comment the assert out for those. (The follow-on "override" errors
-# are cascades from the aborted template instantiation and clear once it's gone.)
 case "$TARGET" in
   riscv32-*|powerpc-*)
     sed -i 's/^\([[:space:]]*\)static_assert(std::atomic<.*>::is_always_lock_free);/\1\/\/ &/' ${PWD_SRC}/src/art/libartbase/base/metrics/metrics.h
