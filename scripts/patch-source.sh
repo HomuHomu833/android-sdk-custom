@@ -74,7 +74,7 @@ sed -i '/#define LOG_TAG "cutils-trace"/a\
 
 # fml
 case "$TARGET" in
-  riscv32-*)
+  riscv32-*|powerpc-*musl*)
     sed -i 's/^\([[:space:]]*\)static_assert(std::atomic<.*>::is_always_lock_free);/\1\/\/ &/' ${PWD_SRC}/src/art/libartbase/base/metrics/metrics.h
     ;;
 esac
