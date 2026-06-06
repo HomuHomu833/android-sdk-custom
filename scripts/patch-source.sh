@@ -208,6 +208,14 @@ sed -i '/^#else$/{N;s/^#else\n#error "Undefined Architecture."/#elif defined(__h
 sed -i 's/^#if defined(_WIN32) || defined(__hexagon__)$/#if defined(_WIN32)/' \
   "${PWD_SRC}/src/abseil-cpp/absl/log/internal/conditions.h"
 
+# logging/liblog logger_name.cpp: hexagon Clang picks unsigned char as the
+# underlying type for android_LogPriority (values 0-8), but the original
+# static_assert demands uint32_t.  Guard both asserts (log_id_t might also
+# differ) under !__hexagon__ since they're only ABI-relevant on-device.
+sed -i '/^static_assert(std::is_same<std::underlying_type<log_id_t>::type, uint32_t>::value,$/i #ifndef __hexagon__' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
+sed -i '/^static_assert(std::is_same<std::underlying_type<android_LogPriority>::type, uint32_t>::value,$/i #ifndef __hexagon__' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
+sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
+
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
