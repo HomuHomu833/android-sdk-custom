@@ -188,9 +188,10 @@ sed -i 's/path_data\.name\.contains('\''\.'\'')/path_data.name.find('\''.'\'') !
 # abseil's 32-bit PowerPC stacktrace reads registers through glibc's mcontext
 # layout (uc_mcontext.uc_regs->gregs[], where uc_regs is a pt_regs*). musl's
 # ppc32 mcontext_t exposes the registers directly as uc_mcontext.gregs[], with no
-# uc_regs indirection. We only build powerpc against musl, so drop the indirect.
+# uc_regs indirection. Only rewrite for musl ppc32 — glibc ppc32 needs the
+# original uc_regs-> form.
 case "$TARGET" in
-  powerpc-*)
+  powerpc-*musl*)
     for f in src/abseil-cpp/absl/debugging/internal/stacktrace_powerpc-inl.inc \
              src/abseil-cpp/absl/debugging/internal/examine_stack.cc; do
       [ -f "$f" ] && sed -i 's/uc_mcontext\.uc_regs->gregs/uc_mcontext.gregs/g' "$f"
