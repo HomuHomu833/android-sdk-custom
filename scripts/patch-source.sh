@@ -226,11 +226,6 @@ sed -i 's/extra_args\.flavor = \&flavor;/extra_args.flavor = (uint32_t *)\&flavo
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
-# bionic: fdsan owner-tag APIs (android_fdsan_*, API 29) used by libbase unique_fd.h
-# and libcutils native_handle.cpp are handled by the ungated include/android/fdsan.h
-# shim (declarations) + no-op stubs in faked_functions.cpp -- see those files. No
-# source edit needed here.
-
 # bionic: the in-tree liblog <android/log.h> (on the include path ahead of the
 # NDK's) annotates the newer __android_log_* APIs with __INTRODUCED_IN(30), so
 # libbase logging.cpp fails at minSdk 25 with "'__android_log_*' is unavailable:
