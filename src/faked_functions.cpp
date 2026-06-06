@@ -5,6 +5,48 @@
 #include <string>
 #include <mutex>
 
+#if defined(__BIONIC__)
+
+// On Android the device's real property system is used (faked_functions.h compiles
+// the host fake store out). minSdk < 26 can't link the API-26 property helpers
+// (__system_property_read_callback / _wait / _serial / _area_serial), so provide
+// compat shims implemented over the API-1 primitives that already exist at API 25.
+// Property *reads* work correctly; the serial-based change tracking degrades to a
+// no-op (pre-26 libc exposes no public way to read serials), which only affects
+// the rarely used WaitForProperty path in these host tools. The repo's ungated
+// <sys/system_properties.h> (added to the include path for bionic in build.sh)
+// supplies the matching declarations so the rest of the tree compiles.
+#include <sys/system_properties.h>
+
+#if __ANDROID_API__ < 26
+extern "C" {
+    void __system_property_read_callback(
+        const prop_info* pi,
+        void (*callback)(void* cookie, const char* name, const char* value, uint32_t serial),
+        void* cookie) {
+        char name[PROP_NAME_MAX] = {};
+        char value[PROP_VALUE_MAX] = {};
+        int len = __system_property_read(pi, name, value);
+        if (len >= 0) {
+            callback(cookie, name, value, 0);
+        }
+    }
+
+    uint32_t __system_property_serial(const prop_info* /*pi*/) { return 0; }
+
+    uint32_t __system_property_area_serial(void) { return 0; }
+
+    bool __system_property_wait(const prop_info* /*pi*/, uint32_t /*old_serial*/,
+                                uint32_t* new_serial_ptr,
+                                const struct timespec* /*relative_timeout*/) {
+        if (new_serial_ptr) *new_serial_ptr = 0;
+        return false;  // no change-notification primitive before API 26
+    }
+}
+#endif  // __ANDROID_API__ < 26
+
+#else  // !__BIONIC__ -- host builds back the property API with a fake store
+
 #define MAX_PROPERTIES 128
 #define MAX_NAME_LEN   64
 #define MAX_VALUE_LEN  256
@@ -31,7 +73,11 @@ extern "C" {
 
         callback(cookie, pi->name, pi->value, pi->serial);
     }
+}
 
+#endif  // __BIONIC__
+
+extern "C" {
     int cacheflush(long start, long end, long flags) {
         (void)flags;
 
