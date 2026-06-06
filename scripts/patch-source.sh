@@ -72,6 +72,11 @@ sed -i '/#define LOG_TAG "cutils-trace"/a\
 #endif
 ' ${PWD_SRC}/src/core/libcutils/trace-dev.inc
 
+# fmtlib's allocator calls bare malloc()/free(), relying on <cstdlib> leaking the
+# C names into the global namespace. zig 0.17's newer libc++ no longer does that,
+# so pull in <stdlib.h> (which declares them globally) right after the guard.
+sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/include/fmt/format.h
+
 # fml
 case "$TARGET" in
   riscv32-*|powerpc-*)
