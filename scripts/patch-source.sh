@@ -158,10 +158,12 @@ sed -i 's/path_data\.name\.contains('\''\.'\'')/path_data.name.find('\''.'\'') !
 # gnu builds (-include strl_compat.h pulls in <string.h> with _GNU_SOURCE
 # defined, locking in the GNU char* variant). The original file's #undef
 # _GNU_SOURCE would then defeat the __GLIBC__+_GNU_SOURCE guard below, so
-# remove it first. musl builds omit -D_GNU_SOURCE and keep the #else.
+# remove it first. musl builds omit -D_GNU_SOURCE and keep the #else. bionic also
+# ships the GNU char* variant under _GNU_SOURCE (implied by -std=gnu++20, API>=23),
+# so it joins the char* branch too.
 sed -i '/\/\* Undefine _GNU_SOURCE/,/#undef _GNU_SOURCE/d' ${PWD_SRC}/src/libbase/posix_strerror_r.cpp
 sed -i '/return strerror_r(errnum, buf, buflen);/c\
-#if defined(__GLIBC__) \&\& defined(_GNU_SOURCE)\
+#if (defined(__GLIBC__) || defined(__BIONIC__)) \&\& defined(_GNU_SOURCE)\
   char* msg = strerror_r(errnum, buf, buflen);\
   if (msg != buf) {\
     strncpy(buf, msg, buflen);\
