@@ -108,7 +108,7 @@ s/.*/#if defined(__arm__) \&\& !defined(__aarch64__)\
 #endif/
 }' ${PWD_SRC}/src/art/libartbase/base/utils.cc
 sed -i '/FlushCpuCaches/,/}/ {
-  /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/i #if !defined(__s390x__) && !defined(__ppc__)
+  /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/i #if !defined(__s390x__) && !defined(__ppc__) && !defined(__hexagon__)
   /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/a #endif
 }' ${PWD_SRC}/src/art/libartbase/base/utils.cc
 
