@@ -202,6 +202,12 @@ sed -i 's@^\([[:space:]]*\)static_assert(sizeof(unsigned long) == 8, "Platform i
 sed -i '/^#else$/{N;s/^#else\n#error "Undefined Architecture."/#elif defined(__hexagon__)\n    return reinterpret_cast<void*>(context->uc_mcontext.pc);\n#else\n#error "Undefined Architecture."/;}' \
   "${PWD_SRC}/src/abseil-cpp/absl/debugging/internal/examine_stack.cc"
 
+# abseil conditions.h: _exit() needs <unistd.h> on hexagon musl.
+# The Win32 guard incorrectly excluded hexagon, leaving _exit undeclared.
+# abort() is already covered by the unconditional #include <stdlib.h> that follows.
+sed -i 's/^#if defined(_WIN32) || defined(__hexagon__)$/#if defined(_WIN32)/' \
+  "${PWD_SRC}/src/abseil-cpp/absl/log/internal/conditions.h"
+
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
