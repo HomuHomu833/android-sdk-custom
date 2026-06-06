@@ -16,7 +16,7 @@
 #     bash -c 'scripts/fetch-source.sh && scripts/build.sh'
 FROM ubuntu:24.04
 
-ARG ZIG_VERSION=0.15.1
+ARG ZIG_VERSION=0.17.0-dev.304+9787df942
 ARG REPO_OWNER=HomuHomu833
 
 ENV DEBIAN_FRONTEND=noninteractive
