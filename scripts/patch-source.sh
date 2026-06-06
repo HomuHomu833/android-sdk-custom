@@ -72,13 +72,17 @@ sed -i '/#define LOG_TAG "cutils-trace"/a\
 #endif
 ' ${PWD_SRC}/src/core/libcutils/trace-dev.inc
 
+# fml
 # ART metrics.h asserts std::atomic<uint64_t>::is_always_lock_free, which fails on
-# 32-bit arches without native 64-bit atomics (riscv32, ppc32, ...); there the
-# atomic lowers to libatomic/compiler-rt calls (still correct, just not lock-free).
-# Comment the assert out unconditionally — on arches where it would pass, removing
-# it is a no-op. (The follow-on "override" errors are cascades from the aborted
-# template instantiation and clear once the assert is gone.)
-sed -i 's/^\([[:space:]]*\)static_assert(std::atomic<.*>::is_always_lock_free);/\1\/\/ &/' ${PWD_SRC}/src/art/libartbase/base/metrics/metrics.h
+# 32-bit arches without native 64-bit atomics (riscv32, ppc32 incl. glibc); there
+# the atomic lowers to libatomic/compiler-rt calls (still correct, just not
+# lock-free). Comment the assert out for those. (The follow-on "override" errors
+# are cascades from the aborted template instantiation and clear once it's gone.)
+case "$TARGET" in
+  riscv32-*|powerpc-*)
+    sed -i 's/^\([[:space:]]*\)static_assert(std::atomic<.*>::is_always_lock_free);/\1\/\/ &/' ${PWD_SRC}/src/art/libartbase/base/metrics/metrics.h
+    ;;
+esac
 
 # fml 2
 sed -i '/# Set definitions and sources for ARM./i\
