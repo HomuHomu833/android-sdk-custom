@@ -224,4 +224,20 @@ sed -i 's/extra_args\.flavor = \&flavor;/extra_args.flavor = (uint32_t *)\&flavo
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
+# bionic: libbase unique_fd.h calls the fdsan APIs (android_fdsan_create/exchange/
+# close_*_tag, introduced in API 29) guarded only by a runtime null-check, but the
+# NDK's <android/fdsan.h> doesn't declare them below API 29, so a low-minSdk (25)
+# build fails with "use of undeclared identifier". Forward-declare them as weak so
+# the null-check compiles and stays correct at runtime: null on pre-29 devices
+# (unique_fd falls back to plain close()), resolved by libc on API 29+. Guarded by
+# __BIONIC__ + API<29 so it's inert for the linux/musl/gnu targets and for API>=29.
+sed -i '/#include <android\/fdsan\.h>/a\
+#if defined(__BIONIC__) \&\& __ANDROID_API__ < 29\
+extern "C" {\
+__attribute__((weak)) uint64_t android_fdsan_create_owner_tag(enum android_fdsan_owner_type, uint64_t);\
+__attribute__((weak)) void android_fdsan_exchange_owner_tag(int, uint64_t, uint64_t);\
+__attribute__((weak)) int android_fdsan_close_with_tag(int, uint64_t);\
+}\
+#endif' ${PWD_SRC}/src/libbase/include/android-base/unique_fd.h
+
 log "Source fixups applied"

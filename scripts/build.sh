@@ -111,13 +111,11 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    # __ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__: keep the API floor low (25) yet let
-    # code reference newer bionic APIs as weak symbols, resolved at runtime via a
-    # null check. libbase's unique_fd.h needs this for the fdsan APIs (android_fdsan_*,
-    # API 29) — otherwise <android/fdsan.h> doesn't declare them at API 25 and the
-    # build fails with "use of undeclared identifier". On pre-29 devices the symbols
-    # are null and unique_fd falls back to a plain close().
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__"
+    # Newer-than-minSdk bionic APIs (e.g. libbase unique_fd.h's fdsan calls, API 29)
+    # are handled with targeted weak forward-declarations in patch-source.sh, not a
+    # blanket -D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__ (which would weaken *every*
+    # post-25 symbol and risk unguarded calls crashing on old devices).
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
