@@ -14,12 +14,15 @@
 #ifndef ANDROID_SDK_STRL_COMPAT_H
 #define ANDROID_SDK_STRL_COMPAT_H
 
-#if defined(__GLIBC__)
-#include <features.h>
-#if !defined(__GLIBC_PREREQ) || !__GLIBC_PREREQ(2, 38)
+/* This header is force-included (-include) before the translation unit's own
+ * includes, so __GLIBC__/__GLIBC_PREREQ aren't defined yet -- they come from
+ * <features.h>, which <string.h> pulls in. Include it first (it also declares
+ * strlcpy/strlcat on glibc >= 2.38), then decide whether the shim is needed. */
+#include <string.h>
+
+#if defined(__GLIBC__) && (!defined(__GLIBC_PREREQ) || !__GLIBC_PREREQ(2, 38))
 
 #include <stddef.h>
-#include <string.h>
 
 static inline __attribute__((__unused__))
 size_t strlcpy(char *dst, const char *src, size_t dsize) {
@@ -60,5 +63,4 @@ size_t strlcat(char *dst, const char *src, size_t dsize) {
 }
 
 #endif /* glibc < 2.38 */
-#endif /* __GLIBC__ */
 #endif /* ANDROID_SDK_STRL_COMPAT_H */
