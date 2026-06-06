@@ -62,7 +62,7 @@ case "$PLATFORM" in
     # relevant SIMD path so libpng falls back to portable C. (aarch64 Neon and
     # ppc64le VSX build fine and are left enabled.)
     case "$TARGET" in
-      thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0" ;;
+      thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
       powerpc-*|powerpc64-*)    CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_POWERPC_VSX_OPT=0" ;;
     esac
     # x32 ABI (x86_64 ISA, 32-bit pointers): clang emits initial-exec TLS with
