@@ -217,19 +217,14 @@ case "$TARGET" in
     ;;
 esac
 
-# abseil direct_mmap.h: the direct syscall path requires 64-bit (unsigned long == 8);
-# on 32-bit platforms fall back to the libc mmap() which handles the offset correctly.
-# Idempotent: only apply if __LP64__ guard not already present.
-if ! grep -q '__LP64__' "${PWD_SRC}/src/abseil-cpp/absl/base/internal/direct_mmap.h" 2>/dev/null; then
-  sed -i '/static_assert.*Platform is not 64-bit/,/offset));/c\
-#if defined(__LP64__)\
-  static_assert(sizeof(unsigned long) == 8, "Platform is not 64-bit");\
-  return reinterpret_cast<void*>(\
-      syscall(SYS_mmap, start, length, prot, flags, fd, offset));\
-#else\
-  return mmap(start, length, prot, flags, fd, offset);\
-#endif' "${PWD_SRC}/src/abseil-cpp/absl/base/internal/direct_mmap.h"
-fi
+# abseil direct_mmap.h assumes "no __NR_mmap2 implies a 64-bit platform" and
+# static_asserts it, which is wrong for the generic-syscall 32-bit arches
+# (riscv32, hexagon): unsigned long is 4 bytes there. Replace just the assert
+# with a libc mmap() fallback on non-LP64 (the original 64-bit syscall path,
+# which follows, is left intact for LP64). Done as a one-line swap so it doesn't
+# depend on the exact form of the syscall line after it.
+sed -i 's@^\([[:space:]]*\)static_assert(sizeof(unsigned long) == 8, "Platform is not 64-bit");@#if !defined(__LP64__)\n\1return mmap(start, length, prot, flags, fd, offset);\n#endif@' \
+  "${PWD_SRC}/src/abseil-cpp/absl/base/internal/direct_mmap.h"
 
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )

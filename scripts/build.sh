@@ -50,8 +50,10 @@ case "$PLATFORM" in
         # exposes them unconditionally, so this only matters for gnu.
         # strlcpy/strlcat shim: glibc only declares them from 2.38. Force-include
         # a shim that supplies them on older glibc instead of raising the
-        # binaries' runtime glibc requirement.
-        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE -include $ROOTDIR/patches/misc/strl_compat.h"
+        # binaries' runtime glibc requirement. HAVE_STRLCPY/HAVE_STRLCAT make
+        # deps that ship their own fallback (e.g. selinux's #ifndef HAVE_STRLCPY)
+        # yield to the shim, avoiding a duplicate definition.
+        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
     # libpng ships SIMD code that doesn't build/link on every target: the 32-bit
