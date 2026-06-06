@@ -185,6 +185,21 @@ sed -i '/utf8.resize_and_overwrite/{N;N;N; s/utf8.resize_and_overwrite(utf8_leng
 sed -i 's/libusb::usb_init();/usb_init();/g' ${PWD_SRC}/src/adb/client/main.cpp
 sed -i 's/path_data\.name\.contains('\''\.'\'')/path_data.name.find('\''.'\'') != std::string::npos/g' src/base/tools/aapt2/cmd/Compile.cpp
 
+# libbase posix_strerror_r.cpp expects the XSI strerror_r (returns int), but with
+# _GNU_SOURCE (set for the gnu builds) glibc hands out the GNU variant returning
+# char*. Handle that variant under glibc; musl is always XSI and keeps the #else.
+sed -i '/return strerror_r(errnum, buf, buflen);/c\
+#if defined(__GLIBC__) \&\& defined(_GNU_SOURCE)\
+  char* msg = strerror_r(errnum, buf, buflen);\
+  if (msg != buf) {\
+    strncpy(buf, msg, buflen);\
+    if (buflen > 0) buf[buflen - 1] = 0;\
+  }\
+  return 0;\
+#else\
+  return strerror_r(errnum, buf, buflen);\
+#endif' ${PWD_SRC}/src/libbase/posix_strerror_r.cpp
+
 # abseil's 32-bit PowerPC stacktrace reads registers through glibc's mcontext
 # layout (uc_mcontext.uc_regs->gregs[], where uc_regs is a pt_regs*). musl's
 # ppc32 mcontext_t exposes the registers directly as uc_mcontext.gregs[], with no
