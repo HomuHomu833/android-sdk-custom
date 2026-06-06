@@ -49,6 +49,10 @@ target_compile_definitions(libcutils PRIVATE
     -D_GNU_SOURCE
     )
 
+set_source_files_properties(${SRC}/core/libcutils/strlcpy.c PROPERTIES
+    COMPILE_DEFINITIONS "ANDROID_SDK_STRL_COMPAT_IMPLEMENTATION"
+    )
+
 target_include_directories(libcutils PRIVATE
     ${SRC}/core/libutils/include
     ${SRC}/core/libcutils/include

@@ -24,6 +24,10 @@
 
 #include <stddef.h>
 
+/* Don't duplicate definitions when compiling the implementation file
+ * (strlcpy.c) itself; it defines strlcpy as a real (extern) function. */
+#ifndef ANDROID_SDK_STRL_COMPAT_IMPLEMENTATION
+
 static inline __attribute__((__unused__))
 size_t strlcpy(char *dst, const char *src, size_t dsize) {
   const char *osrc = src;
@@ -62,5 +66,6 @@ size_t strlcat(char *dst, const char *src, size_t dsize) {
   return dlen + (size_t)(src - osrc);
 }
 
+#endif /* !ANDROID_SDK_STRL_COMPAT_IMPLEMENTATION */
 #endif /* glibc < 2.38 */
 #endif /* ANDROID_SDK_STRL_COMPAT_H */
