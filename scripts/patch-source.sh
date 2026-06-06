@@ -185,6 +185,19 @@ sed -i '/utf8.resize_and_overwrite/{N;N;N; s/utf8.resize_and_overwrite(utf8_leng
 sed -i 's/libusb::usb_init();/usb_init();/g' ${PWD_SRC}/src/adb/client/main.cpp
 sed -i 's/path_data\.name\.contains('\''\.'\'')/path_data.name.find('\''.'\'') != std::string::npos/g' src/base/tools/aapt2/cmd/Compile.cpp
 
+# abseil's 32-bit PowerPC stacktrace reads registers through glibc's mcontext
+# layout (uc_mcontext.uc_regs->gregs[], where uc_regs is a pt_regs*). musl's
+# ppc32 mcontext_t exposes the registers directly as uc_mcontext.gregs[], with no
+# uc_regs indirection. We only build powerpc against musl, so drop the indirect.
+case "$TARGET" in
+  powerpc-*)
+    for f in src/abseil-cpp/absl/debugging/internal/stacktrace_powerpc-inl.inc \
+             src/abseil-cpp/absl/debugging/internal/examine_stack.cc; do
+      [ -f "$f" ] && sed -i 's/uc_mcontext\.uc_regs->gregs/uc_mcontext.gregs/g' "$f"
+    done
+    ;;
+esac
+
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
