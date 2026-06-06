@@ -240,4 +240,13 @@ __attribute__((weak)) int android_fdsan_close_with_tag(int, uint64_t);\
 }\
 #endif' ${PWD_SRC}/src/libbase/include/android-base/unique_fd.h
 
+# bionic: the in-tree liblog <android/log.h> (on the include path ahead of the
+# NDK's) annotates the newer __android_log_* APIs with __INTRODUCED_IN(30), so
+# libbase logging.cpp fails at minSdk 25 with "'__android_log_*' is unavailable:
+# introduced in Android 30". We compile and statically link liblog ourselves, so
+# those symbols are always present in the binary regardless of device API -- strip
+# the availability annotation. No-op on linux/musl/gnu, where __INTRODUCED_IN is
+# already empty; only the NDK's cdefs turns it into a real availability attribute.
+sed -i 's/__INTRODUCED_IN([0-9]\+)//g' ${PWD_SRC}/src/logging/liblog/include/android/log.h
+
 log "Source fixups applied"
