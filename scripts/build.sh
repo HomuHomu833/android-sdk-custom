@@ -60,6 +60,13 @@ case "$PLATFORM" in
       thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0" ;;
       powerpc-*|powerpc64-*)    CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_POWERPC_VSX_OPT=0" ;;
     esac
+    # x32 ABI (x86_64 ISA, 32-bit pointers): clang emits initial-exec TLS with
+    # 32-bit MOV/ADD, but lld's R_X86_64_GOTTPOFF relaxation requires a 64-bit
+    # MOVQ/ADDQ, so the link fails. These are fully-static executables, so force
+    # local-exec TLS (no GOTTPOFF) which is the correct model here anyway.
+    case "$TARGET" in
+      *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
+    esac
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
