@@ -115,7 +115,10 @@ case "$PLATFORM" in
     # the NDK sysroot's (which gates the API-26 property helpers behind API>=26), so
     # properties.cpp etc. compile at minSdk 25; faked_functions.cpp supplies compat
     # shims for those API-26 helpers implemented over the API-1 primitives.
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -I$ROOTDIR/include"
+    # bionic_compat.h (force-included): maps the GNU stdio *_unlocked extensions
+    # AOSP host code uses (e.g. selinux label_file.c) to their locked equivalents,
+    # which bionic -- unlike glibc/musl -- doesn't provide.
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -I$ROOTDIR/include -include $ROOTDIR/patches/misc/bionic_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
