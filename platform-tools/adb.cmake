@@ -143,10 +143,13 @@ if(PLATFORM_DARWIN)
         ${SRC}/adb/fdevent/fdevent_poll.cpp
         )
 elseif(PLATFORM_WINDOWS)
-    # NB: windows adb also needs the prebuilt AdbWinApi (USB API) lib, which isn't
-    # built here yet — see the executable link section / README.
+    # Use the libusb backend on windows (WinUSB) instead of the native
+    # usb_windows.cpp, so we don't depend on the prebuilt AdbWinApi (which is only
+    # shipped 32-bit). usb_init() comes from usb_libusb_hotplug.cpp here.
     target_sources(libadb PRIVATE
-        ${SRC}/adb/client/usb_windows.cpp
+        ${SRC}/adb/client/usb_libusb_device.cpp
+        ${SRC}/adb/client/usb_libusb_hotplug.cpp
+        ${SRC}/adb/client/usb_libusb_inhouse_hotplug.cpp
         ${SRC}/adb/fdevent/fdevent_poll.cpp
         ${SRC}/adb/sysdeps_win32.cpp
         ${SRC}/adb/sysdeps/win32/errno.cpp
@@ -360,6 +363,6 @@ target_link_libraries(adb
 if(PLATFORM_DARWIN)
     target_link_libraries(adb "-framework CoreFoundation" "-framework IOKit" "-framework Security")
 elseif(PLATFORM_WINDOWS)
-    # AdbWinApi (USB API DLL) is also required on windows but isn't built here yet.
-    target_link_libraries(adb gdi32 userenv ws2_32)
+    # No AdbWinApi: the libusb (WinUSB) backend needs these Win32 libs instead.
+    target_link_libraries(adb setupapi ole32 cfgmgr32 winusb gdi32 userenv ws2_32)
 endif()

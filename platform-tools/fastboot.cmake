@@ -68,6 +68,8 @@ add_executable(fastboot
 if(PLATFORM_DARWIN)
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_osx.cpp)
 elseif(PLATFORM_WINDOWS)
+    # fastboot's windows USB backend needs AdbWinApi and has no libusb fallback, so
+    # fastboot is not built for windows (gated in platform-tools/CMakeLists.txt).
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_windows.cpp)
 else()
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_linux.cpp)

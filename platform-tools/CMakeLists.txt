@@ -28,5 +28,10 @@ include(sqlite3.cmake)
 include(etc1tool.cmake)
 include(e2fsprogs.cmake)
 include(f2fs-tools.cmake)
-include(fastboot.cmake)
+# fastboot has no libusb backend; its windows USB path needs AdbWinApi (which we
+# don't ship), so it's built for every host except windows (the official
+# fastboot.exe stays in the spliced windows SDK).
+if(NOT PLATFORM_WINDOWS)
+  include(fastboot.cmake)
+endif()
 include(adb.cmake)
