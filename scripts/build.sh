@@ -104,7 +104,7 @@ case "$PLATFORM" in
     # libbase. riscv64 only exists from API 35.
     API="${ANDROID_PLATFORM:-30}"; [ "$TARGET" = riscv64-linux-android ] && API=35
     if [ "$API" -lt 30 ]; then
-      echo "bionic build requires ANDROID_PLATFORM >= 30 (got $API): the fdsan / reallocarray / __android_log_* APIs used by libbase/libcutils only exist from API 29-30 and the compat shims were removed." >&2
+      echo "bionic build requires ANDROID_PLATFORM >= 30 (got $API): the fdsan / reallocarray / __android_log_* APIs used by libbase/libcutils only exist from API 30." >&2
       exit 1
     fi
     NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
