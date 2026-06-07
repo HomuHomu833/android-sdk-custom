@@ -6,7 +6,11 @@
 // label_file.c uses them as a single-threaded perf optimization. The _unlocked
 // forms differ from the plain ones only in skipping the per-FILE lock, so mapping
 // them to the locked equivalents is functionally identical here.
-#if defined(__BIONIC__)
+//
+// NB: guard on __ANDROID__ (a compiler predefine), not __BIONIC__ (defined by
+// bionic's <sys/cdefs.h>) -- this header is force-included before any system
+// header, so __BIONIC__ isn't defined yet at this point.
+#if defined(__ANDROID__)
 #ifndef fgets_unlocked
 #define fgets_unlocked(s, n, f)      fgets((s), (n), (f))
 #endif
