@@ -1,5 +1,5 @@
 name: Make SDK (Bionic)
-run-name: Make SDK ${{ inputs.version }} (bionic)
+run-name: Make SDK ${{ inputs.version }}
 on:
   workflow_dispatch:
     inputs:
