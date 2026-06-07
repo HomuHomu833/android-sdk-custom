@@ -212,7 +212,7 @@ if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
   ( cd "$ROOTDIR"
     fetch --dir=/tmp -o bzip2-1.0.8.tar.gz https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz && gzip -d < /tmp/bzip2-1.0.8.tar.gz | tar -x && rm /tmp/bzip2-1.0.8.tar.gz
     cd bzip2-1.0.8
-    make CC="$CROSS_CC" AR="$CROSS_AR" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" install )
+    make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" install )
 fi
 
 # --- the SDK host tools -----------------------------------------------------
