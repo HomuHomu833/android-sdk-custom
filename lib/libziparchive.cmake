@@ -23,7 +23,7 @@ add_library(libziparchive STATIC
     )
 
 # incfs_support signal-fault handling is POSIX-only (not built on mingw)
-if(PLATFORM_NOT_WINDOWS)
+if(NOT PLATFORM_WINDOWS)
     target_sources(libziparchive PRIVATE
         ${SRC}/libziparchive/incfs_support/signal_handling.cpp
         )

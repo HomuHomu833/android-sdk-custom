@@ -68,14 +68,9 @@ else()
 endif()
 
 # Soong-style derived groupings used by the module CMake files:
-#   PLATFORM_NOT_WINDOWS  -> Android.bp target.not_windows
 #   PLATFORM_LINUX_KERNEL -> Android.bp target.linux (android + host Linux)
 #   PLATFORM_HOST         -> Android.bp target.host  (everything but android)
-if(PLATFORM_WINDOWS)
-    set(PLATFORM_NOT_WINDOWS OFF)
-else()
-    set(PLATFORM_NOT_WINDOWS ON)
-endif()
+# (Android.bp target.not_windows maps to a plain `if(NOT PLATFORM_WINDOWS)`.)
 if(PLATFORM_LINUX OR PLATFORM_ANDROID)
     set(PLATFORM_LINUX_KERNEL ON)
 else()

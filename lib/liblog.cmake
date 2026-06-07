@@ -27,7 +27,7 @@ add_library(liblog STATIC
     )
 
 # target.not_windows (host non-windows + android)
-if(PLATFORM_NOT_WINDOWS)
+if(NOT PLATFORM_WINDOWS)
     target_sources(liblog PRIVATE
         ${SRC}/logging/liblog/event_tag_map.cpp
         )

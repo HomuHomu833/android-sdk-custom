@@ -41,7 +41,7 @@ if(PLATFORM_LINUX_KERNEL)
 endif()
 
 # target.not_windows (host non-windows + android) -- incl. the unix sockets
-if(PLATFORM_NOT_WINDOWS)
+if(NOT PLATFORM_WINDOWS)
     target_sources(libcutils PRIVATE
         ${SRC}/core/libcutils/fs.cpp
         ${SRC}/core/libcutils/hashmap.cpp
