@@ -62,10 +62,7 @@ sed -i '/};/ a\
 #ifndef PAGE_SIZE\
 #define PAGE_SIZE 4096\
 #endif' ${PWD_SRC}/src/logging/liblog/logger.h
-# NB: klog.h (klog.cpp) and uevent.cpp are now compiled only for the android
-# target (libcutils.cmake target.android); bionic's <unistd.h> already provides
-# TEMP_FAILURE_RETRY, so the old host-only TEMP_FAILURE_RETRY shims for them were
-# dropped. logger.h's shim above stays — it's compiled on the musl host.
+
 sed -i '/struct msghdr hdr = {/,/};/c\
     struct msghdr hdr = {};\
     hdr.msg_name = &addr;\
@@ -99,9 +96,6 @@ sed -i '/#include <sys\/limits.h>/d; /#include <log\/log.h>/a\
 #ifndef UID_MAX\n#define UID_MAX 2147483647\n#endif' ${PWD_SRC}/src/core/libpackagelistparser/packagelistparser.cpp
 
 sed -i 's/std::vector<const StringPiece>/std::vector<StringPiece>/g' ${PWD_SRC}/src/base/tools/aapt2/util/Files.cpp
-
-# (trace-dev.inc's PROP_NAME_MAX shim was dropped: trace-dev.cpp is android-only
-# now (libcutils.cmake target.android), and bionic defines PROP_NAME_MAX.)
 
 # fmtlib's allocator calls bare malloc()/free(), relying on <cstdlib> leaking the
 # C names into the global namespace. zig 0.17's newer libc++ no longer does that,
