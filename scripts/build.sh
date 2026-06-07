@@ -120,10 +120,7 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    # bionic_compat.h (force-included): maps the GNU stdio *_unlocked extensions
-    # AOSP host code uses (e.g. selinux label_file.c) to their locked equivalents,
-    # which bionic -- unlike glibc/musl -- doesn't provide at any API level.
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/bionic_compat.h"
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
