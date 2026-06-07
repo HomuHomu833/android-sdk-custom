@@ -56,4 +56,5 @@ target_include_directories(libbase PRIVATE
     ${SRC}/core/include
     ${SRC}/fmtlib/include 
     ${SRC}/logging/liblog/include
+    ${SRC}/../include
     )

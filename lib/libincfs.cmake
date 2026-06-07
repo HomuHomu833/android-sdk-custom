@@ -33,4 +33,5 @@ target_include_directories(libincfs PRIVATE
     ${SRC}/boringssl/include
     ${SRC}/selinux/libselinux/include
     ${SRC}/logging/liblog/include 
+    ${SRC}/../include
     )

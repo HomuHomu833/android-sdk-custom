@@ -57,5 +57,6 @@ target_include_directories(liblog PRIVATE
     ${SRC}/logging/liblog/include
     ${SRC}/core/libcutils/include
     ${SRC}/libbase/include
+    ${SRC}/../include
     )
     
