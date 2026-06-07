@@ -87,5 +87,11 @@ target_link_libraries(aapt
     dl
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+# libaapt Android.bp target.darwin (no per-OS srcs for aapt)
+if(PLATFORM_DARWIN)
+    target_compile_definitions(libaapt PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
+    target_compile_definitions(aapt PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
+endif()
     
     

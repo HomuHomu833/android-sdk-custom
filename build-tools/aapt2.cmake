@@ -217,3 +217,14 @@ target_link_libraries(aapt2
     png_static
     dl
     )
+
+# Per-OS flags/libs (Android.bp aapt2 target.{darwin,windows}). No per-OS srcs.
+if(PLATFORM_DARWIN)
+    target_compile_definitions(libaapt2 PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
+    target_compile_definitions(aapt2 PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
+    target_link_libraries(aapt2 "-framework CoreFoundation")  # required by protobuf
+elseif(PLATFORM_WINDOWS)
+    target_compile_options(libaapt2 PRIVATE -Wno-maybe-uninitialized)
+    target_compile_options(aapt2 PRIVATE -Wno-maybe-uninitialized)
+    target_link_libraries(aapt2 dbghelp)  # protobuf stack tracing
+endif()
