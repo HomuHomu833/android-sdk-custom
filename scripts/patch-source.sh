@@ -248,6 +248,10 @@ sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' ${PWD_SRC}/s
 sed -i 's/extra_args\.flavor = \&flavor;/extra_args.flavor = (uint32_t *)\&flavor;/' \
   ${PWD_SRC}/src/selinux/libsepol/cil/src/cil_verify.c
 
+# bionic: fdsan is intreduced in API 29 and upper but users might target
+# lower APIs which android_fdsan_* symbols won't be available. Guard the uses in unique_fd.h under an API check.
+sed -i 's/#if defined(__BIONIC__)/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/g' ${PWD_SRC}/src/libbase/include/android-base/unique_fd.h
+
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
