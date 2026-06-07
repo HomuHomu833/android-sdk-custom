@@ -30,7 +30,6 @@ cp patches/misc/platform_tools_version.h src/soong/cc/libbuildversion/include/
 
 cp patches/misc/instruction_set.h        src/art/libartbase/arch/instruction_set.h
 cp patches/misc/instruction_set.cc       src/art/libartbase/arch/instruction_set.cc
-cp patches/misc/instruction_set_test.cc  src/art/libartbase/arch/instruction_set_test.cc
 cp patches/misc/mem_map.h                src/art/libartbase/base/mem_map.h
 
 cp patches/misc/target.h            src/boringssl/src/include/openssl/target.h
@@ -63,13 +62,10 @@ sed -i '/};/ a\
 #ifndef PAGE_SIZE\
 #define PAGE_SIZE 4096\
 #endif' ${PWD_SRC}/src/logging/liblog/logger.h
-sed -i '/__END_DECLS/i\
-#ifndef TEMP_FAILURE_RETRY\n\
-#define TEMP_FAILURE_RETRY(expression) (({ long int __result; do __result = (long int)(expression); while (__result == -1 && errno == EINTR); __result; }))\n\
-#endif\n' ${PWD_SRC}/src/core/libcutils/include/cutils/klog.h
-sed -i '/extern "C" {/a\
-#ifndef TEMP_FAILURE_RETRY\n#define TEMP_FAILURE_RETRY(expression) (({ long int __result; do __result = (long int)(expression); while (__result == -1 && errno == EINTR); __result; }))\n#endif
-' ${PWD_SRC}/src/core/libcutils/uevent.cpp
+# NB: klog.h (klog.cpp) and uevent.cpp are now compiled only for the android
+# target (libcutils.cmake target.android); bionic's <unistd.h> already provides
+# TEMP_FAILURE_RETRY, so the old host-only TEMP_FAILURE_RETRY shims for them were
+# dropped. logger.h's shim above stays — it's compiled on the musl host.
 sed -i '/struct msghdr hdr = {/,/};/c\
     struct msghdr hdr = {};\
     hdr.msg_name = &addr;\
@@ -104,11 +100,8 @@ sed -i '/#include <sys\/limits.h>/d; /#include <log\/log.h>/a\
 
 sed -i 's/std::vector<const StringPiece>/std::vector<StringPiece>/g' ${PWD_SRC}/src/base/tools/aapt2/util/Files.cpp
 
-sed -i '/#define LOG_TAG "cutils-trace"/a\
-#ifndef PROP_NAME_MAX\
-#define PROP_NAME_MAX 32\
-#endif
-' ${PWD_SRC}/src/core/libcutils/trace-dev.inc
+# (trace-dev.inc's PROP_NAME_MAX shim was dropped: trace-dev.cpp is android-only
+# now (libcutils.cmake target.android), and bionic defines PROP_NAME_MAX.)
 
 # fmtlib's allocator calls bare malloc()/free(), relying on <cstdlib> leaking the
 # C names into the global namespace. zig 0.17's newer libc++ no longer does that,
