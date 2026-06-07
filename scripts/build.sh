@@ -171,10 +171,22 @@ if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
 fi
 
 # --- the SDK host tools -----------------------------------------------------
+# TARGET_OS maps our PLATFORM to the AOSP Android.bp os axis (android | linux |
+# darwin | windows), so the module CMake files can do the same per-OS source/flag
+# selection the .bp files do. (bionic builds set CMAKE_SYSTEM_NAME=Linux, so this
+# is the only way CMake can tell android apart from a Linux host.)
+case "$PLATFORM" in
+  bionic)  TARGET_OS=android ;;
+  macos)   TARGET_OS=darwin ;;
+  windows) TARGET_OS=windows ;;
+  *)       TARGET_OS=linux ;;
+esac
+
 log "Configuring SDK ($PLATFORM / $TARGET)"
 cmake -GNinja \
   -B "$BUILD_DIR" \
   -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
+  -DTARGET_OS="$TARGET_OS" \
   -DCMAKE_CROSSCOMPILING=True \
   -DCMAKE_SYSTEM_PROCESSOR="$ARCH" \
   -DCMAKE_PREFIX_PATH="$EXTRA_PREFIX" \

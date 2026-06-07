@@ -37,6 +37,56 @@ set(SRC ${PROJECT_SOURCE_DIR}/src)
 # 64-bit off_t for lseek.
 add_definitions(-D_FILE_OFFSET_BITS=64)
 
+# --- platform classification ------------------------------------------------
+# Mirrors the AOSP Android.bp "os" axis so the module CMake files can do the same
+# per-OS source/flag selection the .bp target.{android,linux,darwin,windows}
+# blocks do. scripts/build.sh passes TARGET_OS (android|linux|darwin|windows);
+# fall back to a CMAKE_SYSTEM_NAME guess for standalone cmake runs.
+if(NOT DEFINED TARGET_OS)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set(TARGET_OS "windows")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set(TARGET_OS "darwin")
+    else()
+        set(TARGET_OS "linux")
+    endif()
+endif()
+message(STATUS "TARGET_OS = ${TARGET_OS}")
+
+set(PLATFORM_ANDROID OFF)   # Android.bp target.android  (bionic device)
+set(PLATFORM_LINUX   OFF)   # Android.bp target.linux_glibc/musl (host Linux)
+set(PLATFORM_DARWIN  OFF)   # Android.bp target.darwin   (macOS host)
+set(PLATFORM_WINDOWS OFF)   # Android.bp target.windows  (mingw host)
+if(TARGET_OS STREQUAL "android")
+    set(PLATFORM_ANDROID ON)
+elseif(TARGET_OS STREQUAL "darwin")
+    set(PLATFORM_DARWIN ON)
+elseif(TARGET_OS STREQUAL "windows")
+    set(PLATFORM_WINDOWS ON)
+else()
+    set(PLATFORM_LINUX ON)
+endif()
+
+# Soong-style derived groupings used by the module CMake files:
+#   PLATFORM_NOT_WINDOWS  -> Android.bp target.not_windows
+#   PLATFORM_LINUX_KERNEL -> Android.bp target.linux (android + host Linux)
+#   PLATFORM_HOST         -> Android.bp target.host  (everything but android)
+if(PLATFORM_WINDOWS)
+    set(PLATFORM_NOT_WINDOWS OFF)
+else()
+    set(PLATFORM_NOT_WINDOWS ON)
+endif()
+if(PLATFORM_LINUX OR PLATFORM_ANDROID)
+    set(PLATFORM_LINUX_KERNEL ON)
+else()
+    set(PLATFORM_LINUX_KERNEL OFF)
+endif()
+if(PLATFORM_ANDROID)
+    set(PLATFORM_HOST OFF)
+else()
+    set(PLATFORM_HOST ON)
+endif()
+
 set(PROTOC_COMPILER)
 
 if(DEFINED PROTOC_PATH)
