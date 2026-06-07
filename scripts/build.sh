@@ -99,8 +99,14 @@ case "$PLATFORM" in
     NDK_REVISION="${NDK_REVISION:-}"
     # API 30 floor: AOSP libbase/libcutils use bionic APIs that only exist from
     # 29-30 (fdsan, reallocarray -> 29; __android_log_* logger APIs -> 30), so
-    # building lower needs per-symbol shims. 30 lets the code compile as-is.
+    # building lower needs per-symbol shims (since removed). 30 lets the code
+    # compile as-is; refuse anything lower up front rather than failing deep in
+    # libbase. riscv64 only exists from API 35.
     API="${ANDROID_PLATFORM:-30}"; [ "$TARGET" = riscv64-linux-android ] && API=35
+    if [ "$API" -lt 30 ]; then
+      echo "bionic build requires ANDROID_PLATFORM >= 30 (got $API): the fdsan / reallocarray / __android_log_* APIs used by libbase/libcutils only exist from API 29-30 and the compat shims were removed." >&2
+      exit 1
+    fi
     NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
     NDK_DIR="$ROOTDIR/$NDK_NAME"
     if [ ! -d "$NDK_DIR" ]; then
