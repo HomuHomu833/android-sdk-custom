@@ -120,7 +120,10 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined"
+    # bionic_prop_compat.h (force-included): forward-declares the two property
+    # functions libbase uses that the NDK headers never declare (serial /
+    # area_serial); they're real libc symbols, so only the declaration is missing.
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/bionic_prop_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
