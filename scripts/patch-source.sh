@@ -26,6 +26,10 @@ cp patches/misc/IncrementalProperties.sysprop.cpp src/incremental_delivery/syspr
 cp patches/misc/deployagent.inc        src/adb/fastdeploy/deployagent/
 cp patches/misc/deployagentscript.inc  src/adb/fastdeploy/deployagent/
 
+# our libusb-based fastboot USB backend — lets fastboot build for windows with no
+# AdbWinApi (fastboot.cmake compiles it instead of usb_windows.cpp on windows).
+cp patches/misc/fastboot_usb_libusb.cpp src/core/fastboot/usb_libusb.cpp
+
 cp patches/misc/platform_tools_version.h src/soong/cc/libbuildversion/include/
 
 cp patches/misc/instruction_set.h        src/art/libartbase/arch/instruction_set.h

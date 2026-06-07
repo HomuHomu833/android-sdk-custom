@@ -68,9 +68,10 @@ add_executable(fastboot
 if(PLATFORM_DARWIN)
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_osx.cpp)
 elseif(PLATFORM_WINDOWS)
-    # fastboot's windows USB backend needs AdbWinApi and has no libusb fallback, so
-    # fastboot is not built for windows (gated in platform-tools/CMakeLists.txt).
-    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_windows.cpp)
+    # our libusb backend (installed by patch-source.sh) instead of usb_windows.cpp,
+    # so fastboot builds for windows without the AdbWinApi dependency.
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_libusb.cpp)
+    target_include_directories(fastboot PRIVATE ${SRC}/libusb/libusb)
 else()
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_linux.cpp)
 endif()
@@ -120,5 +121,6 @@ target_link_libraries(fastboot
 if(PLATFORM_DARWIN)
     target_link_libraries(fastboot "-framework CoreFoundation" "-framework IOKit")
 elseif(PLATFORM_WINDOWS)
-    target_link_libraries(fastboot ws2_32)
+    # libusb (WinUSB) backend + the Win32 libs it needs; no AdbWinApi.
+    target_link_libraries(fastboot libusb setupapi ole32 cfgmgr32 winusb ws2_32)
 endif()
