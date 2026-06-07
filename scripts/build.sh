@@ -11,7 +11,7 @@
 #   JOBS       parallelism (default: nproc)
 #   NDK_VERSION   official NDK to pull for the bionic clang, e.g. 27 (bionic only)
 #   NDK_REVISION  optional NDK revision letter, e.g. c (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 25, riscv64 forced to 35; bionic only)
+#   ANDROID_PLATFORM  bionic API level (default 30, riscv64 forced to 35; bionic only)
 #
 # Expects fetch-source.sh to have run first (sources + patches in place).
 set -euo pipefail
@@ -97,7 +97,10 @@ case "$PLATFORM" in
     # over with its own NDK toolchain machinery — mirrors the sibling NDK repo.
     : "${NDK_VERSION:?set NDK_VERSION for the bionic build}"
     NDK_REVISION="${NDK_REVISION:-}"
-    API="${ANDROID_PLATFORM:-25}"; [ "$TARGET" = riscv64-linux-android ] && API=35
+    # API 30 floor: AOSP libbase/libcutils use bionic APIs that only exist from
+    # 29-30 (fdsan, reallocarray -> 29; __android_log_* logger APIs -> 30), so
+    # building lower needs per-symbol shims. 30 lets the code compile as-is.
+    API="${ANDROID_PLATFORM:-30}"; [ "$TARGET" = riscv64-linux-android ] && API=35
     NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
     NDK_DIR="$ROOTDIR/$NDK_NAME"
     if [ ! -d "$NDK_DIR" ]; then
@@ -111,14 +114,10 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    # -I$ROOTDIR/include puts the repo's ungated <sys/system_properties.h> ahead of
-    # the NDK sysroot's (which gates the API-26 property helpers behind API>=26), so
-    # properties.cpp etc. compile at minSdk 25; faked_functions.cpp supplies compat
-    # shims for those API-26 helpers implemented over the API-1 primitives.
     # bionic_compat.h (force-included): maps the GNU stdio *_unlocked extensions
     # AOSP host code uses (e.g. selinux label_file.c) to their locked equivalents,
-    # which bionic -- unlike glibc/musl -- doesn't provide.
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -I$ROOTDIR/include -include $ROOTDIR/patches/misc/bionic_compat.h"
+    # which bionic -- unlike glibc/musl -- doesn't provide at any API level.
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/bionic_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
