@@ -142,7 +142,7 @@ case "$PLATFORM" in
     CROSS_RANLIB="$TC/bin/${HOST}-ranlib"; CROSS_STRIP="$TC/bin/${HOST}-strip"
     CROSS_OBJCOPY=""                  # cctools ships no objcopy; nothing here needs it
     SYSTEM_NAME=Darwin
-    CROSS_CFLAGS="-Wno-error=date-time"
+    CROSS_CFLAGS="-Wno-error=date-time -D_DARWIN_C_SOURCE"
     CROSS_LDFLAGS=""
     # Point CMake's Apple support at the osxcross SDK + pin arch/deployment target.
     SDKROOT="$(ls -d "$TC/SDK/MacOSX"*.sdk 2>/dev/null | head -n1 || true)"
@@ -209,7 +209,7 @@ if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
   ( cd "$ROOTDIR"
     fetch --dir=/tmp -o bzip2-1.0.8.tar.gz https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz && gzip -d < /tmp/bzip2-1.0.8.tar.gz | tar -x && rm /tmp/bzip2-1.0.8.tar.gz
     cd bzip2-1.0.8
-    make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" install )
+    make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" OS="${PLATFORM/windows/Windows_NT}" install )
 fi
 
 # --- the SDK host tools -----------------------------------------------------
