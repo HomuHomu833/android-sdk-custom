@@ -49,8 +49,16 @@ add_library(libopenscreen STATIC
     ${SRC}/openscreen/util/big_endian.cc
     ${SRC}/openscreen/platform/impl/time.cc
     ${SRC}/openscreen/platform/impl/network_interface.cc
-    ${SRC}/openscreen/platform/impl/network_interface_linux.cc
     )
+
+# Per-OS network-interface enumeration (Android.bp target.{linux,darwin,windows})
+if(PLATFORM_DARWIN)
+    target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_mac.cc)
+elseif(PLATFORM_WINDOWS)
+    target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_win.cc)
+else()
+    target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_linux.cc)
+endif()
 
 target_compile_options(libopenscreen PRIVATE 
     -fno-exceptions

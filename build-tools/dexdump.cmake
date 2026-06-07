@@ -56,10 +56,17 @@ add_library(libartbase STATIC
     ${SRC}/art/libartbase/base/unix_file/random_access_file_utils.cc
     ${SRC}/art/libartbase/base/utils.cc
     ${SRC}/art/libartbase/base/zip_archive.cc
-    ${SRC}/art/libartbase/base/globals_unix.cc
-    ${SRC}/art/libartbase/base/mem_map_unix.cc
     ${SRC}/faked_functions.cpp
     )
+# libartbase per-OS (Android.bp target.{not_windows,windows})
+if(PLATFORM_WINDOWS)
+    target_sources(libartbase PRIVATE ${SRC}/art/libartbase/base/mem_map_windows.cc)
+else()
+    target_sources(libartbase PRIVATE
+        ${SRC}/art/libartbase/base/globals_unix.cc
+        ${SRC}/art/libartbase/base/mem_map_unix.cc
+        )
+endif()
 target_include_directories(libartbase PRIVATE ${INCLUDES})
 
 add_library(libartpalette STATIC

@@ -21,11 +21,33 @@ add_library(libusb STATIC
     ${SRC}/libusb/libusb/io.c
     ${SRC}/libusb/libusb/sync.c
     ${SRC}/libusb/libusb/strerror.c
-    ${SRC}/libusb/libusb/os/linux_usbfs.c
-    ${SRC}/libusb/libusb/os/events_posix.c
-    ${SRC}/libusb/libusb/os/threads_posix.c
-    ${SRC}/libusb/libusb/os/linux_netlink.c
     )
+
+# Per-OS backend (Android.bp libusb target.{linux_glibc,darwin,windows}).
+# NB: libusb's config.h also needs per-OS defines (PLATFORM_POSIX/WINDOWS, etc.)
+# for darwin/windows beyond these sources.
+if(PLATFORM_DARWIN)
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/darwin_usb.c
+        ${SRC}/libusb/libusb/os/events_posix.c
+        ${SRC}/libusb/libusb/os/threads_posix.c
+        )
+elseif(PLATFORM_WINDOWS)
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/events_windows.c
+        ${SRC}/libusb/libusb/os/threads_windows.c
+        ${SRC}/libusb/libusb/os/windows_common.c
+        ${SRC}/libusb/libusb/os/windows_usbdk.c
+        ${SRC}/libusb/libusb/os/windows_winusb.c
+        )
+else()
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/linux_usbfs.c
+        ${SRC}/libusb/libusb/os/events_posix.c
+        ${SRC}/libusb/libusb/os/threads_posix.c
+        ${SRC}/libusb/libusb/os/linux_netlink.c
+        )
+endif()
 target_include_directories(libusb PRIVATE
     ${SRC}/libusb/libusb
     ${SRC}/libusb/libusb/os
