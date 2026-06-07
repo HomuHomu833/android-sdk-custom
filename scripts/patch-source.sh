@@ -93,6 +93,13 @@ find ${PWD_SRC}/src -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -e
 #define __INTRODUCED_IN(version)\
 #endif' {} +
 
+# The in-tree liblog <android/log.h> annotates the newer __android_log_* APIs with
+# __INTRODUCED_IN(30); the global neutralization above doesn't catch it (cdefs is
+# already included by then), so libbase logging.cpp fails below API 30. We build &
+# statically link liblog ourselves, so those symbols are always present regardless
+# of the device API -- strip the availability annotation. (No-op at API >= 30.)
+sed -i 's/__INTRODUCED_IN([0-9]\+)//g' ${PWD_SRC}/src/logging/liblog/include/android/log.h
+
 sed -i 's/__BEGIN_DECLS/#ifdef __cplusplus\nextern "C" {\n#endif/g; s/__END_DECLS/#ifdef __cplusplus\n}\n#endif/g' ${PWD_SRC}/src/core/libpackagelistparser/include/packagelistparser/packagelistparser.h
 
 sed -i '/#include <sys\/limits.h>/d; /#include <log\/log.h>/a\
