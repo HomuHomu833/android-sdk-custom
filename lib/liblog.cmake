@@ -14,21 +14,35 @@
 # limitations under the License.
 #
 
+# Common srcs (Android.bp: liblog_sources). Per-OS adds mirror liblog.defaults
+# target.{not_windows,android}.
 add_library(liblog STATIC
     ${SRC}/logging/liblog/log_event_list.cpp
     ${SRC}/logging/liblog/log_event_write.cpp
     ${SRC}/logging/liblog/logger_name.cpp
     ${SRC}/logging/liblog/logger_read.cpp
     ${SRC}/logging/liblog/logger_write.cpp
-    ${SRC}/logging/liblog/properties.cpp
     ${SRC}/logging/liblog/logprint.cpp
-    ${SRC}/logging/liblog/event_tag_map.cpp
-    ${SRC}/logging/liblog/log_time.cpp
-    ${SRC}/logging/liblog/pmsg_reader.cpp
-    ${SRC}/logging/liblog/pmsg_writer.cpp
-    ${SRC}/logging/liblog/logd_reader.cpp
-    ${SRC}/logging/liblog/logd_writer.cpp
+    ${SRC}/logging/liblog/properties.cpp
     )
+
+# target.not_windows (host non-windows + android)
+if(PLATFORM_NOT_WINDOWS)
+    target_sources(liblog PRIVATE
+        ${SRC}/logging/liblog/event_tag_map.cpp
+        )
+endif()
+
+# target.android (device logging: logd/pmsg readers+writers, log_time)
+if(PLATFORM_ANDROID)
+    target_sources(liblog PRIVATE
+        ${SRC}/logging/liblog/log_time.cpp
+        ${SRC}/logging/liblog/pmsg_reader.cpp
+        ${SRC}/logging/liblog/pmsg_writer.cpp
+        ${SRC}/logging/liblog/logd_reader.cpp
+        ${SRC}/logging/liblog/logd_writer.cpp
+        )
+endif()
 
 target_compile_definitions(liblog PRIVATE
     -DLIBLOG_LOG_TAG=1006 
