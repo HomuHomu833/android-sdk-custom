@@ -37,21 +37,17 @@ fetch() {
 
 [ -d "$BUILT_BIN" ] || { echo "built binaries not found at $BUILT_BIN" >&2; exit 1; }
 
-# --- windows: ship the raw .exe tools ---------------------------------------
-# The official SDK's per-OS build-tools can't be fetched on the Linux build host
-# (sdkmanager only pulls the host OS's package), and the launcher scripts are
-# bash, not .bat. So the Windows deliverable is the cross-built tool set; drop it
-# into a real Windows SDK on-device. (Linux/macOS/bionic splice below: same binary
-# names + universal Java/shell tooling make the official Linux SDK a valid base.)
-if [ "$PLATFORM" = windows ]; then
-  mkdir -p "$DEST"
-  ARCHIVE="$DEST/android-sdk-$TARGET.tar.xz"
-  log "Archiving windows host tools -> $ARCHIVE"
-  tar -cf - -C "$(dirname "$BUILT_BIN")" "$(basename "$BUILT_BIN")" \
-    | xz -T0 -9e --lzma2=dict=256MiB > "$ARCHIVE"
-  log "Done -> $ARCHIVE"
-  exit 0
-fi
+# REPO_OS_OVERRIDE makes sdkmanager fetch a specific OS's packages regardless of
+# the (Linux) build host, so each platform gets the matching official SDK to
+# splice into — windows .exe + .bat launchers, macOS Mach-O, etc. bionic splices
+# its android ELF binaries into the linux SDK (the Java/shell tooling runs on
+# device via Termux's JRE).
+case "$PLATFORM" in
+  windows) REPO_OS_OVERRIDE=windows ;;
+  macos)   REPO_OS_OVERRIDE=macosx ;;
+  *)       REPO_OS_OVERRIDE=linux ;;
+esac
+export REPO_OS_OVERRIDE
 
 # --- fetch the official SDK (build-tools + platform-tools) -------------------
 log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"
@@ -73,7 +69,7 @@ splice() {
   local dir="$1"
   find "$dir" -type f | while IFS= read -r file; do
     bname="$(basename "$file")"
-    if [ -f "$BUILT_BIN/$bname" ] && file "$file" | grep -q 'ELF'; then
+    if [ -f "$BUILT_BIN/$bname" ] && file "$file" | grep -qE 'ELF|Mach-O|PE32'; then
       echo "Replacing $bname"
       cp "$BUILT_BIN/$bname" "$file"
     fi
@@ -88,12 +84,16 @@ rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
 rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc "$BT"/bcc_compat "$BT"/renderscript
 
 # --- convert the bash launcher scripts to POSIX sh --------------------------
-sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
-       -e 's/^declare -a javaOpts=()/javaOpts=""/' \
-       -e 's/javaOpts+=("-\${opt}")/javaOpts="\$javaOpts -\${opt}"/' \
-       -e 's/javaOpts+=("\${defaultMx}")/javaOpts="\$javaOpts \${defaultMx}"/' \
-       -e 's|"\${javaOpts\[@\]}"|$javaOpts|' "$BT/d8"
-sed -i '1s|^#!.*bash|#!/bin/sh|' "$BT/apksigner"
+# Unix-host SDKs (linux/macosx, and the linux base used for bionic) ship bash
+# launchers; windows ships .bat instead, so skip the conversion there.
+if [ "$PLATFORM" != windows ]; then
+  sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
+         -e 's/^declare -a javaOpts=()/javaOpts=""/' \
+         -e 's/javaOpts+=("-\${opt}")/javaOpts="\$javaOpts -\${opt}"/' \
+         -e 's/javaOpts+=("\${defaultMx}")/javaOpts="\$javaOpts \${defaultMx}"/' \
+         -e 's|"\${javaOpts\[@\]}"|$javaOpts|' "$BT/d8"
+  sed -i '1s|^#!.*bash|#!/bin/sh|' "$BT/apksigner"
+fi
 
 # --- archive ----------------------------------------------------------------
 mkdir -p "$DEST"
