@@ -34,7 +34,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates aria2 xz-utils unzip zip p7zip-full git make cmake ninja-build \
         build-essential clang lld file tree jq openjdk-21-jre-headless \
-        golang-go bison flex m4 \
+        golang-go bison flex m4 python \
         autoconf automake libtool autoconf-archive pkg-config \
         zlib1g-dev libssl-dev libxml2-dev liblzma-dev libbz2-dev uuid-dev cpio bzip2 \
     && rm -rf /var/lib/apt/lists/*
