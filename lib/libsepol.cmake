@@ -61,6 +61,7 @@ add_library(libsepol STATIC
     ${SRC}/selinux/libsepol/cil/src/cil_build_ast.c
     ${SRC}/selinux/libsepol/cil/src/cil.c
     ${SRC}/selinux/libsepol/cil/src/cil_copy_ast.c
+    ${SRC}/selinux/libsepol/cil/src/cil_deny.c
     ${SRC}/selinux/libsepol/cil/src/cil_find.c
     ${SRC}/selinux/libsepol/cil/src/cil_fqn.c
     ${SRC}/selinux/libsepol/cil/src/cil_lexer.l
