@@ -119,7 +119,7 @@ case "$PLATFORM" in
     # bionic_prop_compat.h (force-included): forward-declares the two property
     # functions libbase uses that the NDK headers never declare (serial /
     # area_serial); they're real libc symbols, so only the declaration is missing.
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/bionic_prop_compat.h"
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -Wno-unguarded-availability-new -Wno-availability -include $ROOTDIR/patches/misc/bionic_prop_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   macos)
