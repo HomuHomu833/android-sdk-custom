@@ -11,7 +11,7 @@
 #   JOBS       parallelism (default: nproc)
 #   NDK_VERSION   official NDK to pull for the bionic clang, e.g. 27 (bionic only)
 #   NDK_REVISION  optional NDK revision letter, e.g. c (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 30, riscv64 forced to 35; bionic only)
+#   ANDROID_PLATFORM  bionic API level (default 29, riscv64 forced to 35; bionic only)
 #
 # Expects fetch-source.sh to have run first (sources + patches in place).
 set -euo pipefail
@@ -97,14 +97,9 @@ case "$PLATFORM" in
     # over with its own NDK toolchain machinery — mirrors the sibling NDK repo.
     : "${NDK_VERSION:?set NDK_VERSION for the bionic build}"
     NDK_REVISION="${NDK_REVISION:-}"
-    # API 30 floor: AOSP libbase/libcutils use bionic APIs that only exist from
-    # 29-30 (fdsan, reallocarray -> 29; __android_log_* logger APIs -> 30), so
-    # building lower needs per-symbol shims (since removed). 30 lets the code
-    # compile as-is; refuse anything lower up front rather than failing deep in
-    # libbase. riscv64 only exists from API 35.
-    API="${ANDROID_PLATFORM:-30}"; [ "$TARGET" = riscv64-linux-android ] && API=35
-    if [ "$API" -lt 30 ]; then
-      echo "bionic build requires ANDROID_PLATFORM >= 30 (got $API): the fdsan / reallocarray / __android_log_* APIs used by libbase/libcutils only exist from API 30." >&2
+    API="${ANDROID_PLATFORM:-29}"; [ "$TARGET" = riscv64-linux-android ] && API=35
+    if [ "$API" -lt 29 ]; then
+      echo "bionic build requires ANDROID_PLATFORM >= 29 (got $API)." >&2
       exit 1
     fi
     NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
