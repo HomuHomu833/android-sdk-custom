@@ -63,22 +63,35 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/setrans_client.c
     ${SRC}/selinux/libselinux/src/sha1.c
     ${SRC}/selinux/libselinux/src/stringrep.c
-    ${SRC}/selinux/libselinux/src/android/android_device.c
     )
 
+# target.android (Android.bp libselinux): android_device.c
+if(PLATFORM_ANDROID)
+    target_sources(libselinux PRIVATE
+        ${SRC}/selinux/libselinux/src/android/android_device.c
+        )
+endif()
+
 target_compile_definitions(libselinux PRIVATE
-    -DAUDITD_LOG_TAG=1003 
-    -D_GNU_SOURCE 
-    -DHOST 
+    -DAUDITD_LOG_TAG=1003
+    -D_GNU_SOURCE
+    -DHOST
     -DUSE_PCRE2
-    -DNO_PERSISTENTLY_STORED_PATTERNS 
+    -DNO_PERSISTENTLY_STORED_PATTERNS
     -DDISABLE_SETRANS
-    -DDISABLE_BOOL 
-    -DNO_MEDIA_BACKEND 
-    -DNO_X_BACKEND 
+    -DDISABLE_BOOL
+    -DNO_MEDIA_BACKEND
+    -DNO_X_BACKEND
     -DNO_DB_BACKEND
     -DPCRE2_CODE_UNIT_WIDTH=8
     )
+
+# Per-OS cflags (Android.bp libselinux target.{host,android})
+if(PLATFORM_HOST)
+    target_compile_definitions(libselinux PRIVATE -DBUILD_HOST)
+else()
+    target_compile_definitions(libselinux PRIVATE -DHAVE_STRLCPY -DHAVE_REALLOCARRAY)
+endif()
     
 target_include_directories(libselinux PRIVATE
     ${SRC}/selinux/libselinux/include 
