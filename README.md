@@ -20,12 +20,31 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 **Platforms**
 - Linux
 - Android
+- NetBSD
+- FreeBSD
+- OpenBSD
 
 **Architectures**
-- **X86 Family**: `x86`, `x86_64`
+- **X86 Family**: `x86`, `x86_64`, `x32`
 - **ARM Family**: `armhf`, `armeb`, `aarch64`, `aarch64_be`
-- **RISC-V**: `riscv32`, `riscv64` 
-- **Other**: `loongarch64`, `powerpc64le`, `s390x`
+- **RISC-V**: `riscv32`, `riscv64`
+- **PowerPC**: `powerpc`, `powerpc64`, `powerpc64le`
+- **Other**: `loongarch64`, `s390x`, `hexagon`
+
+---
+
+### 🔹 Native Environment
+
+**Platforms**
+- Windows
+- macOS
+- Android
+
+**Architectures**
+- `x86`, `x86_64`
+- `aarch64`
+- `armv7a` *(Android-only)*
+- `arm64e`, `x86_64h` *(macOS-only)*
 
 ---
 
