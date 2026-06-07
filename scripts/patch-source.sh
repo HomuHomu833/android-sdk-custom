@@ -16,6 +16,44 @@ PWD_SRC="$ROOTDIR"   # the old workflow anchored every path on ${PWD}
 cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+
+# --- drop in the prebuilt patch files (get_source.py:patches()) -------------
+log "Installing patch files"
+mkdir -p src/incremental_delivery/sysprop/include
+cp patches/misc/IncrementalProperties.sysprop.h   src/incremental_delivery/sysprop/include/
+cp patches/misc/IncrementalProperties.sysprop.cpp src/incremental_delivery/sysprop/
+
+cp patches/misc/deployagent.inc        src/adb/fastdeploy/deployagent/
+cp patches/misc/deployagentscript.inc  src/adb/fastdeploy/deployagent/
+
+cp patches/misc/platform_tools_version.h src/soong/cc/libbuildversion/include/
+
+cp patches/misc/instruction_set.h        src/art/libartbase/arch/instruction_set.h
+cp patches/misc/instruction_set.cc       src/art/libartbase/arch/instruction_set.cc
+cp patches/misc/instruction_set_test.cc  src/art/libartbase/arch/instruction_set_test.cc
+cp patches/misc/mem_map.h                src/art/libartbase/base/mem_map.h
+
+cp patches/misc/target.h            src/boringssl/src/include/openssl/target.h
+# getrandom_fillin.h moved between boringssl releases (crypto/fipsmodule/rand ->
+# crypto/rand), so overwrite it wherever it currently lives.
+find src/boringssl -name getrandom_fillin.h -exec cp patches/misc/getrandom_fillin.h {} \;
+
+cp patches/misc/unscaledcycleclock.cc  src/abseil-cpp/absl/base/internal/unscaledcycleclock.cc
+
+cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/CombinedIterator.h
+
+# aapt2 proto include-path rewrites
+sed -i 's#frameworks/base/tools/aapt2/Resources.proto#Resources.proto#g'         src/base/tools/aapt2/ApkInfo.proto
+sed -i 's#frameworks/base/tools/aapt2/Configuration.proto#Configuration.proto#g'  src/base/tools/aapt2/Resources.proto
+sed -i 's#frameworks/base/tools/aapt2/Configuration.proto#Configuration.proto#g'  src/base/tools/aapt2/ResourcesInternal.proto
+sed -i 's#frameworks/base/tools/aapt2/Resources.proto#Resources.proto#g'          src/base/tools/aapt2/ResourcesInternal.proto
+
+# point abseil at our in-tree googletest
+sed -i 's#/usr/src/googletest#${CMAKE_SOURCE_DIR}/src/googletest#g' src/abseil-cpp/CMakeLists.txt
+
+# boringssl pulls googletest from its own third_party dir
+ln -sf "$ROOTDIR/src/googletest" "$ROOTDIR/src/boringssl/src/third_party/googletest"
+
 log "Applying source fixups${TARGET:+ for $TARGET}"
 
 sed -i '/};/ a\
