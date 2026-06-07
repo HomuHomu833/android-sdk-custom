@@ -209,7 +209,9 @@ if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
   ( cd "$ROOTDIR"
     fetch --dir=/tmp -o bzip2-1.0.8.tar.gz https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz && gzip -d < /tmp/bzip2-1.0.8.tar.gz | tar -x && rm /tmp/bzip2-1.0.8.tar.gz
     cd bzip2-1.0.8
-    make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" PREFIX="$EXTRA_PREFIX" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" OS="${PLATFORM/windows/Windows_NT}" install )
+    make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" libbz2.a
+    cp -f libbz2.a "$EXTRA_PREFIX/lib/"
+    cp -f bzlib.h "$EXTRA_PREFIX/include/" )
 fi
 
 # --- the SDK host tools -----------------------------------------------------
