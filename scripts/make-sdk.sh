@@ -83,6 +83,15 @@ splice "$HOST_SDK/platform-tools"
 rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
 rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc "$BT"/bcc_compat "$BT"/renderscript
 
+# --- drop now-useless DLLs (windows base) -----------------------------------
+# - AdbWinApi/AdbWinUsbApi: only the official adb/fastboot used them; ours use libusb.
+# - libwinpthread-1: our windows tools are statically linked, so it's unused.
+# - libbcc/libbcinfo/libclang_android/libLLVM_android: RenderScript libs, dead now
+#   that its tools (pruned above) are gone.
+rm -f "$HOST_SDK/platform-tools/AdbWinApi.dll" "$HOST_SDK/platform-tools/AdbWinUsbApi.dll"
+rm -f "$BT/libbcc.dll" "$BT/libbcinfo.dll" "$BT/libclang_android.dll" "$BT/libLLVM_android.dll"
+find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true
+
 # --- convert the bash launcher scripts to POSIX sh --------------------------
 # Unix-host SDKs (linux/macosx, and the linux base used for bionic) ship bash
 # launchers; windows ships .bat instead, so skip the conversion there.
