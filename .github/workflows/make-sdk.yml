@@ -3,7 +3,7 @@ on:
   workflow_call:
     inputs:
       platform:
-        description: "linux | bionic"
+        description: "linux | bionic | macos | windows"
         required: true
         type: string
       targets:

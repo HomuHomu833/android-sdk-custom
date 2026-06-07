@@ -13,6 +13,7 @@ set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
 : "${TARGET:?set TARGET}"
+PLATFORM="${PLATFORM:-linux}"
 OUT="${OUT:-$ROOTDIR/out}"
 BUILT_BIN="${BUILT_BIN:-$OUT/bin-$TARGET}"
 BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-36.1.0}"
@@ -35,6 +36,22 @@ fetch() {
 }
 
 [ -d "$BUILT_BIN" ] || { echo "built binaries not found at $BUILT_BIN" >&2; exit 1; }
+
+# --- windows: ship the raw .exe tools ---------------------------------------
+# The official SDK's per-OS build-tools can't be fetched on the Linux build host
+# (sdkmanager only pulls the host OS's package), and the launcher scripts are
+# bash, not .bat. So the Windows deliverable is the cross-built tool set; drop it
+# into a real Windows SDK on-device. (Linux/macOS/bionic splice below: same binary
+# names + universal Java/shell tooling make the official Linux SDK a valid base.)
+if [ "$PLATFORM" = windows ]; then
+  mkdir -p "$DEST"
+  ARCHIVE="$DEST/android-sdk-$TARGET.tar.xz"
+  log "Archiving windows host tools -> $ARCHIVE"
+  tar -cf - -C "$(dirname "$BUILT_BIN")" "$(basename "$BUILT_BIN")" \
+    | xz -T0 -9e --lzma2=dict=256MiB > "$ARCHIVE"
+  log "Done -> $ARCHIVE"
+  exit 0
+fi
 
 # --- fetch the official SDK (build-tools + platform-tools) -------------------
 log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"

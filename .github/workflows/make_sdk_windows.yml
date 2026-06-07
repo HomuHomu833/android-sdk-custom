@@ -1,0 +1,28 @@
+name: Make SDK (Windows)
+run-name: Make SDK ${{ inputs.version }}
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Platform Tools Version (release tag)"
+        required: true
+        default: "36.0.2"
+      tag:
+        description: "Android Source Tag"
+        required: true
+        default: "android-16.0.0_r4"
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  make:
+    uses: ./.github/workflows/make-sdk.yml
+    secrets: inherit
+    with:
+      platform: windows
+      version: ${{ inputs.version }}
+      tag: ${{ inputs.tag }}
+      # armv7-w64-mingw32, arm64ec-w64-mingw32
+      targets: '["x86_64-w64-mingw32", "aarch64-w64-mingw32", "i686-w64-mingw32"]'

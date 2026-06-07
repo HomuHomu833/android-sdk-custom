@@ -40,8 +40,9 @@ fetch() {
 }
 
 # --- toolchain selection ----------------------------------------------------
-# Structured as a per-PLATFORM case so windows (llvm-mingw) / macos (osxcross) /
-# bionic (NDK clang) can be added the same way the sibling repos do.
+# Structured as a per-PLATFORM case: linux (zig), bionic (NDK clang), macos
+# (osxcross), windows (llvm-mingw) — mirrors the sibling NDK/llvm repos.
+CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
 case "$PLATFORM" in
   linux)
     TC=/opt/zig-as-llvm
@@ -121,6 +122,55 @@ case "$PLATFORM" in
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/bionic_prop_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
+  macos)
+    # macOS host tools via osxcross (cctools-port + clang wrappers that carry the
+    # macOS SDK sysroot). zig segfaults building macOS binaries, so darwin uses
+    # osxcross — mirrors the sibling NDK/llvm repos.
+    TC=/opt/osxcross
+    export PATH="$TC/bin:$PATH"
+    case "$TARGET" in
+      arm64e-*)          OSX_ARCH=arm64e ;;   # distinct PAC ABI, not arm64
+      aarch64-*|arm64-*) OSX_ARCH=arm64 ;;
+      x86_64h-*)         OSX_ARCH=x86_64h ;;  # Haswell+ x86_64 slice
+      x86_64-*)          OSX_ARCH=x86_64 ;;
+      *) echo "Unsupported macOS arch in TARGET='$TARGET'" >&2; exit 1 ;;
+    esac
+    # osxcross names wrappers with the SDK's darwin version (e.g.
+    # arm64-apple-darwin24.5-clang); resolve the prefix by globbing.
+    CCWRAP="$(ls "$TC/bin/${OSX_ARCH}-apple-darwin"*-clang 2>/dev/null | head -n1 || true)"
+    [ -n "$CCWRAP" ] || { echo "osxcross clang wrapper for $OSX_ARCH not found in $TC/bin" >&2; exit 1; }
+    HOST="$(basename "${CCWRAP%-clang}")"
+    CROSS_CC="$TC/bin/${HOST}-clang"; CROSS_CXX="$TC/bin/${HOST}-clang++"
+    CROSS_LD="$TC/bin/${HOST}-ld"; CROSS_AR="$TC/bin/${HOST}-ar"
+    CROSS_RANLIB="$TC/bin/${HOST}-ranlib"; CROSS_STRIP="$TC/bin/${HOST}-strip"
+    CROSS_OBJCOPY=""                  # cctools ships no objcopy; nothing here needs it
+    SYSTEM_NAME=Darwin
+    CROSS_CFLAGS="-Wno-error=date-time"
+    CROSS_LDFLAGS=""
+    # Point CMake's Apple support at the osxcross SDK + pin arch/deployment target.
+    SDKROOT="$(ls -d "$TC/SDK/MacOSX"*.sdk 2>/dev/null | head -n1 || true)"
+    CROSS_CMAKE_EXTRA=(-DCMAKE_OSX_ARCHITECTURES="$OSX_ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
+    [ -n "$SDKROOT" ] && CROSS_CMAKE_EXTRA+=(-DCMAKE_OSX_SYSROOT="$SDKROOT")
+    # cctools libtool under the plain `libtool` name on PATH, in case any archive
+    # merge step shells out to it (parity with the sibling repos).
+    LIBTOOLBIN="$(ls "$TC/bin/${OSX_ARCH}-apple-darwin"*-libtool 2>/dev/null | head -n1 || true)"
+    if [ -n "$LIBTOOLBIN" ]; then
+      mkdir -p "$BUILD_DIR/.macos-shims"; ln -sf "$LIBTOOLBIN" "$BUILD_DIR/.macos-shims/libtool"
+      export PATH="$BUILD_DIR/.macos-shims:$PATH"
+    fi
+    ;;
+  windows)
+    # Windows host tools via llvm-mingw (clang + lld targeting ucrt mingw-w64).
+    TC=/opt/llvm-mingw
+    CROSS_CC="$TC/bin/${TARGET}-clang"; CROSS_CXX="$TC/bin/${TARGET}-clang++"
+    CROSS_LD="$TC/bin/${TARGET}-ld"; CROSS_AR="$TC/bin/${TARGET}-ar"
+    CROSS_RANLIB="$TC/bin/${TARGET}-ranlib"; CROSS_STRIP="$TC/bin/${TARGET}-strip"
+    CROSS_OBJCOPY="$TC/bin/${TARGET}-objcopy"
+    SYSTEM_NAME=Windows
+    CROSS_CFLAGS="-Wno-error=date-time"
+    # Static CRT/libstdc++ so the .exe tools run without shipping the mingw runtime DLLs.
+    CROSS_LDFLAGS="-static -static-libstdc++ -static-libgcc"
+    ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
 export CROSS_CC CROSS_CXX CROSS_LD CROSS_AR CROSS_RANLIB CROSS_STRIP CROSS_OBJCOPY CROSS_LDFLAGS
@@ -199,7 +249,8 @@ cmake -GNinja \
   -Dprotobuf_BUILD_TESTS=OFF \
   -DABSL_PROPAGATE_CXX_STD=ON \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
-  -DPROTOC_PATH="$PROTOC"
+  -DPROTOC_PATH="$PROTOC" \
+  "${CROSS_CMAKE_EXTRA[@]}"
 
 log "Building"
 ninja -C "$BUILD_DIR" -j"$JOBS"
@@ -211,7 +262,10 @@ tools="aapt aapt2 aidl zipalign dexdump split-select \
        make_f2fs make_f2fs_casefold dmtracedump \
        veridex"
 for t in $tools; do
-  [ -f "$BUILD_DIR/bin/$t" ] && "$CROSS_STRIP" "$BUILD_DIR/bin/$t" || true
+  # windows tools are $t.exe; everything else is bare $t
+  for f in "$BUILD_DIR/bin/$t" "$BUILD_DIR/bin/$t.exe"; do
+    [ -f "$f" ] && "$CROSS_STRIP" "$f" || true
+  done
 done
 
 mkdir -p "$OUT"
