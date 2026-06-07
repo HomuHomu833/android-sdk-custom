@@ -127,12 +127,38 @@ add_library(libadb STATIC
     ${SRC}/adb/client/mdns_tracker.cpp
     ${SRC}/adb/client/mdns_utils.cpp
     ${SRC}/adb/client/pairing/pairing_client.cpp
-    ${SRC}/adb/client/usb_linux.cpp
-    ${SRC}/adb/fdevent/fdevent_epoll.cpp
-    ${SRC}/adb/sysdeps_unix.cpp
-    ${SRC}/adb/sysdeps/posix/network.cpp
     ${ADB_PROTO_SRC} ${ADB_PROTO_HDRS}
     )
+
+# Per-OS srcs (Android.bp libadb_host target.{linux,darwin,not_windows,windows}).
+if(NOT PLATFORM_WINDOWS)
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/sysdeps_unix.cpp
+        ${SRC}/adb/sysdeps/posix/network.cpp
+        )
+endif()
+if(PLATFORM_DARWIN)
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_osx.cpp
+        ${SRC}/adb/fdevent/fdevent_poll.cpp
+        )
+elseif(PLATFORM_WINDOWS)
+    # NB: windows adb also needs the prebuilt AdbWinApi (USB API) lib, which isn't
+    # built here yet — see the executable link section / README.
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_windows.cpp
+        ${SRC}/adb/fdevent/fdevent_poll.cpp
+        ${SRC}/adb/sysdeps_win32.cpp
+        ${SRC}/adb/sysdeps/win32/errno.cpp
+        ${SRC}/adb/sysdeps/win32/stat.cpp
+        )
+else()
+    # linux (host)
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_linux.cpp
+        ${SRC}/adb/fdevent/fdevent_epoll.cpp
+        )
+endif()
 target_compile_definitions(libadb PRIVATE 
     -D_GNU_SOURCE
     -DADB_HOST=1
@@ -329,3 +355,11 @@ target_link_libraries(adb
     dl
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+# Per-OS host libs (Android.bp adb/libadb_host target.{darwin,windows} host_ldlibs)
+if(PLATFORM_DARWIN)
+    target_link_libraries(adb "-framework CoreFoundation" "-framework IOKit" "-framework Security")
+elseif(PLATFORM_WINDOWS)
+    # AdbWinApi (USB API DLL) is also required on windows but isn't built here yet.
+    target_link_libraries(adb gdi32 userenv ws2_32)
+endif()

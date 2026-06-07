@@ -60,10 +60,18 @@ add_executable(fastboot
     ${SRC}/core/fastboot/task.cpp
     ${SRC}/core/fastboot/tcp.cpp
     ${SRC}/core/fastboot/udp.cpp
-    ${SRC}/core/fastboot/usb_linux.cpp
     ${SRC}/core/fastboot/vendor_boot_img_utils.cpp
     ${SRC}/core/fastboot/util.cpp
     )
+
+# Per-OS USB backend (Android.bp fastboot target.{linux,darwin,windows})
+if(PLATFORM_DARWIN)
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_osx.cpp)
+elseif(PLATFORM_WINDOWS)
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_windows.cpp)
+else()
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_linux.cpp)
+endif()
 
 target_include_directories(fastboot PRIVATE
     ${SRC}/avb
@@ -105,3 +113,10 @@ target_link_libraries(fastboot
     dl
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+# Per-OS host libs (Android.bp fastboot target.{darwin,windows} host_ldlibs)
+if(PLATFORM_DARWIN)
+    target_link_libraries(fastboot "-framework CoreFoundation" "-framework IOKit")
+elseif(PLATFORM_WINDOWS)
+    target_link_libraries(fastboot ws2_32)
+endif()
