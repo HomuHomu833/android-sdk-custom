@@ -68,6 +68,13 @@ else()
         )
 endif()
 target_include_directories(libartbase PRIVATE ${INCLUDES})
+# ART image base address + reservation deltas. Soong injects these via
+# -DART_BASE_ADDRESS=...; mem_map.cc references them, so define them here.
+target_compile_definitions(libartbase PRIVATE
+    ART_BASE_ADDRESS=0x70000000
+    ART_BASE_ADDRESS_MIN_DELTA=-0x1000000
+    ART_BASE_ADDRESS_MAX_DELTA=0x1000000
+    )
 
 add_library(libartpalette STATIC
     ${SRC}/art/libartpalette/apex/palette.cc
