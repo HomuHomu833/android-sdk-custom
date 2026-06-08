@@ -40,6 +40,33 @@ extern "C" {
 
 #endif  // !__BIONIC__
 
+#if defined(__BIONIC__)
+// The bionic host tools target a low API (default 25), whose NDK stub libc does
+// not export every property symbol the AOSP sources reference:
+//   __system_property_wait   -- API 26 (libbase properties.cpp WaitForProperty)
+//   __system_properties_init -- libc-private (selinux android_device.c)
+// Provide weak no-op fallbacks so the tools link at API 25; property-wait
+// degrades to an immediate timeout and the init is a no-op (libc auto-initialises
+// the property area on first use anyway).
+#include <time.h>
+#include <sys/system_properties.h>
+
+extern "C" {
+    __attribute__((weak))
+    bool __system_property_wait(const prop_info* /*pi*/, uint32_t /*old_serial*/,
+                                uint32_t* /*new_serial_ptr*/,
+                                const struct timespec* /*relative_timeout*/) {
+        return false;
+    }
+
+    __attribute__((weak))
+    int __system_properties_init(void) {
+        return 0;
+    }
+}
+
+#endif  // __BIONIC__
+
 extern "C" {
     int cacheflush(long start, long end, long flags) {
         (void)flags;
