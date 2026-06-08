@@ -114,6 +114,13 @@ if(DEFINED PROTOC_PATH)
 endif()
 
 # thrid-party libraries
+# BoringSSL uses NASM for its x86/x86_64 assembly on Windows, but the llvm-mingw
+# toolchain image ships no nasm, so enable_language(ASM_NASM) fails at configure
+# time. Build the pure-C crypto on Windows instead (the perlasm/GAS paths the
+# other hosts use don't need nasm and stay enabled).
+if(PLATFORM_WINDOWS)
+    set(OPENSSL_NO_ASM ON CACHE BOOL "" FORCE)
+endif()
 add_subdirectory(src/boringssl EXCLUDE_FROM_ALL)
 add_subdirectory(src/fmtlib EXCLUDE_FROM_ALL)
 add_subdirectory(src/pcre EXCLUDE_FROM_ALL)

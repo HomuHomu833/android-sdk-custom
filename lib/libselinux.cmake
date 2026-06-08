@@ -15,8 +15,6 @@
 #
 
 add_library(libselinux STATIC
-    ${SRC}/selinux/libselinux/src/android/android.c
-    ${SRC}/selinux/libselinux/src/android/android_seapp.c
     ${SRC}/selinux/libselinux/src/avc.c
     ${SRC}/selinux/libselinux/src/avc_internal.c
     ${SRC}/selinux/libselinux/src/avc_sidtab.c
@@ -64,6 +62,17 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/sha1.c
     ${SRC}/selinux/libselinux/src/stringrep.c
     )
+
+# The android/ backend pulls in Linux-only headers (android.c -> <fnmatch.h>,
+# android_seapp.c -> <linux/magic.h>), so it only builds on the linux-kernel
+# platforms (Android + host Linux); macOS/Windows hosts lack those headers and
+# don't need these device-side selinux_android_* APIs.
+if(PLATFORM_LINUX_KERNEL)
+    target_sources(libselinux PRIVATE
+        ${SRC}/selinux/libselinux/src/android/android.c
+        ${SRC}/selinux/libselinux/src/android/android_seapp.c
+        )
+endif()
 
 # target.android (Android.bp libselinux): android_device.c
 if(PLATFORM_ANDROID)

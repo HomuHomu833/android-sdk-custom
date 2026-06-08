@@ -116,7 +116,9 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined"
+    # reallocarray() is API 29+ in bionic but selinux is built -DHAVE_REALLOCARRAY;
+    # force-include a shim that supplies it on the lower API levels we target.
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/bionic_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   macos)
