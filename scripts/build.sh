@@ -144,7 +144,7 @@ case "$PLATFORM" in
     CROSS_RANLIB="$TC/bin/${HOST}-ranlib"; CROSS_STRIP="$TC/bin/${HOST}-strip"
     CROSS_OBJCOPY=""                  # cctools ships no objcopy; nothing here needs it
     SYSTEM_NAME=Darwin
-    CROSS_CFLAGS="-Wno-error=date-time -D_DARWIN_C_SOURCE -include $ROOTDIR/patches/misc/host_compat.h"
+    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -D_LIBCPP_DISABLE_AVAILABILITY"
     CROSS_LDFLAGS=""
     # Point CMake's Apple support at the osxcross SDK + pin arch/deployment target.
     SDKROOT="$(ls -d "$TC/SDK/MacOSX"*.sdk 2>/dev/null | head -n1 || true)"
