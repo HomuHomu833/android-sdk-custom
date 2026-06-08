@@ -125,30 +125,9 @@ target_include_directories(libselinux PRIVATE
     ${SRC}/../include
     )
 
-# mingw lacks some POSIX headers/constants selinux uses unconditionally (e.g.
-# <poll.h>, O_CLOEXEC); the code behind them is host-inert, so a header shim on
-# the include path plus a force-included constants shim is enough to compile.
-# host_compat supplies headers neither mingw nor the macOS SDK ship but that
-# selinux includes unconditionally (e.g. <stdio_ext.h>).
-if(PLATFORM_WINDOWS OR PLATFORM_DARWIN)
-    target_include_directories(libselinux PRIVATE
-        ${CMAKE_SOURCE_DIR}/patches/misc/host_compat
-        )
-endif()
-
-if(PLATFORM_WINDOWS)
-    target_include_directories(libselinux PRIVATE
-        ${CMAKE_SOURCE_DIR}/patches/misc/win_compat
-        )
-    target_compile_options(libselinux PRIVATE
-        -include ${CMAKE_SOURCE_DIR}/patches/misc/win_compat/win_selinux_compat.h
-        )
-endif()
-
-# macOS xattr calls take extra (position, options) args vs Linux and lack
-# O_PATH / l*xattr; force-include a shim that maps the Linux forms selinux uses.
-if(PLATFORM_DARWIN)
-    target_compile_options(libselinux PRIVATE
-        -include ${CMAKE_SOURCE_DIR}/patches/misc/mac_compat/mac_selinux_compat.h
-        )
-endif()
+# The macOS/mingw host builds need no compat-header shims here: the Linux-isms
+# libselinux would otherwise hit on a host (selinuxfs/proc mount probe,
+# __fsetlocking, O_CLOEXEC, stpcpy, getxattr) are guarded directly in the source
+# by patches/selinux/0001-host-portability-guards.patch (applied by
+# scripts/patch-source.sh), and the kernel-only translation units are excluded
+# above under PLATFORM_LINUX_KERNEL.

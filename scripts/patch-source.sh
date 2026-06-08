@@ -275,4 +275,9 @@ sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
+# selinux: guard the host-inert Linux-isms in libselinux (selinuxfs/proc mount
+# probe, __fsetlocking, O_CLOEXEC, stpcpy, getxattr) so the macOS/mingw host
+# builds compile without compat-header shims. See patches/selinux/.
+( cd ${PWD_SRC}/src/selinux && git apply ../../patches/selinux/0001-host-portability-guards.patch )
+
 log "Source fixups applied"

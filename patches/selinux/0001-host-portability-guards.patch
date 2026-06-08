@@ -1,0 +1,183 @@
+diff --git a/libselinux/src/context.c b/libselinux/src/context.c
+index 33c48ef..03b1c44 100644
+--- a/libselinux/src/context.c
++++ b/libselinux/src/context.c
+@@ -4,6 +4,17 @@
+ #include <stdlib.h>
+ #include <errno.h>
+ 
++/* stpcpy() is a POSIX.1-2008/GNU function mingw doesn't provide; context.c uses
++ * it to assemble a context string. Supply the standard "copy and return the end
++ * pointer" form on Windows only. */
++#if defined(_WIN32)
++static inline char *stpcpy(char *__dst, const char *__src)
++{
++	size_t __len = strlen(__src);
++	return (char *)memcpy(__dst, __src, __len + 1) + __len;
++}
++#endif
++
+ #define COMP_USER  0
+ #define COMP_ROLE  1
+ #define COMP_TYPE  2
+diff --git a/libselinux/src/init.c b/libselinux/src/init.c
+index 439da41..7642176 100644
+--- a/libselinux/src/init.c
++++ b/libselinux/src/init.c
+@@ -5,10 +5,16 @@
+ #include <errno.h>
+ #include <ctype.h>
+ #include <stdio.h>
++/* The selinuxfs/proc mount probe below is host-inert, and its glibc/musl-only
++ * deps -- <stdio_ext.h> (__fsetlocking), <sys/vfs.h> (statfs) and
++ * <sys/statvfs.h> (statvfs) -- are absent on macOS/mingw. Include them only
++ * where they exist; the probe itself is stubbed out for those hosts below.
++ * (<dlfcn.h> was included but no dl* symbol is used, so it is dropped.) */
++#if !defined(__APPLE__) && !defined(_WIN32)
+ #include <stdio_ext.h>
+-#include <dlfcn.h>
+ #include <sys/statvfs.h>
+ #include <sys/vfs.h>
++#endif
+ #include <stdint.h>
+ #include <limits.h>
+ 
+@@ -21,6 +27,19 @@ int selinux_page_size = 0;
+ 
+ int has_selinux_config = 0;
+ 
++#if defined(__APPLE__) || defined(_WIN32)
++/* A macOS/Windows host has no selinuxfs and no /proc to probe, so there is
++ * nothing to discover: leave selinux_mnt unset. These stubs stand in for the
++ * Linux mount-probe machinery (which needs statfs/statvfs/__fsetlocking). */
++int selinuxfs_exists(void)
++{
++	return 0;
++}
++
++static void init_selinuxmnt(void)
++{
++}
++#else
+ /* Verify the mount point for selinux file system has a selinuxfs.
+    If the file system:
+    * Exist,
+@@ -129,6 +148,7 @@ static void init_selinuxmnt(void)
+ 		fclose(fp);
+ 	return;
+ }
++#endif /* __APPLE__ || _WIN32 */
+ 
+ void fini_selinuxmnt(void)
+ {
+diff --git a/libselinux/src/label_file.c b/libselinux/src/label_file.c
+index ad9a542..22038b9 100644
+--- a/libselinux/src/label_file.c
++++ b/libselinux/src/label_file.c
+@@ -24,6 +24,18 @@
+ #include "label_internal.h"
+ #include "label_file.h"
+ 
++/* mingw has no extended attributes; the restorecon partial-match digest probe
++ * below (getxattr) is host-inert, so behave as if no stored digest exists. */
++#if defined(_WIN32)
++static inline ssize_t getxattr(const char *__path, const char *__name,
++			       void *__value, size_t __size)
++{
++	(void)__path; (void)__name; (void)__value; (void)__size;
++	errno = ENOTSUP;
++	return -1;
++}
++#endif
++
+ /* controls the shrink multiple of the hashtab length */
+ #define SHRINK_MULTIS 1
+ 
+diff --git a/libselinux/src/label_file.h b/libselinux/src/label_file.h
+index c91a6c1..b1a3b58 100644
+--- a/libselinux/src/label_file.h
++++ b/libselinux/src/label_file.h
+@@ -6,7 +6,12 @@
+ #include <string.h>
+ 
+ #include <sys/stat.h>
++/* mingw has no extended-attribute API/header; the only xattr use in the
++ * compiled-on-Windows selabel backend (label_file.c) is host-inert and stubbed
++ * there. macOS ships <sys/xattr.h> natively. */
++#if !defined(_WIN32)
+ #include <sys/xattr.h>
++#endif
+ 
+ /*
+  * regex.h/c were introduced to hold all dependencies on the regular
+diff --git a/libselinux/src/selinux_config.c b/libselinux/src/selinux_config.c
+index 1d8cfb7..5fe31cb 100644
+--- a/libselinux/src/selinux_config.c
++++ b/libselinux/src/selinux_config.c
+@@ -1,5 +1,12 @@
+ #include <stdio.h>
++/* __fsetlocking() (a single-threaded perf hint) and its <stdio_ext.h> are a
++ * glibc/musl extension; macOS and mingw lack both. The hint is irrelevant on a
++ * host build, so make it a no-op there. */
++#if defined(__APPLE__) || defined(_WIN32)
++#define __fsetlocking(stream, type) ((void)0)
++#else
+ #include <stdio_ext.h>
++#endif
+ #include <string.h>
+ #include <ctype.h>
+ #include <stddef.h>
+diff --git a/libselinux/src/selinux_internal.h b/libselinux/src/selinux_internal.h
+index e4d4b48..83baa8f 100644
+--- a/libselinux/src/selinux_internal.h
++++ b/libselinux/src/selinux_internal.h
+@@ -6,6 +6,13 @@
+ #include <pthread.h>
+ #include <stdio.h>
+ 
++/* mingw lacks O_CLOEXEC; the host-only selinuxfs/proc open() paths that use it
++ * never close-on-exec anything meaningful on a Windows host. Guarded to _WIN32
++ * so it can never collide with a real definition from <fcntl.h> on macOS/Linux,
++ * regardless of include order. */
++#if defined(_WIN32) && !defined(O_CLOEXEC)
++#define O_CLOEXEC 0
++#endif
+ 
+ extern int require_seusers ;
+ extern int selinux_page_size ;
+diff --git a/libselinux/src/sestatus.c b/libselinux/src/sestatus.c
+index fbe6430..853baf4 100644
+--- a/libselinux/src/sestatus.c
++++ b/libselinux/src/sestatus.c
+@@ -16,6 +16,12 @@
+ #include "avc_internal.h"
+ #include "policy.h"
+ 
++/* mingw lacks O_CLOEXEC; sestatus.c does not include selinux_internal.h, so
++ * supply it here too. Guarded to _WIN32 to avoid clashing with <fcntl.h>. */
++#if defined(_WIN32) && !defined(O_CLOEXEC)
++#define O_CLOEXEC 0
++#endif
++
+ /*
+  * copied from the selinux/include/security.h
+  */
+diff --git a/libselinux/src/seusers.c b/libselinux/src/seusers.c
+index 5a521f8..c2ba0f3 100644
+--- a/libselinux/src/seusers.c
++++ b/libselinux/src/seusers.c
+@@ -3,7 +3,14 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stdio.h>
++/* __fsetlocking() (a single-threaded perf hint) and its <stdio_ext.h> are a
++ * glibc/musl extension; macOS and mingw lack both. The hint is irrelevant on a
++ * host build, so make it a no-op there. */
++#if defined(__APPLE__) || defined(_WIN32)
++#define __fsetlocking(stream, type) ((void)0)
++#else
+ #include <stdio_ext.h>
++#endif
+ #include <ctype.h>
+ #include <errno.h>
+ #include <limits.h>
