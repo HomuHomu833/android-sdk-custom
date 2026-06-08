@@ -41,12 +41,13 @@
 #endif
 #endif
 
-/* --- bionic / Android NDK specific fallbacks ------------------------------- */
-#if defined(__ANDROID__)
-
-/* reallocarray() was only added to bionic at API level 29.  AOSP's libselinux
- * is compiled with -DHAVE_REALLOCARRAY which makes selinux_internal.h yield to
- * the libc declaration, so on API < 29 the call is left undeclared. */
+/*
+ * --- reallocarray() ----------------------------------------------------------
+ * libsepol is compiled with -DHAVE_REALLOCARRAY which skips the static
+ * declaration in selinux_internal.h, but macOS  and MinGW may still lack a
+ * libc declaration.  Provide a static-inline fallback for those platforms;
+ * on bionic it is guarded by the API level (added at API 29).
+ */
 #if !defined(__ANDROID_API__) || __ANDROID_API__ < 29
 #include <errno.h>
 #include <stdlib.h>
@@ -60,7 +61,10 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) {
   }
   return realloc(ptr, bytes);
 }
-#endif /* API < 29 */
+#endif
+
+/* --- bionic / Android NDK specific fallbacks ------------------------------- */
+#if defined(__ANDROID__)
 
 /* hasmntopt() was only added to bionic at API level 26; e2fsprogs' ismounted.c
  * uses it to test a mount entry's options. */
