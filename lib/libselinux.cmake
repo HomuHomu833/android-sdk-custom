@@ -115,11 +115,14 @@ target_include_directories(libselinux PRIVATE
     ${SRC}/../include
     )
 
-# mingw lacks some POSIX headers selinux includes unconditionally (e.g. <poll.h>);
-# the code behind them is compiled out under BUILD_HOST, so a header shim on the
-# include path is enough to let the windows host build compile.
+# mingw lacks some POSIX headers/constants selinux uses unconditionally (e.g.
+# <poll.h>, O_CLOEXEC); the code behind them is host-inert, so a header shim on
+# the include path plus a force-included constants shim is enough to compile.
 if(PLATFORM_WINDOWS)
     target_include_directories(libselinux PRIVATE
         ${CMAKE_SOURCE_DIR}/patches/misc/win_compat
+        )
+    target_compile_options(libselinux PRIVATE
+        -include ${CMAKE_SOURCE_DIR}/patches/misc/win_compat/win_selinux_compat.h
         )
 endif()

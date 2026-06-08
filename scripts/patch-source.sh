@@ -252,9 +252,25 @@ sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' ${PWD_SRC}/s
 sed -i 's/extra_args\.flavor = \&flavor;/extra_args.flavor = (uint32_t *)\&flavor;/' \
   ${PWD_SRC}/src/selinux/libsepol/cil/src/cil_verify.c
 
+# selinux selinux_internal.h __selinux_once: the fallback branch does
+# `(ONCE_CONTROL) == PTHREAD_ONCE_INIT` / `(ONCE_CONTROL) = 2`, which only
+# compiles where pthread_once_t is an integer (Linux/bionic). macOS and mingw
+# define it as a struct, so that branch fails to compile. On those hosts
+# pthread_once is always present, so wrap the macro to call it directly.
+sed -i '/#define __selinux_once(ONCE_CONTROL, INIT_FUNCTION)/i\
+#if defined(__APPLE__) || defined(_WIN32)\
+#define __selinux_once(ONCE_CONTROL, INIT_FUNCTION) \\\
+	pthread_once(\&(ONCE_CONTROL), (INIT_FUNCTION))\
+#else' ${PWD_SRC}/src/selinux/libselinux/src/selinux_internal.h
+sed -i '0,/} while (0)/s/} while (0)/} while (0)\
+#endif/' ${PWD_SRC}/src/selinux/libselinux/src/selinux_internal.h
+
 # bionic: some functions are is introduced in API 29 and upper but users might target
 # lower APIs which some symbols won't be available. Guard the uses in files under an API check.
 sed -i 's/#if defined(__BIONIC__)/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/g' ${PWD_SRC}/src/libbase/include/android-base/unique_fd.h
+# libziparchive zip_archive.cc uses the same API-29 android_fdsan_* tagging API
+# under a plain __BIONIC__ guard; gate it the same way so API < 29 builds.
+sed -i 's/#if defined(__BIONIC__)/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/g' ${PWD_SRC}/src/libziparchive/zip_archive.cc
 sed -i 's/__INTRODUCED_IN([0-9]*)//g' ${PWD_SRC}/src/logging/liblog/include/android/log.h
 sed -i 's/^#if !defined(__BIONIC__)$/#if !defined(__BIONIC__) || __ANDROID_API__ < 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
 sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
