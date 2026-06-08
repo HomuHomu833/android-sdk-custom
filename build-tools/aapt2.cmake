@@ -197,10 +197,9 @@ target_include_directories(aapt2 PRIVATE ${INCLUDES})
 target_compile_options(aapt2 PRIVATE ${COMPILE_FLAGS})
 target_link_libraries(aapt2 
     libaapt2
-    libandroidfw 
+    libandroidfw
     libincfs
-    libselinux
-    libsepol
+    ${SELINUX_LINK_LIBS}
     libpackagelistparser
     libutils 
     libcutils

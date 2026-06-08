@@ -14,50 +14,50 @@
 # limitations under the License.
 #
 
-if(PLATFORM_WINDOWS)
-    # Selinux is a Linux LSM — no host tool actually calls selinux functions
-    # on Windows.  Build an empty archive so consumers can still link -llibselinux
-    # without pulling in any platform-inert sources.
-    add_library(libselinux STATIC ${SRC}/selinux/libselinux/src/callbacks.c)
-else()
-    add_library(libselinux STATIC
-        ${SRC}/selinux/libselinux/src/booleans.c
-        ${SRC}/selinux/libselinux/src/callbacks.c
-        ${SRC}/selinux/libselinux/src/canonicalize_context.c
-        ${SRC}/selinux/libselinux/src/checkAccess.c
-        ${SRC}/selinux/libselinux/src/check_context.c
-        ${SRC}/selinux/libselinux/src/compute_av.c
-        ${SRC}/selinux/libselinux/src/compute_create.c
-        ${SRC}/selinux/libselinux/src/compute_member.c
-        ${SRC}/selinux/libselinux/src/context.c
-        ${SRC}/selinux/libselinux/src/deny_unknown.c
-        ${SRC}/selinux/libselinux/src/disable.c
-        ${SRC}/selinux/libselinux/src/enabled.c
-        ${SRC}/selinux/libselinux/src/freecon.c
-        ${SRC}/selinux/libselinux/src/get_initial_context.c
-        ${SRC}/selinux/libselinux/src/getenforce.c
-        ${SRC}/selinux/libselinux/src/hashtab.c
-        ${SRC}/selinux/libselinux/src/init.c
-        ${SRC}/selinux/libselinux/src/label.c
-        ${SRC}/selinux/libselinux/src/label_backends_android.c
-        ${SRC}/selinux/libselinux/src/label_file.c
-        ${SRC}/selinux/libselinux/src/label_support.c
-        ${SRC}/selinux/libselinux/src/mapping.c
-        ${SRC}/selinux/libselinux/src/matchpathcon.c
-        ${SRC}/selinux/libselinux/src/policyvers.c
-        ${SRC}/selinux/libselinux/src/procattr.c
-        ${SRC}/selinux/libselinux/src/regex.c
-        ${SRC}/selinux/libselinux/src/reject_unknown.c
-        ${SRC}/selinux/libselinux/src/selinux_config.c
-        ${SRC}/selinux/libselinux/src/selinux_internal.c
-        ${SRC}/selinux/libselinux/src/sestatus.c
-        ${SRC}/selinux/libselinux/src/seusers.c
-        ${SRC}/selinux/libselinux/src/setenforce.c
-        ${SRC}/selinux/libselinux/src/setrans_client.c
-        ${SRC}/selinux/libselinux/src/sha1.c
-        ${SRC}/selinux/libselinux/src/stringrep.c
-        )
-endif()
+# AOSP has no target.windows for libselinux (SELinux is a Linux-kernel facility),
+# and no Windows host tool links it, so it is not built for the mingw host at all.
+# The macOS host still builds it (sload_f2fs links it there), so the guard is
+# PLATFORM_WINDOWS rather than PLATFORM_HOST. On Windows, consumers link the empty
+# ${SELINUX_LINK_LIBS} instead (see the top-level CMakeLists.txt).
+if(NOT PLATFORM_WINDOWS)
+
+add_library(libselinux STATIC
+    ${SRC}/selinux/libselinux/src/booleans.c
+    ${SRC}/selinux/libselinux/src/callbacks.c
+    ${SRC}/selinux/libselinux/src/canonicalize_context.c
+    ${SRC}/selinux/libselinux/src/checkAccess.c
+    ${SRC}/selinux/libselinux/src/check_context.c
+    ${SRC}/selinux/libselinux/src/compute_av.c
+    ${SRC}/selinux/libselinux/src/compute_create.c
+    ${SRC}/selinux/libselinux/src/compute_member.c
+    ${SRC}/selinux/libselinux/src/context.c
+    ${SRC}/selinux/libselinux/src/deny_unknown.c
+    ${SRC}/selinux/libselinux/src/disable.c
+    ${SRC}/selinux/libselinux/src/enabled.c
+    ${SRC}/selinux/libselinux/src/freecon.c
+    ${SRC}/selinux/libselinux/src/get_initial_context.c
+    ${SRC}/selinux/libselinux/src/getenforce.c
+    ${SRC}/selinux/libselinux/src/hashtab.c
+    ${SRC}/selinux/libselinux/src/init.c
+    ${SRC}/selinux/libselinux/src/label.c
+    ${SRC}/selinux/libselinux/src/label_backends_android.c
+    ${SRC}/selinux/libselinux/src/label_file.c
+    ${SRC}/selinux/libselinux/src/label_support.c
+    ${SRC}/selinux/libselinux/src/mapping.c
+    ${SRC}/selinux/libselinux/src/matchpathcon.c
+    ${SRC}/selinux/libselinux/src/policyvers.c
+    ${SRC}/selinux/libselinux/src/procattr.c
+    ${SRC}/selinux/libselinux/src/regex.c
+    ${SRC}/selinux/libselinux/src/reject_unknown.c
+    ${SRC}/selinux/libselinux/src/selinux_config.c
+    ${SRC}/selinux/libselinux/src/selinux_internal.c
+    ${SRC}/selinux/libselinux/src/sestatus.c
+    ${SRC}/selinux/libselinux/src/seusers.c
+    ${SRC}/selinux/libselinux/src/setenforce.c
+    ${SRC}/selinux/libselinux/src/setrans_client.c
+    ${SRC}/selinux/libselinux/src/sha1.c
+    ${SRC}/selinux/libselinux/src/stringrep.c
+    )
 
 # Linux-only sources, built on the linux-kernel platforms (Android + host Linux)
 # only; macOS/Windows hosts can't compile them and the host tools don't use them:
@@ -132,9 +132,13 @@ target_include_directories(libselinux PRIVATE
     ${SRC}/../include
     )
 
-# The macOS/mingw host builds need no compat-header shims here: the Linux-isms
+endif() # NOT PLATFORM_WINDOWS
+
+# The macOS host build needs no compat-header shims here: the Linux-isms
 # libselinux would otherwise hit on a host (selinuxfs/proc mount probe,
 # __fsetlocking, O_CLOEXEC, stpcpy, getxattr) are guarded directly in the source
 # by patches/selinux/0001-host-portability-guards.patch (applied by
 # scripts/patch-source.sh), and the kernel-only translation units are excluded
-# above under PLATFORM_LINUX_KERNEL.
+# above under PLATFORM_LINUX_KERNEL. (Windows builds no libselinux at all -- see
+# the NOT PLATFORM_WINDOWS guard above -- so its _WIN32 shims in that patch are
+# now dormant but harmless.)

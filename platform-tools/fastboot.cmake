@@ -106,10 +106,9 @@ target_link_libraries(fastboot
     libcutils 
     libfsmgr 
     libutils
-    libbase 
-    libext4 
-    libselinux 
-    libsepol 
+    libbase
+    libext4
+    ${SELINUX_LINK_LIBS}
     liblog
     crypto
     pcre2-8

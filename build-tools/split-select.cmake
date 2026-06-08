@@ -41,8 +41,7 @@ target_include_directories(split-select PRIVATE
 target_link_libraries(split-select
     libaapt
     libandroidfw
-    libselinux
-    libsepol
+    ${SELINUX_LINK_LIBS}
     libutils
     libcutils
     libincfs

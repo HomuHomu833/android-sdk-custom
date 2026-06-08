@@ -71,8 +71,7 @@ target_link_libraries(aapt
     libincfs
     libutils
     libcutils
-    libselinux
-    libsepol
+    ${SELINUX_LINK_LIBS}
     libziparchive
     libpackagelistparser
     libbase

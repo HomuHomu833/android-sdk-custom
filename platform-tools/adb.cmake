@@ -328,8 +328,7 @@ target_link_libraries(adb
     libcrypto
     libadb_sysdeps
     libfastdeploy
-    libselinux
-    libsepol
+    ${SELINUX_LINK_LIBS}
     libincfs
     libpackagelistparser
     libbase
