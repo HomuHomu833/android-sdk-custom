@@ -19,8 +19,40 @@
 #ifndef ANDROID_SDK_BIONIC_COMPAT_H
 #define ANDROID_SDK_BIONIC_COMPAT_H
 
-#if defined(__ANDROID__) && (!defined(__ANDROID_API__) || __ANDROID_API__ < 29)
+#if defined(__ANDROID__)
 
+/* bionic lacks the glibc/musl GNU stdio "*_unlocked" extensions at the API
+ * levels we target (it only ships the POSIX getc/putc/getchar/putchar variants),
+ * but AOSP host code such as selinux's selinux_config.c / label_file.c uses them
+ * as a single-threaded perf optimization. The _unlocked forms differ from the
+ * plain ones only in skipping the per-FILE lock, so mapping them to the locked
+ * equivalents is functionally identical here. */
+#ifndef fgets_unlocked
+#define fgets_unlocked(s, n, f)      fgets((s), (n), (f))
+#endif
+#ifndef fputs_unlocked
+#define fputs_unlocked(s, f)         fputs((s), (f))
+#endif
+#ifndef fread_unlocked
+#define fread_unlocked(p, sz, n, f)  fread((p), (sz), (n), (f))
+#endif
+#ifndef fwrite_unlocked
+#define fwrite_unlocked(p, sz, n, f) fwrite((p), (sz), (n), (f))
+#endif
+#ifndef fgetc_unlocked
+#define fgetc_unlocked(f)            fgetc((f))
+#endif
+#ifndef fputc_unlocked
+#define fputc_unlocked(c, f)         fputc((c), (f))
+#endif
+#ifndef fflush_unlocked
+#define fflush_unlocked(f)           fflush((f))
+#endif
+
+/* reallocarray() was only added to bionic at API level 29; supply a fallback for
+ * the lower API levels. On API >= 29 bionic's <stdlib.h> declares the real one,
+ * so this expands to nothing and the libc implementation is used instead. */
+#if !defined(__ANDROID_API__) || __ANDROID_API__ < 29
 #include <errno.h>
 #include <stdlib.h>
 
@@ -33,6 +65,7 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) {
   }
   return realloc(ptr, bytes);
 }
+#endif /* API < 29 */
 
-#endif /* __ANDROID__ && API < 29 */
+#endif /* __ANDROID__ */
 #endif /* ANDROID_SDK_BIONIC_COMPAT_H */

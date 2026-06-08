@@ -112,3 +112,12 @@ target_include_directories(libselinux PRIVATE
     ${SRC}/pcre/include
     ${SRC}/../include
     )
+
+# mingw lacks some POSIX headers selinux includes unconditionally (e.g. <poll.h>);
+# the code behind them is compiled out under BUILD_HOST, so a header shim on the
+# include path is enough to let the windows host build compile.
+if(PLATFORM_WINDOWS)
+    target_include_directories(libselinux PRIVATE
+        ${CMAKE_SOURCE_DIR}/patches/misc/win_compat
+        )
+endif()
