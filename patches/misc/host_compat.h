@@ -11,6 +11,16 @@
 #define HOST_COMPAT_H
 
 /*
+ * --- Windows API compat -----------------------------------------------------
+ * rand_s() is declared in <stdlib.h> on MSVC but may be hidden in MinGW
+ * headers (guarded by _WIN32_WINNT >= 0x0600).  Forward-declare it here;
+ * the symbol lives in msvcrt.dll on all Windows versions >= XP.
+ */
+#if defined(_WIN32) && !defined(rand_s)
+int rand_s(unsigned int *_Value);
+#endif
+
+/*
  * --- stdio *_unlocked extensions -------------------------------------------
  * bionic, macOS and MinGW all lack the glibc/musl GNU stdio *_unlocked
  * functions (fgets_unlocked, etc.).  AOSP host code such as libselinux uses
