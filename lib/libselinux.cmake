@@ -27,12 +27,9 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/deny_unknown.c
     ${SRC}/selinux/libselinux/src/disable.c
     ${SRC}/selinux/libselinux/src/enabled.c
-    ${SRC}/selinux/libselinux/src/fgetfilecon.c
     ${SRC}/selinux/libselinux/src/freecon.c
-    ${SRC}/selinux/libselinux/src/fsetfilecon.c
     ${SRC}/selinux/libselinux/src/get_initial_context.c
     ${SRC}/selinux/libselinux/src/getenforce.c
-    ${SRC}/selinux/libselinux/src/getfilecon.c
     ${SRC}/selinux/libselinux/src/getpeercon.c
     ${SRC}/selinux/libselinux/src/hashtab.c
     ${SRC}/selinux/libselinux/src/init.c
@@ -40,9 +37,7 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/label_backends_android.c
     ${SRC}/selinux/libselinux/src/label_file.c
     ${SRC}/selinux/libselinux/src/label_support.c
-    ${SRC}/selinux/libselinux/src/lgetfilecon.c
     ${SRC}/selinux/libselinux/src/load_policy.c
-    ${SRC}/selinux/libselinux/src/lsetfilecon.c
     ${SRC}/selinux/libselinux/src/mapping.c
     ${SRC}/selinux/libselinux/src/matchpathcon.c
     ${SRC}/selinux/libselinux/src/policyvers.c
@@ -54,7 +49,6 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/sestatus.c
     ${SRC}/selinux/libselinux/src/seusers.c
     ${SRC}/selinux/libselinux/src/setenforce.c
-    ${SRC}/selinux/libselinux/src/setfilecon.c
     ${SRC}/selinux/libselinux/src/setrans_client.c
     ${SRC}/selinux/libselinux/src/sha1.c
     ${SRC}/selinux/libselinux/src/stringrep.c
@@ -65,7 +59,10 @@ add_library(libselinux STATIC
 #  - the userspace AVC (avc*.c) talks to the kernel over netlink and pulls in
 #    <linux/netlink.h>/<poll.h>;
 #  - the android/ backend pulls in <fnmatch.h> (android.c) and <linux/magic.h>
-#    (android_seapp.c) and exposes the device-side selinux_android_* APIs.
+#    (android_seapp.c) and exposes the device-side selinux_android_* APIs;
+#  - the *filecon get/set a single file's security context via the Linux 5-arg
+#    *xattr API (no __APPLE__ handling, unlike the selabel backend label_file.c),
+#    which the host tools don't use.
 if(PLATFORM_LINUX_KERNEL)
     target_sources(libselinux PRIVATE
         ${SRC}/selinux/libselinux/src/avc.c
@@ -73,6 +70,12 @@ if(PLATFORM_LINUX_KERNEL)
         ${SRC}/selinux/libselinux/src/avc_sidtab.c
         ${SRC}/selinux/libselinux/src/android/android.c
         ${SRC}/selinux/libselinux/src/android/android_seapp.c
+        ${SRC}/selinux/libselinux/src/fgetfilecon.c
+        ${SRC}/selinux/libselinux/src/fsetfilecon.c
+        ${SRC}/selinux/libselinux/src/getfilecon.c
+        ${SRC}/selinux/libselinux/src/lgetfilecon.c
+        ${SRC}/selinux/libselinux/src/lsetfilecon.c
+        ${SRC}/selinux/libselinux/src/setfilecon.c
         )
 endif()
 
