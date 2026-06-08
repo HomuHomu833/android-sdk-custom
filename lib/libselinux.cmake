@@ -14,43 +14,50 @@
 # limitations under the License.
 #
 
-add_library(libselinux STATIC
-    ${SRC}/selinux/libselinux/src/booleans.c
-    ${SRC}/selinux/libselinux/src/callbacks.c
-    ${SRC}/selinux/libselinux/src/canonicalize_context.c
-    ${SRC}/selinux/libselinux/src/checkAccess.c
-    ${SRC}/selinux/libselinux/src/check_context.c
-    ${SRC}/selinux/libselinux/src/compute_av.c
-    ${SRC}/selinux/libselinux/src/compute_create.c
-    ${SRC}/selinux/libselinux/src/compute_member.c
-    ${SRC}/selinux/libselinux/src/context.c
-    ${SRC}/selinux/libselinux/src/deny_unknown.c
-    ${SRC}/selinux/libselinux/src/disable.c
-    ${SRC}/selinux/libselinux/src/enabled.c
-    ${SRC}/selinux/libselinux/src/freecon.c
-    ${SRC}/selinux/libselinux/src/get_initial_context.c
-    ${SRC}/selinux/libselinux/src/getenforce.c
-    ${SRC}/selinux/libselinux/src/hashtab.c
-    ${SRC}/selinux/libselinux/src/init.c
-    ${SRC}/selinux/libselinux/src/label.c
-    ${SRC}/selinux/libselinux/src/label_backends_android.c
-    ${SRC}/selinux/libselinux/src/label_file.c
-    ${SRC}/selinux/libselinux/src/label_support.c
-    ${SRC}/selinux/libselinux/src/mapping.c
-    ${SRC}/selinux/libselinux/src/matchpathcon.c
-    ${SRC}/selinux/libselinux/src/policyvers.c
-    ${SRC}/selinux/libselinux/src/procattr.c
-    ${SRC}/selinux/libselinux/src/regex.c
-    ${SRC}/selinux/libselinux/src/reject_unknown.c
-    ${SRC}/selinux/libselinux/src/selinux_config.c
-    ${SRC}/selinux/libselinux/src/selinux_internal.c
-    ${SRC}/selinux/libselinux/src/sestatus.c
-    ${SRC}/selinux/libselinux/src/seusers.c
-    ${SRC}/selinux/libselinux/src/setenforce.c
-    ${SRC}/selinux/libselinux/src/setrans_client.c
-    ${SRC}/selinux/libselinux/src/sha1.c
-    ${SRC}/selinux/libselinux/src/stringrep.c
-    )
+if(PLATFORM_WINDOWS)
+    # Selinux is a Linux LSM — no host tool actually calls selinux functions
+    # on Windows.  Build an empty archive so consumers can still link -llibselinux
+    # without pulling in any platform-inert sources.
+    add_library(libselinux STATIC ${SRC}/selinux/libselinux/src/callbacks.c)
+else()
+    add_library(libselinux STATIC
+        ${SRC}/selinux/libselinux/src/booleans.c
+        ${SRC}/selinux/libselinux/src/callbacks.c
+        ${SRC}/selinux/libselinux/src/canonicalize_context.c
+        ${SRC}/selinux/libselinux/src/checkAccess.c
+        ${SRC}/selinux/libselinux/src/check_context.c
+        ${SRC}/selinux/libselinux/src/compute_av.c
+        ${SRC}/selinux/libselinux/src/compute_create.c
+        ${SRC}/selinux/libselinux/src/compute_member.c
+        ${SRC}/selinux/libselinux/src/context.c
+        ${SRC}/selinux/libselinux/src/deny_unknown.c
+        ${SRC}/selinux/libselinux/src/disable.c
+        ${SRC}/selinux/libselinux/src/enabled.c
+        ${SRC}/selinux/libselinux/src/freecon.c
+        ${SRC}/selinux/libselinux/src/get_initial_context.c
+        ${SRC}/selinux/libselinux/src/getenforce.c
+        ${SRC}/selinux/libselinux/src/hashtab.c
+        ${SRC}/selinux/libselinux/src/init.c
+        ${SRC}/selinux/libselinux/src/label.c
+        ${SRC}/selinux/libselinux/src/label_backends_android.c
+        ${SRC}/selinux/libselinux/src/label_file.c
+        ${SRC}/selinux/libselinux/src/label_support.c
+        ${SRC}/selinux/libselinux/src/mapping.c
+        ${SRC}/selinux/libselinux/src/matchpathcon.c
+        ${SRC}/selinux/libselinux/src/policyvers.c
+        ${SRC}/selinux/libselinux/src/procattr.c
+        ${SRC}/selinux/libselinux/src/regex.c
+        ${SRC}/selinux/libselinux/src/reject_unknown.c
+        ${SRC}/selinux/libselinux/src/selinux_config.c
+        ${SRC}/selinux/libselinux/src/selinux_internal.c
+        ${SRC}/selinux/libselinux/src/sestatus.c
+        ${SRC}/selinux/libselinux/src/seusers.c
+        ${SRC}/selinux/libselinux/src/setenforce.c
+        ${SRC}/selinux/libselinux/src/setrans_client.c
+        ${SRC}/selinux/libselinux/src/sha1.c
+        ${SRC}/selinux/libselinux/src/stringrep.c
+        )
+endif()
 
 # Linux-only sources, built on the linux-kernel platforms (Android + host Linux)
 # only; macOS/Windows hosts can't compile them and the host tools don't use them:

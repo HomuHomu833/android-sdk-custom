@@ -287,8 +287,8 @@ sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29
 # setrans_client.c: POSIX socket headers don't exist on MinGW.  With
 # DISABLE_SETRANS defined the function bodies are all stubs, so the
 # network includes are dead code on that platform.  Guard them out.
-sed -i '/^#include <sys\/socket.h>/i #ifndef _WIN32' ${PWD_SRC}/src/selinux/libselinux/src/setrans_client.c
-sed -i '/^#include <sys\/un.h>/a #endif' ${PWD_SRC}/src/selinux/libselinux/src/setrans_client.c
+sed -i '/^#include <netdb.h>/i #ifndef _WIN32' ${PWD_SRC}/src/selinux/libselinux/src/setrans_client.c
+sed -i '/^#include <sys\/uio.h>/a #endif' ${PWD_SRC}/src/selinux/libselinux/src/setrans_client.c
 
 # e2fsprogs error-table sources: 'link' variable collides with POSIX link()
 # on bionic (<unistd.h> declares link()). Rename to 'et_link' in all files

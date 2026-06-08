@@ -76,6 +76,28 @@ int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
 #endif
 
 /*
+ * --- Windows stat() macros ----------------------------------------------------
+ * MinGW's <sys/stat.h> omits S_ISLNK and S_ISSOCK (Windows has no symlinks
+ * or sockets-as-file-types in the traditional sense).  Provide them so that
+ * libselinux code such as stringrep.c and label_file.h compiles.
+ */
+#if defined(_WIN32)
+/* S_IFLNK / S_IFSOCK are missing from MinGW's <sys/stat.h> */
+#ifndef S_IFLNK
+#define S_IFLNK 0xA000
+#endif
+#ifndef S_IFSOCK
+#define S_IFSOCK 0xC000
+#endif
+#ifndef S_ISLNK
+#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef S_ISSOCK
+#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+#endif
+#endif
+
+/*
  * --- getline() ----------------------------------------------------------------
  * MinGW does not provide POSIX getline().  Provide a simple fallback so that
  * libselinux (label_file.c, selinux_config.c) and other host code can use it.
