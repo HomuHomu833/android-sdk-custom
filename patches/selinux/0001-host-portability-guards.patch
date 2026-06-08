@@ -21,7 +21,7 @@ index 33c48ef..03b1c44 100644
  #define COMP_ROLE  1
  #define COMP_TYPE  2
 diff --git a/libselinux/src/init.c b/libselinux/src/init.c
-index 439da41..7642176 100644
+index 439da41..cb97447 100644
 --- a/libselinux/src/init.c
 +++ b/libselinux/src/init.c
 @@ -5,10 +5,16 @@
@@ -70,11 +70,52 @@ index 439da41..7642176 100644
  
  void fini_selinuxmnt(void)
  {
+@@ -146,7 +166,13 @@ void set_selinuxmnt(const char *mnt)
+ static void init_lib(void) __attribute__ ((constructor));
+ static void init_lib(void)
+ {
++#if defined(_WIN32)
++	/* mingw has no sysconf(); selinux_page_size only sizes scratch buffers,
++	 * so a fixed 4 KiB page is fine on a Windows host. */
++	selinux_page_size = 4096;
++#else
+ 	selinux_page_size = sysconf(_SC_PAGE_SIZE);
++#endif
+ #ifndef ANDROID_UNIT_TESTING
+ 	init_selinuxmnt();
+ #ifndef ANDROID
 diff --git a/libselinux/src/label_file.c b/libselinux/src/label_file.c
-index ad9a542..22038b9 100644
+index ad9a542..1631226 100644
 --- a/libselinux/src/label_file.c
 +++ b/libselinux/src/label_file.c
-@@ -24,6 +24,18 @@
+@@ -15,7 +15,26 @@
+ #include <limits.h>
+ #include <stdint.h>
+ #include <unistd.h>
++#if defined(_WIN32)
++/* mingw has no <sys/mman.h>/mmap. A Windows host never loads a compiled
++ * file_contexts (the mmap'd binary form); load_mmap() below simply fails and
++ * the caller falls back to parsing the text file, so inert stubs suffice. */
++#include <sys/types.h>
++#ifndef PROT_READ
++#define PROT_READ 0x1
++#endif
++#ifndef MAP_PRIVATE
++#define MAP_PRIVATE 0x2
++#endif
++#ifndef MAP_FAILED
++#define MAP_FAILED ((void *)-1)
++#endif
++static inline void *mmap(void *__a, size_t __l, int __p, int __f, int __fd, off_t __o)
++{ (void)__a; (void)__l; (void)__p; (void)__f; (void)__fd; (void)__o; return MAP_FAILED; }
++static inline int munmap(void *__a, size_t __l) { (void)__a; (void)__l; return 0; }
++#else
+ #include <sys/mman.h>
++#endif
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ 
+@@ -24,6 +43,18 @@
  #include "label_internal.h"
  #include "label_file.h"
  
@@ -110,6 +151,28 @@ index c91a6c1..b1a3b58 100644
  
  /*
   * regex.h/c were introduced to hold all dependencies on the regular
+diff --git a/libselinux/src/procattr.c b/libselinux/src/procattr.c
+index b7a93a2..028d9cb 100644
+--- a/libselinux/src/procattr.c
++++ b/libselinux/src/procattr.c
+@@ -27,7 +27,16 @@ static __thread char destructor_initialized;
+ 
+ /* Bionic and glibc >= 2.30 declare gettid() system call wrapper in unistd.h and
+  * has a definition for it */
+-#ifdef __BIONIC__
++#if defined(__APPLE__)
++  /* macOS has pthread_threadid_np() instead of gettid(). */
++  #include <pthread.h>
++  static inline pid_t gettid(void) {
++    uint64_t __tid;
++    pthread_threadid_np(NULL, &__tid);
++    return (pid_t)__tid;
++  }
++  #define HAVE_GETTID 1
++#elif defined(__BIONIC__)
+   #define HAVE_GETTID 1
+ #elif !defined(__GLIBC_PREREQ)
+   #define HAVE_GETTID 0
 diff --git a/libselinux/src/selinux_config.c b/libselinux/src/selinux_config.c
 index 1d8cfb7..5fe31cb 100644
 --- a/libselinux/src/selinux_config.c
@@ -146,10 +209,35 @@ index e4d4b48..83baa8f 100644
  extern int require_seusers ;
  extern int selinux_page_size ;
 diff --git a/libselinux/src/sestatus.c b/libselinux/src/sestatus.c
-index fbe6430..853baf4 100644
+index fbe6430..c64fd9c 100644
 --- a/libselinux/src/sestatus.c
 +++ b/libselinux/src/sestatus.c
-@@ -16,6 +16,12 @@
+@@ -9,13 +9,37 @@
+ #include <fcntl.h>
+ #include <limits.h>
+ #include <sched.h>
++#if defined(_WIN32)
++/* mingw has no <sys/mman.h>/mmap; the kernel status page this maps
++ * (/selinux/status) never exists on a Windows host, so inert stubs suffice. */
++#include <sys/types.h>
++#ifndef PROT_READ
++#define PROT_READ 0x1
++#endif
++#ifndef MAP_SHARED
++#define MAP_SHARED 0x1
++#endif
++#ifndef MAP_FAILED
++#define MAP_FAILED ((void *)-1)
++#endif
++static inline void *mmap(void *__a, size_t __l, int __p, int __f, int __fd, off_t __o)
++{ (void)__a; (void)__l; (void)__p; (void)__f; (void)__fd; (void)__o; return MAP_FAILED; }
++static inline int munmap(void *__a, size_t __l) { (void)__a; (void)__l; return 0; }
++#else
+ #include <sys/mman.h>
++#endif
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <unistd.h>
  #include "avc_internal.h"
  #include "policy.h"
  
@@ -162,8 +250,32 @@ index fbe6430..853baf4 100644
  /*
   * copied from the selinux/include/security.h
   */
+@@ -291,7 +315,11 @@ int selinux_status_open(int fallback)
+ 		return -1;
+ 	}
+ 
++#if defined(_WIN32)
++	pagesize = 4096;  /* mingw has no sysconf(); the status page is unused here */
++#else
+ 	pagesize = sysconf(_SC_PAGESIZE);
++#endif
+ 	if (pagesize < 0)
+ 		return -1;
+ 
+@@ -382,7 +410,11 @@ void selinux_status_close(void)
+ 		return;
+ 	}
+ 
++#if defined(_WIN32)
++	pagesize = 4096;  /* mingw has no sysconf(); the status page is unused here */
++#else
+ 	pagesize = sysconf(_SC_PAGESIZE);
++#endif
+ 	/* not much we can do other than leak memory */
+ 	if (pagesize > 0)
+ 		munmap(selinux_status, pagesize);
 diff --git a/libselinux/src/seusers.c b/libselinux/src/seusers.c
-index 5a521f8..c2ba0f3 100644
+index 5a521f8..9b9b414 100644
 --- a/libselinux/src/seusers.c
 +++ b/libselinux/src/seusers.c
 @@ -3,7 +3,14 @@
@@ -181,3 +293,28 @@ index 5a521f8..c2ba0f3 100644
  #include <ctype.h>
  #include <errno.h>
  #include <limits.h>
+@@ -94,6 +101,16 @@ static int process_seusers(const char *buffer,
+ 
+ int require_seusers  = 0;
+ 
++#if defined(_WIN32)
++/* mingw has no pwd/grp database; the "%group" seuser mapping these helpers
++ * implement is meaningless on a Windows host. mingw also lacks gid_t, so define
++ * it, and stub the helpers so the file compiles and group mapping never matches. */
++typedef int gid_t;
++static gid_t get_default_gid(const char *name)
++{ (void)name; return (gid_t)-1; }
++static int check_group(const char *group, const char *name, const gid_t gid)
++{ (void)group; (void)name; (void)gid; return 0; }
++#else
+ #include <pwd.h>
+ #include <grp.h>
+ 
+@@ -184,6 +201,7 @@ static int check_group(const char *group, const char *name, const gid_t gid) {
+ 	free(rbuf);
+ 	return match;
+ }
++#endif /* _WIN32 */
+ 
+ int getseuserbyname(const char *name, char **r_seuser, char **r_level)
+ {

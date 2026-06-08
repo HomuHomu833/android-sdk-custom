@@ -96,5 +96,20 @@ char *hasmntopt(const struct mntent *mnt, const char *opt) {
 }
 #endif /* API < 26 */
 
+/* getlogin_r() was only added to bionic at API level 28; adb's sysdeps.h uses
+ * it for host-name lookup. Supply a fallback for the lower API levels that
+ * returns an empty login name (no-op on a device without traditional logins). */
+#if !defined(__ANDROID_API__) || __ANDROID_API__ < 28
+#include <unistd.h>
+#include <errno.h>
+
+static inline __attribute__((__unused__))
+int getlogin_r(char *buf, size_t bufsize) {
+  if (bufsize == 0) return ERANGE;
+  buf[0] = '\0';
+  return 0;
+}
+#endif /* API < 28 */
+
 #endif /* __ANDROID__ */
 #endif /* ANDROID_SDK_BIONIC_COMPAT_H */
