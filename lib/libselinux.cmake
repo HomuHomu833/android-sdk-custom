@@ -109,7 +109,7 @@ target_compile_definitions(libselinux PRIVATE
 
 # Per-OS cflags (Android.bp libselinux target.{host,android})
 if(PLATFORM_HOST)
-    target_compile_definitions(libselinux PRIVATE -DBUILD_HOST)
+    target_compile_definitions(libselinux PRIVATE -DBUILD_HOST -DHAVE_REALLOCARRAY)
 else()
     target_compile_definitions(libselinux PRIVATE -DHAVE_STRLCPY -DHAVE_REALLOCARRAY)
 endif()

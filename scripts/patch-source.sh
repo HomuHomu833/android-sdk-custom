@@ -268,7 +268,7 @@ sed -i '0,/} while (0)/s/} while (0)/} while (0)\
 # bionic: some functions are is introduced in API 29 and upper but users might target
 # lower APIs which some symbols won't be available. Guard the uses in files under an API check.
 sed -i 's/#if defined(__BIONIC__)/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/g' ${PWD_SRC}/src/libbase/include/android-base/unique_fd.h ${PWD_SRC}/src/libziparchive/zip_archive.cc src/art/libartbase/base/unix_file/fd_file.cc
-sed -i 's/__INTRODUCED_IN([0-9]*)//g' ${PWD_SRC}/src/logging/liblog/include/android/log.h
+sed -i 's/__INTRODUCED_IN([0-9]*)//g' ${PWD_SRC}/src/logging/liblog/include/android/log.h ${PWD_SRC}/src/adb/pairing_connection/include/adb/pairing/pairing_connection.h
 sed -i 's/^#if !defined(__BIONIC__)$/#if !defined(__BIONIC__) || __ANDROID_API__ < 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
 sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
 

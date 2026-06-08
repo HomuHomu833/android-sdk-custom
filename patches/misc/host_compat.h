@@ -76,6 +76,8 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) {
 /* --- bionic / Android NDK specific fallbacks ------------------------------- */
 #if defined(__ANDROID__)
 
+
+
 /* hasmntopt() was only added to bionic at API level 26; e2fsprogs' ismounted.c
  * uses it to test a mount entry's options. */
 #if !defined(__ANDROID_API__) || __ANDROID_API__ < 26
