@@ -48,11 +48,25 @@ else()
         ${SRC}/libusb/libusb/os/linux_netlink.c
         )
 endif()
-target_include_directories(libusb PRIVATE
-    ${SRC}/libusb/libusb
-    ${SRC}/libusb/libusb/os
-    ${SRC}/libusb/linux
-    )
+if(PLATFORM_DARWIN)
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
+        ${SRC}/libusb/darwin
+        )
+elseif(PLATFORM_WINDOWS)
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
+        ${SRC}/libusb/windows
+        )
+else()
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
+        ${SRC}/libusb/linux
+        )
+endif()
 target_compile_options(libusb PRIVATE
     -fvisibility=hidden 
     -pthread
