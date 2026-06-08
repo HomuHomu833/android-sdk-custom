@@ -90,13 +90,13 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
   int c;
   if (*lineptr == NULL || *n == 0) {
     *n = 120;
-    *lineptr = malloc(*n);
+    *lineptr = (char *)malloc(*n);
     if (*lineptr == NULL) return -1;
   }
   while ((c = fgetc(stream)) != EOF) {
     if (pos + 1 >= *n) {
       *n *= 2;
-      char *newp = realloc(*lineptr, *n);
+      char *newp = (char *)realloc(*lineptr, *n);
       if (newp == NULL) return -1;
       *lineptr = newp;
     }
