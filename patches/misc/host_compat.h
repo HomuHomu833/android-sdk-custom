@@ -32,7 +32,7 @@ int rand_s(unsigned int *_Value);
 
 static inline __attribute__((__unused__))
 const char *getprogname(void) {
-  return *_NSGetArgv();
+  return (*_NSGetArgv())[0];
 }
 #endif
 
