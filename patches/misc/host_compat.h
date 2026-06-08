@@ -52,6 +52,65 @@ int rand_s(unsigned int *_Value);
 #endif
 
 /*
+ * --- macOS POSIX scheduling ---------------------------------------------------
+ * macOS lacks the Linux-specific SCHED_BATCH and SCHED_IDLE policies, and
+ * does not provide sched_setscheduler() at all.  Stub them so that
+ * libprocessgroup (task_profiles.cpp) compiles for host builds (the
+ * scheduling calls are inert on macOS anyway).
+ */
+#if defined(__APPLE__)
+#include <sched.h>
+
+#ifndef SCHED_BATCH
+#define SCHED_BATCH 3
+#endif
+#ifndef SCHED_IDLE
+#define SCHED_IDLE 5
+#endif
+
+static inline __attribute__((__unused__))
+int sched_setscheduler(pid_t pid, int policy, const struct sched_param *param) {
+  (void)pid; (void)policy; (void)param;
+  return 0;
+}
+#endif
+
+/*
+ * --- getline() ----------------------------------------------------------------
+ * MinGW does not provide POSIX getline().  Provide a simple fallback so that
+ * libselinux (label_file.c, selinux_config.c) and other host code can use it.
+ */
+#if defined(_WIN32) && !defined(HAVE_GETLINE)
+#include <stdio.h>
+#include <stdlib.h>
+
+static inline __attribute__((__unused__))
+ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
+  size_t pos = 0;
+  int c;
+  if (*lineptr == NULL || *n == 0) {
+    *n = 120;
+    *lineptr = malloc(*n);
+    if (*lineptr == NULL) return -1;
+  }
+  while ((c = fgetc(stream)) != EOF) {
+    if (pos + 1 >= *n) {
+      *n *= 2;
+      char *newp = realloc(*lineptr, *n);
+      if (newp == NULL) return -1;
+      *lineptr = newp;
+    }
+    (*lineptr)[pos++] = (char)c;
+    if (c == '\n') break;
+  }
+  if (pos == 0) return -1;
+  (*lineptr)[pos] = '\0';
+  return (ssize_t)pos;
+}
+#define HAVE_GETLINE 1
+#endif
+
+/*
  * --- reallocarray() ----------------------------------------------------------
  * libsepol is compiled with -DHAVE_REALLOCARRAY which skips the static
  * declaration in selinux_internal.h, but macOS  and MinGW may still lack a
