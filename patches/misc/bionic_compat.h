@@ -67,5 +67,27 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) {
 }
 #endif /* API < 29 */
 
+/* __system_property_read_callback() was added in API 26; provide it for the
+ * lower API levels in terms of the long-available __system_property_read() so
+ * host-tool code that reads build properties (soong's libbuildversion.cpp)
+ * compiles. On API >= 26 bionic declares the real one and this is skipped. */
+#if !defined(__ANDROID_API__) || __ANDROID_API__ < 26
+#include <stdint.h>
+#include <sys/system_properties.h>
+
+static inline __attribute__((__unused__))
+void __system_property_read_callback(
+    const prop_info *__pi,
+    void (*__callback)(void *__cookie, const char *__name,
+                       const char *__value, uint32_t __serial),
+    void *__cookie) {
+  char __name[PROP_NAME_MAX];
+  char __value[PROP_VALUE_MAX];
+  int __len = __system_property_read(__pi, __name, __value);
+  if (__len >= 0)
+    __callback(__cookie, __name, __value, 0);
+}
+#endif /* API < 26 */
+
 #endif /* __ANDROID__ */
 #endif /* ANDROID_SDK_BIONIC_COMPAT_H */

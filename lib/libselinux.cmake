@@ -126,3 +126,11 @@ if(PLATFORM_WINDOWS)
         -include ${CMAKE_SOURCE_DIR}/patches/misc/win_compat/win_selinux_compat.h
         )
 endif()
+
+# macOS xattr calls take extra (position, options) args vs Linux and lack
+# O_PATH / l*xattr; force-include a shim that maps the Linux forms selinux uses.
+if(PLATFORM_DARWIN)
+    target_compile_options(libselinux PRIVATE
+        -include ${CMAKE_SOURCE_DIR}/patches/misc/mac_compat/mac_selinux_compat.h
+        )
+endif()
