@@ -118,6 +118,14 @@ target_include_directories(libselinux PRIVATE
 # mingw lacks some POSIX headers/constants selinux uses unconditionally (e.g.
 # <poll.h>, O_CLOEXEC); the code behind them is host-inert, so a header shim on
 # the include path plus a force-included constants shim is enough to compile.
+# host_compat supplies headers neither mingw nor the macOS SDK ship but that
+# selinux includes unconditionally (e.g. <stdio_ext.h>).
+if(PLATFORM_WINDOWS OR PLATFORM_DARWIN)
+    target_include_directories(libselinux PRIVATE
+        ${CMAKE_SOURCE_DIR}/patches/misc/host_compat
+        )
+endif()
+
 if(PLATFORM_WINDOWS)
     target_include_directories(libselinux PRIVATE
         ${CMAKE_SOURCE_DIR}/patches/misc/win_compat
