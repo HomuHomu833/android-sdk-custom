@@ -43,15 +43,29 @@ extern "C" {
 #if defined(__BIONIC__)
 // The bionic host tools target a low API (default 25), whose NDK stub libc does
 // not export every property symbol the AOSP sources reference:
-//   __system_property_wait   -- API 26 (libbase properties.cpp WaitForProperty)
-//   __system_properties_init -- libc-private (selinux android_device.c)
-// Provide weak no-op fallbacks so the tools link at API 25; property-wait
-// degrades to an immediate timeout and the init is a no-op (libc auto-initialises
-// the property area on first use anyway).
+//   __system_property_read_callback -- API 26 (libbase GetProperty, sysprop gen)
+//   __system_property_wait          -- API 26 (libbase WaitForProperty)
+//   __system_properties_init        -- libc-private (selinux android_device.c)
+// Provide weak fallbacks so the tools link at API 25. read_callback is backed by
+// the long-available __system_property_read(); property-wait degrades to an
+// immediate timeout; init is a no-op (libc auto-initialises on first use).
 #include <time.h>
 #include <sys/system_properties.h>
 
 extern "C" {
+    __attribute__((weak))
+    void __system_property_read_callback(
+        const prop_info* pi,
+        void (*callback)(void* cookie, const char* name, const char* value, uint32_t serial),
+        void* cookie) {
+        char name[PROP_NAME_MAX];
+        char value[PROP_VALUE_MAX];
+        int len = __system_property_read(pi, name, value);
+        if (len >= 0) {
+            callback(cookie, name, value, 0);
+        }
+    }
+
     __attribute__((weak))
     bool __system_property_wait(const prop_info* /*pi*/, uint32_t /*old_serial*/,
                                 uint32_t* /*new_serial_ptr*/,

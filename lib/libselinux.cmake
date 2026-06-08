@@ -30,7 +30,6 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/freecon.c
     ${SRC}/selinux/libselinux/src/get_initial_context.c
     ${SRC}/selinux/libselinux/src/getenforce.c
-    ${SRC}/selinux/libselinux/src/getpeercon.c
     ${SRC}/selinux/libselinux/src/hashtab.c
     ${SRC}/selinux/libselinux/src/init.c
     ${SRC}/selinux/libselinux/src/label.c
@@ -76,6 +75,9 @@ if(PLATFORM_LINUX_KERNEL)
         ${SRC}/selinux/libselinux/src/lgetfilecon.c
         ${SRC}/selinux/libselinux/src/lsetfilecon.c
         ${SRC}/selinux/libselinux/src/setfilecon.c
+        # getpeercon reads a socket peer's context via getsockopt(SO_PEERSEC);
+        # needs <sys/socket.h>/netlink, absent on mingw and unused by host tools.
+        ${SRC}/selinux/libselinux/src/getpeercon.c
         )
 endif()
 
