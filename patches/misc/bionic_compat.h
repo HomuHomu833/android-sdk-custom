@@ -67,5 +67,34 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) {
 }
 #endif /* API < 29 */
 
+/* hasmntopt() was only added to bionic at API level 26; e2fsprogs' ismounted.c
+ * uses it to test a mount entry's options (e.g. MNTOPT_RO). Supply the standard
+ * glibc-equivalent fallback for the lower API levels. On API >= 26 bionic's
+ * <mntent.h> declares the real one, so this expands to nothing and the libc
+ * implementation is used instead. */
+#if !defined(__ANDROID_API__) || __ANDROID_API__ < 26
+#include <mntent.h>
+#include <string.h>
+
+static inline __attribute__((__unused__))
+char *hasmntopt(const struct mntent *mnt, const char *opt) {
+  const size_t optlen = strlen(opt);
+  char *rest = mnt->mnt_opts, *p;
+
+  while ((p = strstr(rest, opt)) != NULL) {
+    if ((p == mnt->mnt_opts || p[-1] == ',') &&
+        (p[optlen] == '\0' || p[optlen] == ',' || p[optlen] == '=')) {
+      return p;
+    }
+    rest = strchr(p, ',');
+    if (rest == NULL) {
+      break;
+    }
+    ++rest;
+  }
+  return NULL;
+}
+#endif /* API < 26 */
+
 #endif /* __ANDROID__ */
 #endif /* ANDROID_SDK_BIONIC_COMPAT_H */
