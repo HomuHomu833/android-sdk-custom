@@ -20,9 +20,6 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 **Platforms**
 - Linux
 - Android
-- NetBSD
-- FreeBSD
-- OpenBSD
 
 **Architectures**
 - **X86 Family**: `x86`, `x86_64`, `x32`
