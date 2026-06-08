@@ -189,15 +189,29 @@ index c91a6c1..735de71 100644
  /*
   * regex.h/c were introduced to hold all dependencies on the regular
 diff --git a/libselinux/src/procattr.c b/libselinux/src/procattr.c
-index b7a93a2..028d9cb 100644
+index b7a93a2..329c453 100644
 --- a/libselinux/src/procattr.c
 +++ b/libselinux/src/procattr.c
-@@ -27,7 +27,16 @@ static __thread char destructor_initialized;
+@@ -1,4 +1,6 @@
++#if !defined(_WIN32)
+ #include <sys/syscall.h>
++#endif
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <pthread.h>
+@@ -27,7 +29,23 @@ static __thread char destructor_initialized;
  
  /* Bionic and glibc >= 2.30 declare gettid() system call wrapper in unistd.h and
   * has a definition for it */
 -#ifdef __BIONIC__
-+#if defined(__APPLE__)
++#if defined(_WIN32)
++  /* MinGW has no gettid() / syscall; use the Windows thread ID API. */
++  #include <windows.h>
++  static inline pid_t gettid(void) {
++    return (pid_t)GetCurrentThreadId();
++  }
++  #define HAVE_GETTID 1
++#elif defined(__APPLE__)
 +  /* macOS has pthread_threadid_np() instead of gettid(). */
 +  #include <pthread.h>
 +  static inline pid_t gettid(void) {
