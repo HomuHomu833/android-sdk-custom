@@ -36,7 +36,6 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/label_backends_android.c
     ${SRC}/selinux/libselinux/src/label_file.c
     ${SRC}/selinux/libselinux/src/label_support.c
-    ${SRC}/selinux/libselinux/src/load_policy.c
     ${SRC}/selinux/libselinux/src/mapping.c
     ${SRC}/selinux/libselinux/src/matchpathcon.c
     ${SRC}/selinux/libselinux/src/policyvers.c
@@ -61,12 +60,18 @@ add_library(libselinux STATIC
 #    (android_seapp.c) and exposes the device-side selinux_android_* APIs;
 #  - the *filecon get/set a single file's security context via the Linux 5-arg
 #    *xattr API (no __APPLE__ handling, unlike the selabel backend label_file.c),
-#    which the host tools don't use.
+#    which the host tools don't use;
+#  - load_policy.c mounts selinuxfs/proc via the Linux 5-arg mount(2) + umount/
+#    umount2 (macOS has only the 4-arg BSD mount(); mingw neither), to load policy
+#    into the running kernel -- a device-only operation (callers live in core/init
+#    and policycoreutils, not the host tools, and nothing else in libselinux
+#    references its symbols).
 if(PLATFORM_LINUX_KERNEL)
     target_sources(libselinux PRIVATE
         ${SRC}/selinux/libselinux/src/avc.c
         ${SRC}/selinux/libselinux/src/avc_internal.c
         ${SRC}/selinux/libselinux/src/avc_sidtab.c
+        ${SRC}/selinux/libselinux/src/load_policy.c
         ${SRC}/selinux/libselinux/src/android/android.c
         ${SRC}/selinux/libselinux/src/android/android_seapp.c
         ${SRC}/selinux/libselinux/src/fgetfilecon.c
