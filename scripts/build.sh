@@ -201,9 +201,7 @@ mkdir -p "$EXTRA_PREFIX"
 if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
   log "Building zlib (static, $TARGET)"
   ( cd "$ROOTDIR"
-    # pass both the github release and the zlib.net mirror so aria2c fails over
-    # when one returns a transient 5xx (github releases 504s intermittently).
-    fetch --dir=/tmp -o zlib-1.3.1.tar.xz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz https://www.zlib.net/zlib-1.3.1.tar.xz && xz -d < /tmp/zlib-1.3.1.tar.xz | tar -x && rm /tmp/zlib-1.3.1.tar.xz
+    fetch --dir=/tmp -o zlib-1.3.1.tar.xz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz && xz -d < /tmp/zlib-1.3.1.tar.xz | tar -x && rm /tmp/zlib-1.3.1.tar.xz
     cd zlib-1.3.1
     CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" ./configure --prefix="$EXTRA_PREFIX" --static
     make -j"$JOBS" install )
