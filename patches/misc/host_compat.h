@@ -21,6 +21,22 @@ int rand_s(unsigned int *_Value);
 #endif
 
 /*
+ * --- macOS getprogname() ------------------------------------------------------
+ * AOSP code sometimes uses getprogname() (a BSD extension), but it is hidden on
+ * macOS when _XOPEN_SOURCE=700 is in effect (POSIX conformance mode strips BSD
+ * symbols).  Provide it ourselves so that the library compiles regardless of the
+ * XOPEN_SOURCE level.
+ */
+#if defined(__APPLE__)
+#include <crt_externs.h>
+
+static inline __attribute__((__unused__))
+const char *getprogname(void) {
+  return *_NSGetArgv();
+}
+#endif
+
+/*
  * --- stdio *_unlocked extensions -------------------------------------------
  * bionic, macOS and MinGW all lack the glibc/musl GNU stdio *_unlocked
  * functions (fgets_unlocked, etc.).  AOSP host code such as libselinux uses
