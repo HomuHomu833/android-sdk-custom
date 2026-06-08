@@ -131,7 +131,11 @@ s/.*/#if defined(__arm__) \&\& !defined(__aarch64__)\
 \
   void* addr = reinterpret_cast<void*>(start);\
   int size = static_cast<int>(limit - start);\
+#if defined(__BIONIC__)\
+  int r = cacheflush(reinterpret_cast<long>(addr), static_cast<long>(size), static_cast<long>(kCacheFlushFlags));\
+#else\
   int r = cacheflush(addr, size, kCacheFlushFlags);\
+#endif\
 #else\
   int r = cacheflush(start, limit, kCacheFlushFlags);\
 #endif/

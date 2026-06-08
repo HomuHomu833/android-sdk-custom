@@ -69,7 +69,7 @@ int rand_s(unsigned int *_Value);
 #endif
 
 static inline __attribute__((__unused__))
-int sched_setscheduler(pid_t pid, int policy, const struct sched_param *param) {
+int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
   (void)pid; (void)policy; (void)param;
   return 0;
 }
