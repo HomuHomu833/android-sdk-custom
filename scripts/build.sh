@@ -118,7 +118,7 @@ case "$PLATFORM" in
     SYSTEM_NAME=Linux
     # reallocarray() is API 29+ in bionic but selinux is built -DHAVE_REALLOCARRAY;
     # force-include a shim that supplies it on the lower API levels we target.
-    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/bionic_compat.h"
+    CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   macos)
@@ -144,7 +144,7 @@ case "$PLATFORM" in
     CROSS_RANLIB="$TC/bin/${HOST}-ranlib"; CROSS_STRIP="$TC/bin/${HOST}-strip"
     CROSS_OBJCOPY=""                  # cctools ships no objcopy; nothing here needs it
     SYSTEM_NAME=Darwin
-    CROSS_CFLAGS="-Wno-error=date-time -D_DARWIN_C_SOURCE"
+    CROSS_CFLAGS="-Wno-error=date-time -D_DARWIN_C_SOURCE -include $ROOTDIR/patches/misc/host_compat.h"
     CROSS_LDFLAGS=""
     # Point CMake's Apple support at the osxcross SDK + pin arch/deployment target.
     SDKROOT="$(ls -d "$TC/SDK/MacOSX"*.sdk 2>/dev/null | head -n1 || true)"
@@ -166,7 +166,7 @@ case "$PLATFORM" in
     CROSS_RANLIB="$TC/bin/${TARGET}-ranlib"; CROSS_STRIP="$TC/bin/${TARGET}-strip"
     CROSS_OBJCOPY="$TC/bin/${TARGET}-objcopy"
     SYSTEM_NAME=Windows
-    CROSS_CFLAGS="-Wno-error=date-time"
+    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
     # Static CRT/libstdc++ so the .exe tools run without shipping the mingw runtime DLLs.
     CROSS_LDFLAGS="-static -static-libstdc++ -static-libgcc"
     ;;

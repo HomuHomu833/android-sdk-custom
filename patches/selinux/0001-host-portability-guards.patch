@@ -85,7 +85,7 @@ index 439da41..cb97447 100644
  	init_selinuxmnt();
  #ifndef ANDROID
 diff --git a/libselinux/src/label_file.c b/libselinux/src/label_file.c
-index ad9a542..1631226 100644
+index ad9a542..842685c 100644
 --- a/libselinux/src/label_file.c
 +++ b/libselinux/src/label_file.c
 @@ -15,7 +15,26 @@
@@ -115,7 +115,7 @@ index ad9a542..1631226 100644
  #include <sys/types.h>
  #include <sys/stat.h>
  
-@@ -24,6 +43,18 @@
+@@ -24,6 +43,47 @@
  #include "label_internal.h"
  #include "label_file.h"
  
@@ -131,14 +131,43 @@ index ad9a542..1631226 100644
 +}
 +#endif
 +
++/* MinGW's vendored getline may use an incompatible size_t, causing
++ * -Wimplicit-function-declaration; supply a local fallback for Windows. */
++#if defined(_WIN32) && !defined(HAVE_GETLINE)
++#include <stdlib.h>
++static inline ssize_t getline(char **__lineptr, size_t *__n, FILE *__stream)
++{
++	size_t __pos = 0;
++	int __c;
++	if (*__lineptr == NULL || *__n == 0) {
++		*__n = 256;
++		*__lineptr = (char *)malloc(*__n);
++		if (*__lineptr == NULL) return -1;
++	}
++	while ((__c = fgetc(__stream)) != EOF) {
++		if (__pos + 1 >= *__n) {
++			*__n *= 2;
++			char *__new = (char *)realloc(*__lineptr, *__n);
++			if (__new == NULL) return -1;
++			*__lineptr = __new;
++		}
++		(*__lineptr)[__pos++] = (char)__c;
++		if (__c == '\n') break;
++	}
++	if (__pos == 0) return -1;
++	(*__lineptr)[__pos] = '\0';
++	return (ssize_t)__pos;
++}
++#endif
++
  /* controls the shrink multiple of the hashtab length */
  #define SHRINK_MULTIS 1
  
 diff --git a/libselinux/src/label_file.h b/libselinux/src/label_file.h
-index c91a6c1..b1a3b58 100644
+index c91a6c1..735de71 100644
 --- a/libselinux/src/label_file.h
 +++ b/libselinux/src/label_file.h
-@@ -6,7 +6,12 @@
+@@ -6,7 +6,20 @@
  #include <string.h>
  
  #include <sys/stat.h>
@@ -147,6 +176,14 @@ index c91a6c1..b1a3b58 100644
 + * there. macOS ships <sys/xattr.h> natively. */
 +#if !defined(_WIN32)
  #include <sys/xattr.h>
++#endif
++
++/* MinGW lacks S_IFLNK and S_IFSOCK in <sys/stat.h> */
++#if defined(_WIN32) && !defined(S_IFLNK)
++#define S_IFLNK 0xA000
++#endif
++#if defined(_WIN32) && !defined(S_IFSOCK)
++#define S_IFSOCK 0xC000
 +#endif
  
  /*

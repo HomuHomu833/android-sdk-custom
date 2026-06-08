@@ -280,4 +280,8 @@ sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29
 # builds compile without compat-header shims. See patches/selinux/.
 ( cd ${PWD_SRC}/src/selinux && git apply ../../patches/selinux/0001-host-portability-guards.patch )
 
+# e2fsprogs prof_err.c: 'link' variable collides with POSIX link() on bionic
+# (which gets dragged in via <unistd.h>). Rename to 'et_link'.
+sed -i 's/\blink\b/et_link/g' ${PWD_SRC}/src/e2fsprogs/lib/support/prof_err.c
+
 log "Source fixups applied"
