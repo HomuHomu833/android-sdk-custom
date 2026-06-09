@@ -330,7 +330,6 @@ target_link_libraries(adb
     libfastdeploy
     ${SELINUX_LINK_LIBS}
     libincfs
-    libpackagelistparser
     libbase
     libutils
     libcutils
@@ -357,6 +356,10 @@ target_link_libraries(adb
     dl
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(PLATFORM_LINUX_KERNEL)
+    target_link_libraries(adb libpackagelistparser)
+endif()
 
 # Per-OS host libs (Android.bp adb/libadb_host target.{darwin,windows} host_ldlibs)
 if(PLATFORM_DARWIN)

@@ -14,12 +14,7 @@
 # limitations under the License.
 #
 
-# AOSP has no target.windows for libselinux (SELinux is a Linux-kernel facility),
-# and no Windows host tool links it, so it is not built for the mingw host at all.
-# The macOS host still builds it (sload_f2fs links it there), so the guard is
-# PLATFORM_WINDOWS rather than PLATFORM_HOST. On Windows, consumers link the empty
-# ${SELINUX_LINK_LIBS} instead (see the top-level CMakeLists.txt).
-if(NOT PLATFORM_WINDOWS)
+if(PLATFORM_LINUX_KERNEL)
 
 add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/booleans.c
@@ -132,13 +127,4 @@ target_include_directories(libselinux PRIVATE
     ${SRC}/../include
     )
 
-endif() # NOT PLATFORM_WINDOWS
-
-# The macOS host build needs no compat-header shims here: the Linux-isms
-# libselinux would otherwise hit on a host (selinuxfs/proc mount probe,
-# __fsetlocking, O_CLOEXEC, stpcpy, getxattr) are guarded directly in the source
-# by patches/selinux/0001-host-portability-guards.patch (applied by
-# scripts/patch-source.sh), and the kernel-only translation units are excluded
-# above under PLATFORM_LINUX_KERNEL. (Windows builds no libselinux at all -- see
-# the NOT PLATFORM_WINDOWS guard above -- so its _WIN32 shims in that patch are
-# now dormant but harmless.)
+endif() # PLATFORM_LINUX_KERNEL

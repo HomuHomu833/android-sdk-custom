@@ -84,17 +84,14 @@ else()
 endif()
 
 # SELinux is a Linux-kernel facility, so AOSP never builds libselinux/libsepol
-# for the Windows host: neither library has a target.windows block in its
-# Android.bp, and the only host SDK tool that actually links them (sload_f2fs)
-# inherits f2fs-tools' `windows: { enabled: false }`. The Windows host tools
-# Google ships (aapt, aapt2, split-select, adb, fastboot, make_f2fs) link no
-# SELinux at all. Mirror that here: expose a link-list that is empty on Windows
-# so the shared tool CMake files can stay platform-agnostic, and skip building
-# the libraries themselves on Windows (see lib/libselinux.cmake, lib/libsepol.cmake).
-if(PLATFORM_WINDOWS)
-    set(SELINUX_LINK_LIBS "")
-else()
+# for the Windows or macOS host. Mirror that here: expose a link-list that is
+# empty on non-Linux-kernel platforms so shared tool CMake files can stay
+# platform-agnostic, and skip building libselinux on macOS/Windows too
+# (see lib/libselinux.cmake, lib/libsepol.cmake).
+if(PLATFORM_LINUX_KERNEL)
     set(SELINUX_LINK_LIBS libselinux libsepol)
+else()
+    set(SELINUX_LINK_LIBS "")
 endif()
 
 set(PROTOC_COMPILER)

@@ -21,6 +21,23 @@ int rand_s(unsigned int *_Value);
 #endif
 
 /*
+ * --- Windows POSIX types ----------------------------------------------------
+ * MinGW's <sys/types.h> omits uid_t and gid_t (they are POSIX concepts that
+ * Windows does not natively express).  Provide them so that AOSP host code
+ * (libpackagelistparser, libprocessgroup, etc.) compiles.
+ */
+#if defined(_WIN32)
+#ifndef uid_t_defined
+typedef unsigned int uid_t;
+#define uid_t_defined
+#endif
+#ifndef gid_t_defined
+typedef unsigned int gid_t;
+#define gid_t_defined
+#endif
+#endif
+
+/*
  * --- macOS extended attributes --------------------------------------------------
  * f2fs-tools sources call setxattr/lsetxattr/fsetxattr under an
  * #elif defined(__APPLE__) branch with the macOS 6-arg signature.

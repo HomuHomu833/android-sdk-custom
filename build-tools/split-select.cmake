@@ -47,8 +47,6 @@ target_link_libraries(split-select
     libincfs
     libbase
     libziparchive
-    libpackagelistparser
-    libprocessgroup
     liblog
     expat
     crypto
@@ -58,4 +56,8 @@ target_link_libraries(split-select
     dl
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(PLATFORM_LINUX_KERNEL)
+    target_link_libraries(split-select libpackagelistparser libprocessgroup)
+endif()
     

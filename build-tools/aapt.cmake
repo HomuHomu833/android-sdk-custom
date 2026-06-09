@@ -73,10 +73,8 @@ target_link_libraries(aapt
     libcutils
     ${SELINUX_LINK_LIBS}
     libziparchive
-    libpackagelistparser
     libbase
     libbuildversion
-    libprocessgroup
     liblog
     expat
     crypto
@@ -86,6 +84,10 @@ target_link_libraries(aapt
     dl
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(PLATFORM_LINUX_KERNEL)
+    target_link_libraries(aapt libpackagelistparser libprocessgroup)
+endif()
 
 # libaapt Android.bp target.darwin (no per-OS srcs for aapt)
 if(PLATFORM_DARWIN)

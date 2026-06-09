@@ -200,7 +200,6 @@ target_link_libraries(aapt2
     libandroidfw
     libincfs
     ${SELINUX_LINK_LIBS}
-    libpackagelistparser
     libutils 
     libcutils
     libziparchive
@@ -216,6 +215,10 @@ target_link_libraries(aapt2
     png_static
     dl
     )
+
+if(PLATFORM_LINUX_KERNEL)
+    target_link_libraries(aapt2 libpackagelistparser)
+endif()
 
 # Per-OS flags/libs (Android.bp aapt2 target.{darwin,windows}). No per-OS srcs.
 if(PLATFORM_DARWIN)
