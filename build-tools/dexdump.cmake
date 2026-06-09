@@ -76,11 +76,20 @@ target_compile_definitions(libartbase PRIVATE
     ART_BASE_ADDRESS_MAX_DELTA=0x1000000
     )
 
-add_library(libartpalette STATIC
-    ${SRC}/art/libartpalette/apex/palette.cc
-    ${SRC}/art/libartpalette/system/palette_fake.cc
-    )
+add_library(libartpalette STATIC)
 target_include_directories(libartpalette PRIVATE ${INCLUDES})
+
+# Android.bp: apex/palette.cc (dlopen-based) is android-only; host targets
+# (linux, darwin, windows) use system/palette_fake.cc (fake implementation).
+if(PLATFORM_ANDROID)
+    target_sources(libartpalette PRIVATE
+        ${SRC}/art/libartpalette/apex/palette.cc
+        )
+else()
+    target_sources(libartpalette PRIVATE
+        ${SRC}/art/libartpalette/system/palette_fake.cc
+        )
+endif()
 
 add_library(libdexfile STATIC
     ${SRC}/art/libdexfile/dex/art_dex_file_loader.cc
