@@ -21,6 +21,25 @@ int rand_s(unsigned int *_Value);
 #endif
 
 /*
+ * --- macOS extended attributes --------------------------------------------------
+ * macOS has lsetxattr() in <sys/xattr.h> but with a different signature
+ * (it takes an extra uint32_t position argument and different flags).
+ * f2fs-tools uses the Linux 5-arg signature.  Provide a stub so that
+ * host builds (sload_f2fs) compile; extended attributes are not critical
+ * when packing images during the build.
+ */
+#if defined(__APPLE__)
+#include <sys/xattr.h>
+
+static inline __attribute__((__unused__))
+int lsetxattr(const char *path, const char *name, const void *value,
+              size_t size, int flags) {
+  (void)path; (void)name; (void)value; (void)size; (void)flags;
+  return 0;
+}
+#endif
+
+/*
  * --- macOS getprogname() ------------------------------------------------------
  * AOSP code sometimes uses getprogname() (a BSD extension), but it is hidden on
  * macOS when _XOPEN_SOURCE=700 is in effect (POSIX conformance mode strips BSD
