@@ -27,6 +27,9 @@ if(PLATFORM_WINDOWS)
         )
 endif()
 
+target_include_directories(libmdnssd PRIVATE
+    ${SRC}/mdnsresponder/mDNSShared
+    )
 target_compile_options(libmdnssd PRIVATE
     -fno-strict-aliasing
     -fwrapv

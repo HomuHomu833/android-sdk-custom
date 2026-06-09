@@ -297,4 +297,8 @@ for f in lib/support/prof_err.c lib/ext2fs/ext2_err.c lib/ss/ss_err.c; do
   sed -i 's/\blink\b/et_link/g' "${PWD_SRC}/src/e2fsprogs/$f"
 done
 
+# MinGW on case-sensitive Linux: <Ws2tcpip.h> won't match ws2tcpip.h
+sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
+  ${PWD_SRC}/src/mdnsresponder/mDNSShared/CommonServices.h
+
 log "Source fixups applied"
