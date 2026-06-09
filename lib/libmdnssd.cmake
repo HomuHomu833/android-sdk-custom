@@ -54,7 +54,10 @@ elseif(PLATFORM_WINDOWS)
         -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES=1
         -DMDNS_UDS_SERVERPATH="/dev/socket/mdnsd"
         )
-    target_compile_options(libmdnssd PRIVATE -include winsock2.h -include ws2ipdef.h)
+    target_compile_options(libmdnssd PRIVATE "-include" "winsock2.h")
+    # ws2ipdef.h is not available as a standalone header in llvm-mingw and is
+    # already pulled in by winsock2.h in its w32api headers.
+    # target_compile_options(libmdnssd PRIVATE "-include" "ws2ipdef.h")
 else()
     # target.linux (host Linux + android)
     target_compile_definitions(libmdnssd PRIVATE
