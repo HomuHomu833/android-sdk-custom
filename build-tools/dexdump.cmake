@@ -114,7 +114,7 @@ target_link_libraries(dexdump
     libbase
     libziparchive
     liblog
-    dl
+    ${CMAKE_DL_LIBS}
     fmt::fmt
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )

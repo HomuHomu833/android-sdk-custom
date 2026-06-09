@@ -41,6 +41,6 @@ target_link_libraries(veridex
     liblog
     libziparchive
     fmt::fmt
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )

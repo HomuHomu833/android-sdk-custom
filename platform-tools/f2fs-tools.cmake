@@ -49,7 +49,7 @@ target_link_libraries(make_f2fs
     libext2_uuid
     libbase
     libsparse
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
     
@@ -72,7 +72,7 @@ target_link_libraries(make_f2fs_casefold
     libext2_uuid
     libbase
     libsparse
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
 
@@ -119,7 +119,7 @@ target_link_libraries(sload_f2fs
     liblog
     pcre2-8
     lz4_static
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
 

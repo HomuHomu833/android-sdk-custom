@@ -226,6 +226,6 @@ target_link_libraries(mke2fs
     libext2_quota 
     libsparse 
     libbase 
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )

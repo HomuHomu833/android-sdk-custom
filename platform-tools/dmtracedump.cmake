@@ -18,4 +18,4 @@
 add_executable(dmtracedump 
     ${SRC}/art/tools/dmtracedump/tracedump.cc
     )
-target_link_libraries(dmtracedump dl ${CMAKE_PREFIX_PATH}/lib/libz.a)
+target_link_libraries(dmtracedump ${CMAKE_DL_LIBS} ${CMAKE_PREFIX_PATH}/lib/libz.a)

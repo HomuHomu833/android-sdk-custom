@@ -112,7 +112,7 @@ target_link_libraries(fastboot
     liblog
     crypto
     pcre2-8
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
 

@@ -48,4 +48,4 @@ target_compile_definitions(sqlite3 PRIVATE
     -DSQLITE_ENABLE_DBSTAT_VTAB
     -DNO_ANDROID_FUNCS=1
     )
-target_link_libraries(sqlite3 dl m ${CMAKE_PREFIX_PATH}/lib/libz.a)
+target_link_libraries(sqlite3 ${CMAKE_DL_LIBS} m ${CMAKE_PREFIX_PATH}/lib/libz.a)

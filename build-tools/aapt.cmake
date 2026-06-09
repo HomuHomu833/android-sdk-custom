@@ -81,7 +81,7 @@ target_link_libraries(aapt
     pcre2-8
     jsoncpp_static
     png_static
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
 

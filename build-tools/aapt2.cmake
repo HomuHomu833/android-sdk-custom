@@ -213,7 +213,7 @@ target_link_libraries(aapt2
     ssl
     pcre2-8
     png_static
-    dl
+    ${CMAKE_DL_LIBS}
     )
 
 if(PLATFORM_LINUX_KERNEL)

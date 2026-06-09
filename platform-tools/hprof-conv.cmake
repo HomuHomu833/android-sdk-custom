@@ -17,4 +17,4 @@
 add_executable(hprof-conv 
     ${SRC}/dalvik/tools/hprof-conv/HprofConv.c
     )
-target_link_libraries(hprof-conv dl ${CMAKE_PREFIX_PATH}/lib/libz.a)
+target_link_libraries(hprof-conv ${CMAKE_DL_LIBS} ${CMAKE_PREFIX_PATH}/lib/libz.a)
