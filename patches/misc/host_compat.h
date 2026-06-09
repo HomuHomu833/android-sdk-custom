@@ -40,6 +40,20 @@ typedef unsigned int gid_t;
 #endif
 
 /*
+ * --- macOS BSD extensions --------------------------------------------------------
+ * macOS Clang with -std=gnu* does NOT implicitly define _DARWIN_C_SOURCE
+ * (unlike Linux where -std=gnu* defines _GNU_SOURCE).  Several AOSP sources
+ * or transitively-included library headers define _XOPEN_SOURCE=700, which
+ * hides BSD extensions (flock, LOCK_EX, getprogname, etc.).  Restore them
+ * unconditionally so the host-tool build sees a consistent POSIX+BSD API.
+ */
+#if defined(__APPLE__)
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE 1
+#endif
+#endif
+
+/*
  * --- macOS extended attributes --------------------------------------------------
  * f2fs-tools sources call setxattr/lsetxattr/fsetxattr under an
  * #elif defined(__APPLE__) branch with the macOS 6-arg signature.
