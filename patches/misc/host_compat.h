@@ -10,6 +10,8 @@
 #ifndef HOST_COMPAT_H
 #define HOST_COMPAT_H
 
+#include <stdint.h>
+
 /*
  * --- Windows API compat -----------------------------------------------------
  * rand_s() is declared in <stdlib.h> on MSVC but may be hidden in MinGW
