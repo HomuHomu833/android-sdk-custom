@@ -297,6 +297,13 @@ for f in lib/support/prof_err.c lib/ext2fs/ext2_err.c lib/ss/ss_err.c; do
   sed -i 's/\blink\b/et_link/g' "${PWD_SRC}/src/e2fsprogs/$f"
 done
 
+# e2fsprogs lib/config.h hard-codes HAVE_SYS_SYSMACROS_H, but llvm-mingw ships no
+# <sys/sysmacros.h>.  devname.c guards the include on that macro, so exclude
+# _WIN32 from the define (mirroring the existing __APPLE__ exclusion); makedev()
+# itself is supplied for Windows by patches/misc/host_compat.h.
+sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32)/' \
+  ${PWD_SRC}/src/e2fsprogs/lib/config.h
+
 # MinGW on case-sensitive Linux: <Ws2tcpip.h> won't match ws2tcpip.h
 sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
   ${PWD_SRC}/src/mdnsresponder/mDNSShared/CommonServices.h

@@ -315,6 +315,27 @@ static inline gid_t getegid(void) { return 0; }
 #endif
 
 /*
+ * --- Windows sys/sysmacros.h (makedev/major/minor) ---------------------------
+ * llvm-mingw ships no <sys/sysmacros.h>, and its <sys/types.h> does not define
+ * the device-number macros.  e2fsprogs lib/blkid/devname.c uses makedev() in
+ * its Linux-only /sys and EVMS scan paths (dead code on Windows, but still
+ * compiled).  config.h's HAVE_SYS_SYSMACROS_H is suppressed for _WIN32 (see
+ * scripts/patch-source.sh) so the missing header is never #include'd; provide
+ * the macros here instead, matching e2fsprogs' own include/mingw/sys/sysmacros.h.
+ */
+#if defined(_WIN32)
+#ifndef makedev
+#define makedev(maj, min) (((maj) << 8) + (min))
+#endif
+#ifndef major
+#define major(dev) ((int)(((dev) >> 8) & 0xff))
+#endif
+#ifndef minor
+#define minor(dev) ((int)((dev) & 0xff))
+#endif
+#endif
+
+/*
  * --- Windows malloc_usable_size ----------------------------------------------
  * sqlite3 is built with -DHAVE_MALLOC_USABLE_SIZE on every platform, but
  * llvm-mingw's <malloc.h> does not declare the function (even though it is
