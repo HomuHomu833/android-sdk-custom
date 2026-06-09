@@ -22,19 +22,32 @@ int rand_s(unsigned int *_Value);
 
 /*
  * --- macOS extended attributes --------------------------------------------------
- * macOS has lsetxattr() in <sys/xattr.h> but with a different signature
- * (it takes an extra uint32_t position argument and different flags).
- * f2fs-tools uses the Linux 5-arg signature.  Provide a stub so that
- * host builds (sload_f2fs) compile; extended attributes are not critical
- * when packing images during the build.
+ * f2fs-tools sources call setxattr/lsetxattr/fsetxattr under an
+ * #elif defined(__APPLE__) branch with the macOS 6-arg signature.
+ * Stub them out — extended attribute operations are not needed for host
+ * builds that pack images.
  */
 #if defined(__APPLE__)
-#include <sys/xattr.h>
-
+#ifndef XATTR_CREATE
+#define XATTR_CREATE 0x0002
+#endif
+#include <sys/types.h>
+static inline __attribute__((__unused__))
+int setxattr(const char *path, const char *name, const void *value,
+             size_t size, uint32_t position, int options) {
+  (void)path; (void)name; (void)value; (void)size; (void)position; (void)options;
+  return 0;
+}
 static inline __attribute__((__unused__))
 int lsetxattr(const char *path, const char *name, const void *value,
-              size_t size, int flags) {
-  (void)path; (void)name; (void)value; (void)size; (void)flags;
+              size_t size, uint32_t position, int options) {
+  (void)path; (void)name; (void)value; (void)size; (void)position; (void)options;
+  return 0;
+}
+static inline __attribute__((__unused__))
+int fsetxattr(int fd, const char *name, const void *value,
+              size_t size, uint32_t position, int options) {
+  (void)fd; (void)name; (void)value; (void)size; (void)position; (void)options;
   return 0;
 }
 #endif
