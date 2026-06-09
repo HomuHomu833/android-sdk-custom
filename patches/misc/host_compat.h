@@ -283,4 +283,47 @@ int getlogin_r(char *buf, size_t bufsize) {
 #endif /* API < 28 */
 
 #endif /* __ANDROID__ */
+
+/*
+ * --- Windows POSIX types ----------------------------------------------------
+ * MinGW's <sys/types.h> omits uid_t and gid_t (they are POSIX concepts that
+ * Windows does not natively express).  Provide them so that AOSP host code
+ * (libpackagelistparser, libprocessgroup, etc.) compiles.
+ */
+#if defined(_WIN32)
+#ifndef uid_t_defined
+typedef unsigned int uid_t;
+#define uid_t_defined
+#endif
+#ifndef gid_t_defined
+typedef unsigned int gid_t;
+#define gid_t_defined
+#endif
+#endif
+
+/*
+ * --- Windows POSIX identity stubs --------------------------------------------
+ * e2fsprogs lib/blkid/cache.c calls getuid/geteuid/getgid/getegid in its
+ * safe_getenv() helper.  These POSIX concepts don't exist on Windows; return 0
+ * (interpreted as "not running setuid/setgid") so the check is a no-op.
+ */
+#if defined(_WIN32)
+static inline uid_t getuid(void) { return 0; }
+static inline uid_t geteuid(void) { return 0; }
+static inline gid_t getgid(void) { return 0; }
+static inline gid_t getegid(void) { return 0; }
+#endif
+
+/*
+ * --- Windows malloc_usable_size ----------------------------------------------
+ * sqlite3 is built with -DHAVE_MALLOC_USABLE_SIZE on every platform, but
+ * llvm-mingw's <malloc.h> does not declare the function (even though it is
+ * exported from msvcrt.dll).  Forward-declare it so C99-compilant code does
+ * not error out.
+ */
+#if defined(_WIN32) && !defined(malloc_usable_size)
+#include <malloc.h>
+size_t malloc_usable_size(void *ptr);
+#endif
+
 #endif /* HOST_COMPAT_H */
