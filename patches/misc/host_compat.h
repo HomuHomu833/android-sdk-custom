@@ -51,6 +51,13 @@ typedef unsigned int gid_t;
 #ifndef _DARWIN_C_SOURCE
 #define _DARWIN_C_SOURCE 1
 #endif
+/* RFC 3542 IPv6 socket options (IPV6_PKTINFO, IPV6_RECVPKTINFO, etc.) are
+ * hidden behind this macro in <netinet/in.h> on macOS.  AOSP/Chromium code
+ * that uses packet-info control messages for IPv6 requires it.
+ */
+#ifndef __APPLE_USE_RFC_3542
+#define __APPLE_USE_RFC_3542 1
+#endif
 #endif
 
 /*
