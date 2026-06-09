@@ -42,6 +42,9 @@ if(PLATFORM_WINDOWS)
         )
     # libbase_cflags_defaults target.windows
     target_compile_definitions(libbase PRIVATE -D_POSIX_THREAD_SAFE_FUNCTIONS)
+    # clock_gettime (and its clock_gettime64 alias) come from winpthreads on
+    # MinGW; propagate so every consumer of libbase resolves the symbol.
+    target_link_libraries(libbase PUBLIC pthread)
 else()
     # target.linux (android + host Linux) and target.darwin both add errors_unix;
     # cmsg.cpp is built everywhere except windows.

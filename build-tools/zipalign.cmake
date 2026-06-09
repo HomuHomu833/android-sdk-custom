@@ -31,7 +31,7 @@ target_include_directories(zipalign PRIVATE
     ${CMAKE_PREFIX_PATH}/include
     )
 
-target_link_libraries(zipalign 
+target_link_libraries(zipalign
     libutils 
     libbase
     libziparchive
