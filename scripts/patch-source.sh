@@ -315,4 +315,15 @@ sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32
 sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
   ${PWD_SRC}/src/mdnsresponder/mDNSShared/CommonServices.h
 
+# ADB Windows: fix time_t to long narrowing conversion in usb_libusb_hotplug.cpp
+# The timeval initialization uses an implicit narrowing cast that clang rejects.
+# Convert time_t to long explicitly.
+sed -i 's/struct timeval timeout{(time_t)libusb_inhouse_hotplug::kScan_rate_s.count(), 0};/struct timeval timeout{static_cast<long>(libusb_inhouse_hotplug::kScan_rate_s.count()), 0};/' \
+  ${PWD_SRC}/src/adb/client/usb_libusb_hotplug.cpp
+
+# ADB Windows: fix invalid static_cast in sysdeps_win32.cpp
+# OSVERSIONINFO and RTL_OSVERSIONINFOW are different struct types; use reinterpret_cast.
+sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVERSIONINFOW>(\&version)/' \
+  ${PWD_SRC}/src/adb/sysdeps_win32.cpp
+
 log "Source fixups applied"
