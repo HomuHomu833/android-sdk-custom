@@ -346,14 +346,17 @@ static inline gid_t getegid(void) { return 0; }
 
 /*
  * --- Windows malloc_usable_size ----------------------------------------------
- * sqlite3 is built with -DHAVE_MALLOC_USABLE_SIZE on every platform, but
- * llvm-mingw's <malloc.h> does not declare the function (even though it is
- * exported from msvcrt.dll).  Forward-declare it so C99-compilant code does
- * not error out.
+ * sqlite3 is built with -DHAVE_MALLOC_USABLE_SIZE on every platform, but the
+ * Windows CRT has no malloc_usable_size: the ucrt equivalent is _msize().
+ * Forward-declaring malloc_usable_size (as we used to) lets the code compile but
+ * leaves an undefined symbol at link time, so define it as an inline wrapper
+ * over _msize() instead.  _msize(NULL) is undefined, so mirror glibc and return
+ * 0 for a NULL pointer.
  */
 #if defined(_WIN32) && !defined(malloc_usable_size)
 #include <malloc.h>
-size_t malloc_usable_size(void *ptr);
+static inline __attribute__((__unused__))
+size_t malloc_usable_size(void *ptr) { return ptr ? _msize(ptr) : 0; }
 #endif
 
 #endif /* HOST_COMPAT_H */
