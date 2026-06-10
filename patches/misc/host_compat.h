@@ -197,30 +197,37 @@ int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
  * MinGW's <sys/stat.h> omits S_ISLNK and S_ISSOCK (Windows has no symlinks
  * or sockets-as-file-types in the traditional sense).  Provide them so that
  * libselinux code such as stringrep.c and label_file.h compiles.
+ *
+ * ADB TUs (ADB_HOST=1) are excluded: adb/sysdeps/stat.h provides its own
+ * definitions of S_IFLNK, S_ISLNK, and lstat (mapped to adb_stat for proper
+ * Windows path handling).  Defining them here first would cause
+ * -Wmacro-redefined warnings when sysdeps/stat.h redefines them with bare
+ * #define.
  */
 #if defined(_WIN32)
-/* S_IFLNK / S_IFSOCK are missing from MinGW's <sys/stat.h> */
-#ifndef S_IFLNK
-#define S_IFLNK 0xA000
-#endif
+/* S_IFSOCK is not defined by adb's stat.h, so always provide it */
 #ifndef S_IFSOCK
 #define S_IFSOCK 0xC000
-#endif
-#ifndef S_ISLNK
-#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
 #ifndef S_ISSOCK
 #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 #endif
-/* MinGW's <sys/stat.h> declares stat() but not lstat() — Windows has no
- * symlinks, so a path stat never differs from a link stat.  Map lstat onto
- * stat so e2fsprogs (lib/blkid/devno.c) and other host code that probes the
+/* S_IFLNK, S_ISLNK, lstat: skip for ADB TUs — sysdeps/stat.h owns these */
+#if !defined(ADB_HOST)
+#ifndef S_IFLNK
+#define S_IFLNK 0xA000
+#endif
+#ifndef S_ISLNK
+#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+/* Map lstat onto stat so e2fsprogs and other host code that probes the
  * filesystem compiles.  Using a macro inherits MinGW's _FILE_OFFSET_BITS=64
  * remapping of stat -> _stat64 (and struct stat -> struct _stat64), which an
  * inline wrapper would not. */
 #ifndef lstat
 #define lstat stat
 #endif
+#endif /* !ADB_HOST */
 #endif
 
 /*
