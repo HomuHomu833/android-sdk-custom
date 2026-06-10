@@ -183,6 +183,15 @@ int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
 #ifndef S_ISSOCK
 #define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
 #endif
+/* MinGW's <sys/stat.h> declares stat() but not lstat() — Windows has no
+ * symlinks, so a path stat never differs from a link stat.  Map lstat onto
+ * stat so e2fsprogs (lib/blkid/devno.c) and other host code that probes the
+ * filesystem compiles.  Using a macro inherits MinGW's _FILE_OFFSET_BITS=64
+ * remapping of stat -> _stat64 (and struct stat -> struct _stat64), which an
+ * inline wrapper would not. */
+#ifndef lstat
+#define lstat stat
+#endif
 #endif
 
 /*
