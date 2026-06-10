@@ -26,6 +26,8 @@ add_library(libusb STATIC
 # Per-OS backend (Android.bp libusb target.{linux_glibc,darwin,windows}).
 # NB: libusb's config.h also needs per-OS defines (PLATFORM_POSIX/WINDOWS, etc.)
 # for darwin/windows beyond these sources.
+# BSD uses the POSIX event/thread layer and (if available) openbsd_usb.c;
+# fall back to bare POSIX if AOSP's libusb checkout lacks a BSD backend.
 if(PLATFORM_DARWIN)
     target_sources(libusb PRIVATE
         ${SRC}/libusb/libusb/os/darwin_usb.c
@@ -40,6 +42,14 @@ elseif(PLATFORM_WINDOWS)
         ${SRC}/libusb/libusb/os/windows_usbdk.c
         ${SRC}/libusb/libusb/os/windows_winusb.c
         )
+elseif(PLATFORM_BSD)
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/events_posix.c
+        ${SRC}/libusb/libusb/os/threads_posix.c
+        )
+    if(EXISTS ${SRC}/libusb/libusb/os/openbsd_usb.c)
+        target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/openbsd_usb.c)
+    endif()
 else()
     target_sources(libusb PRIVATE
         ${SRC}/libusb/libusb/os/linux_usbfs.c
@@ -59,6 +69,11 @@ elseif(PLATFORM_WINDOWS)
         ${SRC}/libusb/libusb
         ${SRC}/libusb/libusb/os
         ${SRC}/libusb/windows
+        )
+elseif(PLATFORM_BSD)
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
         )
 else()
     target_include_directories(libusb PRIVATE

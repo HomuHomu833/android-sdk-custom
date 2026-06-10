@@ -92,6 +92,9 @@ sed -i '/struct msghdr hdr = {/,/};/c\
 ' ${PWD_SRC}/src/core/libcutils/uevent.cpp
 
 find ${PWD_SRC}/src -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i '/#include <sys\/cdefs.h>/c\
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\
+#include <sys/cdefs.h>\
+#else\
 #ifdef __cplusplus\
 #ifndef __GLIBC__\
 #define __BEGIN_DECLS extern "C" {\
@@ -105,9 +108,18 @@ find ${PWD_SRC}/src -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -e
 #endif\
 #ifndef __INTRODUCED_IN\
 #define __INTRODUCED_IN(version)\
+#endif\
 #endif' {} +
 
-sed -i 's/__BEGIN_DECLS/#ifdef __cplusplus\nextern "C" {\n#endif/g; s/__END_DECLS/#ifdef __cplusplus\n}\n#endif/g' ${PWD_SRC}/src/core/libpackagelistparser/include/packagelistparser/packagelistparser.h
+# packagelistparser.h uses __BEGIN_DECLS/__END_DECLS from <sys/cdefs.h>; on
+# platforms without that header (or our replacement above) we expand them
+# inline. BSD keeps its own <sys/cdefs.h>, so skip the replacement there.
+case "$TARGET" in
+  *-freebsd-*|*-netbsd-*|*-openbsd-*) ;;
+  *)
+    sed -i 's/__BEGIN_DECLS/#ifdef __cplusplus\nextern "C" {\n#endif/g; s/__END_DECLS/#ifdef __cplusplus\n}\n#endif/g' ${PWD_SRC}/src/core/libpackagelistparser/include/packagelistparser/packagelistparser.h
+    ;;
+esac
 
 sed -i '/#include <sys\/limits.h>/d; /#include <log\/log.h>/a\
 #ifndef GID_MAX\n#define GID_MAX 2147483647\n#endif\n\

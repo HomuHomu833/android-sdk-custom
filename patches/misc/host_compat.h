@@ -121,12 +121,13 @@ const char *getprogname(void) {
 
 /*
  * --- stdio *_unlocked extensions -------------------------------------------
- * bionic, macOS and MinGW all lack the glibc/musl GNU stdio *_unlocked
+ * bionic, macOS, MinGW and BSDs all lack the glibc/musl GNU stdio *_unlocked
  * functions (fgets_unlocked, etc.).  AOSP host code such as libselinux uses
  * them as a single-threaded perf optimization.  Map them to the locked
  * equivalents (functionally identical on single-threaded or host builds).
  */
-#if defined(__APPLE__) || defined(_WIN32) || defined(__ANDROID__)
+#if defined(__APPLE__) || defined(_WIN32) || defined(__ANDROID__) || \
+    defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #ifndef fgets_unlocked
 #define fgets_unlocked(s, n, f)      fgets((s), (n), (f))
 #endif
@@ -271,11 +272,12 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
  * EINTR).  AOSP host code (e.g. logging/liblog/logger.h) uses it
  * unconditionally.  glibc and bionic already provide it via <unistd.h>, and
  * define it *unguarded* -- so we must NOT pre-define it there, or their header
- * would trip -Wmacro-redefined.  macOS, MinGW and musl ship no such macro, so
- * supply it only on those hosts.  (errno is resolved at the macro's expansion
- * site, where the TU has already included <errno.h>.)
+ * would trip -Wmacro-redefined.  macOS, MinGW, musl and some BSDs ship no such
+ * macro, so supply it only on those hosts.  (errno is resolved at the macro's
+ * expansion site, where the TU has already included <errno.h>.)
  */
 #if defined(__APPLE__) || defined(_WIN32) || \
+    defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
     (defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__))
 #ifndef TEMP_FAILURE_RETRY
 #define TEMP_FAILURE_RETRY(expression) (({ long int __result; do __result = (long int)(expression); while (__result == -1 && errno == EINTR); __result; }))
@@ -285,17 +287,19 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 /*
  * --- reallocarray() ----------------------------------------------------------
  * libsepol is compiled with -DHAVE_REALLOCARRAY which skips the static
- * declaration in selinux_internal.h, but macOS  and MinGW may still lack a
+ * declaration in selinux_internal.h, but macOS and MinGW may still lack a
  * libc declaration.  Provide a static-inline fallback for those platforms;
  * on bionic it is guarded by the API level (added at API 29).
  *
- * glibc (>= 2.26) and musl declare reallocarray themselves, so they are
- * excluded: this header is also force-included on the linux/zig builds, where
- * defining it here would clash with the libc's own declaration.
+ * glibc (>= 2.26), musl, and all BSDs declare reallocarray themselves, so
+ * they are excluded: this header is also force-included on the linux/zig and
+ * bsd builds, where defining it here would clash with the libc's own
+ * declaration.
  */
 #if (!defined(__ANDROID_API__) || __ANDROID_API__ < 29) \
     && !defined(__GLIBC__) \
-    && !(defined(__linux__) && !defined(__ANDROID__))
+    && !(defined(__linux__) && !defined(__ANDROID__)) \
+    && !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 #include <errno.h>
 #include <stdlib.h>
 

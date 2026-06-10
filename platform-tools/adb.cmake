@@ -159,6 +159,13 @@ elseif(PLATFORM_WINDOWS)
         ${SRC}/adb/sysdeps/win32/errno.cpp
         ${SRC}/adb/sysdeps/win32/stat.cpp
         )
+elseif(PLATFORM_BSD)
+    # BSD: use the libusb-based USB backend (portable, no Linux usbfs
+    # dependency) and fdevent_poll (epoll is Linux-only; poll is POSIX).
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_libusb.cpp
+        ${SRC}/adb/fdevent/fdevent_poll.cpp
+        )
 else()
     # linux (host)
     target_sources(libadb PRIVATE

@@ -41,7 +41,8 @@ fetch() {
 # the (Linux) build host, so each platform gets the matching official SDK to
 # splice into — windows .exe + .bat launchers, macOS Mach-O, etc. bionic splices
 # its android ELF binaries into the linux SDK (the Java/shell tooling runs on
-# device via Termux's JRE).
+# device via Termux's JRE). BSD also uses the Linux SDK as the base (ELF format,
+# Java launcher scripts), since no BSD-specific SDK is published.
 case "$PLATFORM" in
   windows) REPO_OS_OVERRIDE=windows ;;
   macos)   REPO_OS_OVERRIDE=macosx ;;

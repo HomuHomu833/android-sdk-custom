@@ -1,10 +1,10 @@
 # Prebuilt build image for the android-sdk-custom builds. Bakes the build tools
 # and the zig / zig-as-llvm toolchain so CI only pulls (fast). zig drives the
-# linux musl/gnu host-tool cross builds.
+# linux musl/gnu and bsd host-tool cross builds.
 #
-# All four platforms are wired: linux (zig), bionic (NDK clang, pulled at run
-# time), windows (llvm-mingw) and macos (osxcross) — laid out like the sibling
-# android-ndk-custom / llvm-custom images.
+# All five platforms are wired: linux (zig), bsd (zig), bionic (NDK clang,
+# pulled at run time), windows (llvm-mingw) and macos (osxcross) — laid out
+# like the sibling android-ndk-custom / llvm-custom images.
 #
 # The build scripts are NOT copied in — they are bind-mounted from the checkout
 # at run time, so editing scripts/ needs no image rebuild.
@@ -47,7 +47,7 @@ RUN printf '%s\n' '#!/bin/sh' \
     '  echo "fetch: aria2c failed, retry $i/5 in 2s..." >&2; sleep 2' \
     'done' > /usr/local/bin/fetch && chmod +x /usr/local/bin/fetch
 
-# zig (provides the cross C/C++ toolchain for the linux musl/gnu targets)
+# zig (provides the cross C/C++ toolchain for the linux musl/gnu and bsd targets)
 RUN arch="$(uname -m)"; \
     case "$arch" in \
         x86_64)        zig_arch="x86_64" ;; \

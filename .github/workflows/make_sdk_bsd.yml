@@ -1,0 +1,41 @@
+name: Make SDK (BSD)
+run-name: Make SDK ${{ inputs.version }}
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Platform Tools Version"
+        required: true
+        default: "36.0.2"
+      tag:
+        description: "Android Source Tag"
+        required: true
+        default: "android-16.0.0_r4"
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  make:
+    uses: ./.github/workflows/make-sdk.yml
+    secrets: inherit
+    with:
+      platform: bsd
+      version: ${{ inputs.version }}
+      tag: ${{ inputs.tag }}
+      # riscv32-netbsd-none, powerpc-freebsd-eabihf, sparc64-openbsd-none
+      targets: >-
+        ["aarch64-freebsd-none", "arm-freebsd-eabihf",
+         "powerpc64-freebsd-none", "powerpc64le-freebsd-none",
+         "riscv64-freebsd-none", "x86-freebsd-none", "x86_64-freebsd-none",
+         "aarch64-netbsd-none", "aarch64_be-netbsd-none",
+         "arm-netbsd-eabi", "arm-netbsd-eabihf",
+         "armeb-netbsd-eabi", "armeb-netbsd-eabihf",
+         "mips-netbsd-eabi", "mips-netbsd-eabihf",
+         "mipsel-netbsd-eabi", "mipsel-netbsd-eabihf",
+         "powerpc-netbsd-eabi", "powerpc-netbsd-eabihf",
+         "x86-netbsd-none", "x86_64-netbsd-none",
+         "arm-openbsd-eabi", "mips64-openbsd-none",
+         "powerpc-openbsd-eabihf", "riscv64-openbsd-none",
+         "x86-openbsd-none", "x86_64-openbsd-none"]

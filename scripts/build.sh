@@ -2,9 +2,11 @@
 # Cross-build the Android SDK host tools for one target. Driven entirely by env
 # vars so it runs identically in CI and in `docker run`.
 #
-#   PLATFORM   linux | bionic   (see the per-PLATFORM case below)
+#   PLATFORM   linux | bionic | bsd   (see the per-PLATFORM case below)
 #   TARGET     target triple, e.g. x86_64-linux-musl / aarch64-linux-gnu (linux)
 #                                  aarch64-linux-android                  (bionic)
+#                                  aarch64-freebsd-none / x86_64-netbsd-none
+#                                  arm-openbsd-eabi                       (bsd)
 #   ARCH       CMAKE_SYSTEM_PROCESSOR (default: triple's arch field)
 #   ROOTDIR    checkout root (default: cwd)
 #   OUT        where the stripped host tools land (default: $ROOTDIR/out)
@@ -41,7 +43,7 @@ fetch() {
 
 # --- toolchain selection ----------------------------------------------------
 # Structured as a per-PLATFORM case: linux (zig), bionic (NDK clang), macos
-# (osxcross), windows (llvm-mingw) — mirrors the sibling NDK/llvm repos.
+# (osxcross), windows (llvm-mingw), bsd (zig) — mirrors the sibling NDK/llvm repos.
 CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
 case "$PLATFORM" in
   linux)
@@ -124,6 +126,35 @@ case "$PLATFORM" in
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
+  bsd)
+    # BSD host tools via zig-as-llvm (same zig-based LLVM wrappers as the linux
+    # case). Zig provides the cross C/C++ toolchain for all BSD targets.
+    TC=/opt/zig-as-llvm
+    export ZIG_TARGET="$TARGET"
+    [ -d "$ROOTDIR/patches/musl/zig" ] && cp -R "$ROOTDIR/patches/musl/zig/." /opt/zig/ || true
+    CROSS_CC="$TC/bin/cc"; CROSS_CXX="$TC/bin/c++"; CROSS_LD="$TC/bin/ld"
+    CROSS_AR="$TC/bin/ar"; CROSS_RANLIB="$TC/bin/ranlib"
+    CROSS_STRIP="$TC/bin/strip"; CROSS_OBJCOPY="$TC/bin/objcopy"
+    case "$(echo "$TARGET" | cut -d- -f2)" in
+      freebsd) SYSTEM_NAME=FreeBSD ;;
+      netbsd)  SYSTEM_NAME=NetBSD ;;
+      openbsd) SYSTEM_NAME=OpenBSD ;;
+    esac
+    # host_compat.h supplies the glibc/bionic-isms BSDs omit (e.g.
+    # TEMP_FAILURE_RETRY, reallocarray); its platform-locked sections
+    # (Windows/Darwin) stay inert on BSD. Dynamic linking for BSD targets.
+    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
+    CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
+    # Per-arch tuning (SIMD, TLS): same as the linux case — mirrors the
+    # sibling NDK/llvm repos.
+    case "$TARGET" in
+      thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
+      powerpc-*|powerpc64-*)    CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_POWERPC_VSX_OPT=0" ;;
+    esac
+    case "$TARGET" in
+      *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
+    esac
+    ;;
   macos)
     # macOS host tools via osxcross (cctools-port + clang wrappers that carry the
     # macOS SDK sysroot). zig segfaults building macOS binaries, so darwin uses
@@ -198,8 +229,9 @@ fi
 
 # --- extra deps (zlib + bzip2, static archives, cross-compiled for target) --
 # We only consume the static .a archives, so -static is only meaningful for the
-# tools' throwaway test binaries. Pass it for musl (proven path); never for gnu,
-# since zig refuses to statically link glibc ("libc ... requires dynamic linking").
+# tools' throwaway test binaries. Pass it for musl (proven path); never for gnu
+# or bsd, since zig refuses to statically link glibc or bsd libc ("libc ...
+# requires dynamic linking").
 case "$TARGET" in
   *musl*) DEP_STATIC="-static" ;;
   *)      DEP_STATIC="" ;;
@@ -232,6 +264,7 @@ case "$PLATFORM" in
   bionic)  TARGET_OS=android ;;
   macos)   TARGET_OS=darwin ;;
   windows) TARGET_OS=windows ;;
+  bsd)     TARGET_OS=bsd ;;
   *)       TARGET_OS=linux ;;
 esac
 

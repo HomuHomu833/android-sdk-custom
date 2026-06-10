@@ -72,6 +72,10 @@ elseif(PLATFORM_WINDOWS)
     # so fastboot builds for windows without the AdbWinApi dependency.
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_libusb.cpp)
     target_include_directories(fastboot PRIVATE ${SRC}/libusb/libusb)
+elseif(PLATFORM_BSD)
+    # BSD: use the portable libusb backend (no Linux usbfs on BSD).
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_libusb.cpp)
+    target_include_directories(fastboot PRIVATE ${SRC}/libusb/libusb)
 else()
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_linux.cpp)
 endif()
@@ -122,4 +126,6 @@ if(PLATFORM_DARWIN)
 elseif(PLATFORM_WINDOWS)
     # libusb (WinUSB) backend + the Win32 libs it needs; no AdbWinApi.
     target_link_libraries(fastboot libusb setupapi ole32 cfgmgr32 winusb ws2_32)
+elseif(PLATFORM_BSD)
+    target_link_libraries(fastboot libusb)
 endif()

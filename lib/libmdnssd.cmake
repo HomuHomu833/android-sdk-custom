@@ -61,6 +61,13 @@ elseif(PLATFORM_WINDOWS)
     # ws2ipdef.h is not available as a standalone header in llvm-mingw and is
     # already pulled in by winsock2.h in its w32api headers.
     # target_compile_options(libmdnssd PRIVATE "-include" "ws2ipdef.h")
+elseif(PLATFORM_BSD)
+    # bsd: no HAVE_LINUX, no NETLINK (Linux-specific). mdnsd socket path
+    # follows the FreeBSD convention (/var/run/mdnsd).
+    target_compile_definitions(libmdnssd PRIVATE
+        -DTARGET_OS_LINUX
+        -DMDNS_UDS_SERVERPATH="/var/run/mdnsd"
+        )
 else()
     # target.linux (host Linux + android)
     target_compile_definitions(libmdnssd PRIVATE
