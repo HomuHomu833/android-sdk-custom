@@ -30,6 +30,13 @@ cp patches/misc/deployagentscript.inc  src/adb/fastdeploy/deployagent/
 # AdbWinApi (fastboot.cmake compiles it instead of usb_windows.cpp on windows).
 cp patches/misc/fastboot_usb_libusb.cpp src/core/fastboot/usb_libusb.cpp
 
+# Windows <rpc.h> (pulled in transitively via libbase <windows.h>) does
+# `#define interface struct`, which clobbers usb_ifc_info's `interface` field and
+# fastboot.cpp's local `interface` strings. Drop the macro right before the struct;
+# it then stays undefined for the rest of every TU that includes usb.h.
+sed -i '/^struct usb_ifc_info {/i\
+#undef interface  /* Windows <rpc.h> defines this as `struct` */' src/core/fastboot/usb.h
+
 cp patches/misc/platform_tools_version.h src/soong/cc/libbuildversion/include/
 
 cp patches/misc/instruction_set.h        src/art/libartbase/arch/instruction_set.h
