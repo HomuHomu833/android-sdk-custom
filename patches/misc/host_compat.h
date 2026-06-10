@@ -266,13 +266,36 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 #endif
 
 /*
+ * --- TEMP_FAILURE_RETRY ------------------------------------------------------
+ * A glibc/bionic convenience macro (re-run a syscall while it fails with
+ * EINTR).  AOSP host code (e.g. logging/liblog/logger.h) uses it
+ * unconditionally.  glibc and bionic already provide it via <unistd.h>, and
+ * define it *unguarded* -- so we must NOT pre-define it there, or their header
+ * would trip -Wmacro-redefined.  macOS, MinGW and musl ship no such macro, so
+ * supply it only on those hosts.  (errno is resolved at the macro's expansion
+ * site, where the TU has already included <errno.h>.)
+ */
+#if defined(__APPLE__) || defined(_WIN32) || \
+    (defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__))
+#ifndef TEMP_FAILURE_RETRY
+#define TEMP_FAILURE_RETRY(expression) (({ long int __result; do __result = (long int)(expression); while (__result == -1 && errno == EINTR); __result; }))
+#endif
+#endif
+
+/*
  * --- reallocarray() ----------------------------------------------------------
  * libsepol is compiled with -DHAVE_REALLOCARRAY which skips the static
  * declaration in selinux_internal.h, but macOS  and MinGW may still lack a
  * libc declaration.  Provide a static-inline fallback for those platforms;
  * on bionic it is guarded by the API level (added at API 29).
+ *
+ * glibc (>= 2.26) and musl declare reallocarray themselves, so they are
+ * excluded: this header is also force-included on the linux/zig builds, where
+ * defining it here would clash with the libc's own declaration.
  */
-#if !defined(__ANDROID_API__) || __ANDROID_API__ < 29
+#if (!defined(__ANDROID_API__) || __ANDROID_API__ < 29) \
+    && !defined(__GLIBC__) \
+    && !(defined(__linux__) && !defined(__ANDROID__))
 #include <errno.h>
 #include <stdlib.h>
 

@@ -66,10 +66,11 @@ ln -sf "$ROOTDIR/src/googletest" "$ROOTDIR/src/boringssl/src/third_party/googlet
 
 log "Applying source fixups${TARGET:+ for $TARGET}"
 
+# TEMP_FAILURE_RETRY is supplied by patches/misc/host_compat.h (force-included)
+# on the hosts that lack it (macOS, MinGW, musl); glibc/bionic provide it via
+# <unistd.h>. PAGE_SIZE stays here: it's an all-platform #ifndef fallback whose
+# necessity on glibc/bionic (16K-page era) can't be assumed away.
 sed -i '/};/ a\
-#ifndef TEMP_FAILURE_RETRY\
-#define TEMP_FAILURE_RETRY(expression) (({ long int __result; do __result = (long int)(expression); while (__result == -1 && errno == EINTR); __result; }))\
-#endif\
 #ifndef PAGE_SIZE\
 #define PAGE_SIZE 4096\
 #endif' ${PWD_SRC}/src/logging/liblog/logger.h

@@ -59,7 +59,10 @@ case "$PLATFORM" in
     # (mirrors how the sibling repos split musl vs gnu).
     case "$TARGET" in
       *musl*)
-        CROSS_CFLAGS="-Wno-error=date-time -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
+        # host_compat.h supplies the GNU/bionic-isms musl omits (e.g.
+        # TEMP_FAILURE_RETRY); its platform-locked sections stay inert on musl,
+        # and its reallocarray fallback is gated off for musl (libc provides it).
+        CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
         # _GNU_SOURCE: AOSP/host code (and bundled deps like zstd's cover.c, which
