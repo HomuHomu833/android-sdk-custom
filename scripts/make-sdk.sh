@@ -81,7 +81,7 @@ splice "$HOST_SDK/platform-tools"
 
 # --- prune host-only / renderscript leftovers -------------------------------
 rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
-rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc "$BT"/bcc_compat "$BT"/renderscript
+rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscript*
 
 # --- drop now-useless DLLs (windows base) -----------------------------------
 # - AdbWinApi/AdbWinUsbApi: only the official adb/fastboot used them; ours use libusb.
