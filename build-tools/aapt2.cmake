@@ -226,7 +226,12 @@ if(PLATFORM_DARWIN)
     target_compile_definitions(aapt2 PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
     target_link_libraries(aapt2 "-framework CoreFoundation")  # required by protobuf
 elseif(PLATFORM_WINDOWS)
-    target_compile_options(libaapt2 PRIVATE -Wno-maybe-uninitialized)
-    target_compile_options(aapt2 PRIVATE -Wno-maybe-uninitialized)
+    # -Wno-maybe-uninitialized is a GCC-only warning name (AOSP's mingw used GCC).
+    # The llvm-mingw toolchain here is clang, which has no such warning and rejects
+    # the flag with -Wunknown-warning-option, so only pass it under GCC.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(libaapt2 PRIVATE -Wno-maybe-uninitialized)
+        target_compile_options(aapt2 PRIVATE -Wno-maybe-uninitialized)
+    endif()
     target_link_libraries(aapt2 dbghelp)  # protobuf stack tracing
 endif()
