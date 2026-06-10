@@ -326,4 +326,9 @@ sed -i 's/struct timeval timeout{(time_t)libusb_inhouse_hotplug::kScan_rate_s.co
 sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVERSIONINFOW>(\&version)/' \
   ${PWD_SRC}/src/adb/sysdeps_win32.cpp
 
+# ADB Windows: fix adb_stat vs _stat64 type mismatch in sysdeps/win32/stat.cpp
+# _wstat64 (aliased as wstat) expects struct _stat64* but the call passes struct adb_stat*.
+sed -i 's/wstat(path_wide\.c_str(), &st)/wstat(path_wide.c_str(), reinterpret_cast<struct _stat64*>(\&st))/' \
+  ${PWD_SRC}/src/adb/sysdeps/win32/stat.cpp
+
 log "Source fixups applied"
