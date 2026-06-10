@@ -195,6 +195,31 @@ int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
 #endif
 
 /*
+ * --- Windows link() -----------------------------------------------------------
+ * Neither llvm-mingw's <unistd.h> nor e2fsprogs' own include/mingw/unistd.h
+ * declares POSIX link(); Windows hardlinks go through the Win32
+ * CreateHardLink API.  e2fsprogs (lib/blkid/save.c) is the only host-build
+ * caller: it uses link() solely to make a best-effort ".old" backup of the
+ * blkid cache before an atomic rename(), and explicitly casts the result to
+ * void.  Provide link() as a stub that *reports failure* (rather than faking
+ * success): the backup is simply skipped, the rename() still runs, and any
+ * other caller that checks the return value sees an honest "unsupported"
+ * instead of a hardlink that was never created.  We avoid CreateHardLinkA on
+ * purpose — it would need <windows.h> (whose macros leak into every
+ * force-included TU) or a forward declaration that would clash with the real
+ * windows.h that save.c includes itself.
+ */
+#if defined(_WIN32) && !defined(link)
+#include <errno.h>
+static inline __attribute__((__unused__))
+int link(const char *oldpath, const char *newpath) {
+  (void)oldpath; (void)newpath;
+  errno = ENOSYS;
+  return -1;
+}
+#endif
+
+/*
  * --- getline() ----------------------------------------------------------------
  * MinGW does not provide POSIX getline().  Provide a simple fallback so that
  * libselinux (label_file.c, selinux_config.c) and other host code can use it.
