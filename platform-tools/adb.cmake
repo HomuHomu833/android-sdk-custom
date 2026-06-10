@@ -145,11 +145,15 @@ if(PLATFORM_DARWIN)
 elseif(PLATFORM_WINDOWS)
     # Use the libusb backend on windows (WinUSB) instead of the native
     # usb_windows.cpp, so we don't depend on the prebuilt AdbWinApi (which is only
-    # shipped 32-bit). usb_init() comes from usb_libusb_hotplug.cpp here.
+    # shipped 32-bit). The legacy BlockingConnection USB path (UsbConnection /
+    # register_usb_transport) is excluded on Windows in patch-source.sh; the modern
+    # LibUsbConnection backend handles all device I/O. usb_windows_libusb.cpp
+    # supplies the global usb_init()/usb_cleanup() entry points main.cpp expects.
     target_sources(libadb PRIVATE
         ${SRC}/adb/client/usb_libusb_device.cpp
         ${SRC}/adb/client/usb_libusb_hotplug.cpp
         ${SRC}/adb/client/usb_libusb_inhouse_hotplug.cpp
+        ${SRC}/adb/client/usb_windows_libusb.cpp
         ${SRC}/adb/fdevent/fdevent_poll.cpp
         ${SRC}/adb/sysdeps_win32.cpp
         ${SRC}/adb/sysdeps/win32/errno.cpp
@@ -366,5 +370,7 @@ if(PLATFORM_DARWIN)
     target_link_libraries(adb "-framework CoreFoundation" "-framework IOKit" "-framework Security")
 elseif(PLATFORM_WINDOWS)
     # No AdbWinApi: the libusb (WinUSB) backend needs these Win32 libs instead.
-    target_link_libraries(adb setupapi ole32 cfgmgr32 winusb gdi32 userenv ws2_32)
+    # iphlpapi provides GetAdaptersAddresses(), used by openscreen's
+    # network_interface_win.cc for mDNS.
+    target_link_libraries(adb setupapi ole32 cfgmgr32 winusb gdi32 userenv ws2_32 iphlpapi)
 endif()

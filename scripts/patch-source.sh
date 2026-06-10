@@ -30,6 +30,12 @@ cp patches/misc/deployagentscript.inc  src/adb/fastdeploy/deployagent/
 # AdbWinApi (fastboot.cmake compiles it instead of usb_windows.cpp on windows).
 cp patches/misc/fastboot_usb_libusb.cpp src/core/fastboot/usb_libusb.cpp
 
+# adb libusb-only Windows glue: supplies the global usb_init()/usb_cleanup()
+# entry points that the dropped usb_windows.cpp (AdbWinApi, 32-bit only) used to
+# provide. The modern LibUsbConnection backend handles device I/O; adb.cmake
+# compiles this on windows.
+cp patches/misc/adb_usb_windows_libusb.cpp src/adb/client/usb_windows_libusb.cpp
+
 # Windows <rpc.h> (pulled in transitively via libbase <windows.h>) does
 # `#define interface struct`, which clobbers usb_ifc_info's `interface` field and
 # fastboot.cpp's local `interface` strings. Drop the macro right before the struct;
@@ -315,6 +321,29 @@ sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32
 # MinGW on case-sensitive Linux: <Ws2tcpip.h> won't match ws2tcpip.h
 sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
   ${PWD_SRC}/src/mdnsresponder/mDNSShared/CommonServices.h
+
+# ADB Windows: default to the libusb backend (we build no native AdbWinApi
+# backend on Windows). Only the is_libusb_enabled() body is touched, so the
+# unrelated #if defined(__APPLE__) CHECK_PACKET_OVERFLOW guard is left alone.
+sed -i '/^bool is_libusb_enabled() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(_WIN32)/' \
+  ${PWD_SRC}/src/adb/client/transport_usb.cpp
+
+# ADB Windows: the legacy BlockingConnection USB path (UsbConnection + the free
+# usb_read/usb_write/... helpers, and init_usb_transport) belongs to the native
+# backends (usb_linux/osx/windows.cpp), none of which we build on Windows. The
+# modern libusb backend uses LibUsbConnection instead, so this code is dead and
+# its references to the (absent) native usb_* helpers would fail to link. Exclude
+# it on Windows, keeping only is_adb_interface()/is_libusb_enabled().
+sed -i '/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i #if !defined(_WIN32)  // legacy native BlockingConnection USB path' \
+  ${PWD_SRC}/src/adb/client/transport_usb.cpp
+sed -i '/^bool is_adb_interface(int usb_class/i #endif  // !defined(_WIN32)\n' \
+  ${PWD_SRC}/src/adb/client/transport_usb.cpp
+# ...and the matching native-transport registration helpers in transport.cpp
+# (register_usb_transport calls the now-absent init_usb_transport).
+sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(_WIN32)  // native usb_handle transport registration' \
+  ${PWD_SRC}/src/adb/transport.cpp
+sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^#endif/ { /^#endif/i #endif  // !defined(_WIN32)
+}' ${PWD_SRC}/src/adb/transport.cpp
 
 # ADB Windows: fix time_t to long narrowing conversion in usb_libusb_hotplug.cpp
 # The timeval initialization uses an implicit narrowing cast that clang rejects.
