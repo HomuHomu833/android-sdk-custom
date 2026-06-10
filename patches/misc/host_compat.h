@@ -409,32 +409,29 @@ size_t malloc_usable_size(void *ptr) { return ptr ? _msize(ptr) : 0; }
 #endif
 
 /*
- * --- NetBSD libcxx locale compat --------------------------------------------
- * zig's bundled libcxx (<__locale_dir/support/bsd_like.h>) assumes FreeBSD-
- * style locale API availability on all BSDs.  NetBSD's libc requires
- * <xlocale.h> for locale_t and the _l function family, and does not define
- * the LC_*_MASK bitmask macros (FreeBSD extension).  Provide them here so
- * <chrono> and other libcxx headers compile on NetBSD targets.
+ * --- NetBSD feature test macro ----------------------------------------------
+ * zig's clang does not predefine _NETBSD_SOURCE, so locale_t, LC_*_MASK and
+ * the _l function family (<locale.h>, <stdio.h>, etc.) are hidden behind
+ * feature-test guards.  Define it here so libcxx locale headers compile.
  */
 #if defined(__NetBSD__)
-#include <xlocale.h>
-#ifndef LC_COLLATE_MASK
-#define LC_COLLATE_MASK   (1 << LC_COLLATE)
+#ifndef _NETBSD_SOURCE
+#define _NETBSD_SOURCE 1
 #endif
-#ifndef LC_CTYPE_MASK
-#define LC_CTYPE_MASK     (1 << LC_CTYPE)
 #endif
-#ifndef LC_MONETARY_MASK
-#define LC_MONETARY_MASK  (1 << LC_MONETARY)
+
+/*
+ * --- OpenBSD feature test macro ---------------------------------------------
+ * _XOPEN_SOURCE=700 (passed by some TUs' compile flags) disables __BSD_VISIBLE
+ * in <sys/cdefs.h>, hiding vasprintf/asprintf etc. that libcxx locale fallbacks
+ * need.  Defining _BSD_SOURCE keeps BSD extensions visible.
+ */
+#if defined(__OpenBSD__)
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE 1
 #endif
-#ifndef LC_NUMERIC_MASK
-#define LC_NUMERIC_MASK   (1 << LC_NUMERIC)
-#endif
-#ifndef LC_TIME_MASK
-#define LC_TIME_MASK      (1 << LC_TIME)
-#endif
-#ifndef LC_MESSAGES_MASK
-#define LC_MESSAGES_MASK  (1 << LC_MESSAGES)
+#ifndef __BSD_VISIBLE
+#define __BSD_VISIBLE 1
 #endif
 #endif
 

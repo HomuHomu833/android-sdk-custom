@@ -154,7 +154,7 @@ case "$PLATFORM" in
     # zig's clang auto-includes ptrauth.h on AArch64, whose typedef of
     # ptrauth_key clashes with FreeBSD's struct ptrauth_key in <machine/proc.h>.
     case "$TARGET" in
-      aarch64-*-freebsd-*) CROSS_CFLAGS="$CROSS_CFLAGS -fno-ptrauth-intrinsics" ;;
+      aarch64-*freebsd*) CROSS_CFLAGS="$CROSS_CFLAGS -fno-ptrauth-intrinsics" ;;
     esac
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
