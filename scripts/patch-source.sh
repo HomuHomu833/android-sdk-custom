@@ -373,6 +373,18 @@ sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVER
 sed -i 's/wstat(path_wide\.c_str(), &st)/wstat(path_wide.c_str(), reinterpret_cast<struct _stat64*>(\&st))/' \
   ${PWD_SRC}/src/adb/sysdeps/win32/stat.cpp
 
+# gtest-port.cc: On FreeBSD AArch64, <machine/proc.h> defines struct ptrauth_key
+# which conflicts with clang's builtin ptrauth.h typedef.  Wrap the include and
+# provide a stub GetThreadCount() since we can't use kinfo_proc there.
+sed -i '/^#include <sys\/user.h>$/i #if !defined(__FreeBSD__) || !defined(__aarch64__)' \
+  "${PWD_SRC}/src/googletest/googletest/src/gtest-port.cc"
+sed -i '/^#include <sys\/user.h>$/a #endif' \
+  "${PWD_SRC}/src/googletest/googletest/src/gtest-port.cc"
+sed -i '/#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\$/{
+  N
+  s/#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\\n    defined(GTEST_OS_GNU_KFREEBSD) || defined(GTEST_OS_NETBSD)/#elif defined(GTEST_OS_FREEBSD) \&\& defined(__aarch64__)\nsize_t GetThreadCount() { return 0; }\n#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\\n    defined(GTEST_OS_GNU_KFREEBSD) || defined(GTEST_OS_NETBSD)/
+}' "${PWD_SRC}/src/googletest/googletest/src/gtest-port.cc"
+
 # abseil stacktrace.cc: NetBSD/OpenBSD declare alloca() in <stdlib.h> as a
 # function (not a macro), so the #if !defined(alloca) guard doesn't catch it
 # and the static definition conflicts with the prior declaration.
@@ -393,6 +405,10 @@ sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__
 # which is glibc-only. FreeBSD/NetBSD/OpenBSD have native getprogname().
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   "${PWD_SRC}/src/libbase/logging.cpp"
+
+# libbase cmsg.cpp: <sys/user.h> is unused here and does not exist on NetBSD.
+sed -i 's|#include <sys/user.h>|#if !defined(__NetBSD__)\n#include <sys/user.h>\n#endif|' \
+  "${PWD_SRC}/src/libbase/cmsg.cpp"
 
 # liblog logger_write.cpp: same getprogname() fallback issue.
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \

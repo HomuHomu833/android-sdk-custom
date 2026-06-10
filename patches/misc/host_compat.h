@@ -421,17 +421,21 @@ size_t malloc_usable_size(void *ptr) { return ptr ? _msize(ptr) : 0; }
 #endif
 
 /*
- * --- OpenBSD feature test macro ---------------------------------------------
+ * --- FreeBSD / OpenBSD feature test macros ----------------------------------
  * _XOPEN_SOURCE=700 (passed by some TUs' compile flags) disables __BSD_VISIBLE
- * in <sys/cdefs.h>, hiding vasprintf/asprintf etc. that libcxx locale fallbacks
- * need.  Defining _BSD_SOURCE keeps BSD extensions visible.
+ * in <sys/_visible.h> (FreeBSD) or <sys/cdefs.h> (OpenBSD), hiding BSD
+ * extensions (getprogname, vasprintf, etc.) that AOSP / libcxx need.  Define
+ * __BSD_VISIBLE directly so these symbols are visible.  On OpenBSD we also
+ * define _BSD_SOURCE to prevent <sys/cdefs.h> from clearing __BSD_VISIBLE.
  */
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#ifndef __BSD_VISIBLE
+#define __BSD_VISIBLE 1
+#endif
+#endif
 #if defined(__OpenBSD__)
 #ifndef _BSD_SOURCE
 #define _BSD_SOURCE 1
-#endif
-#ifndef __BSD_VISIBLE
-#define __BSD_VISIBLE 1
 #endif
 #endif
 
