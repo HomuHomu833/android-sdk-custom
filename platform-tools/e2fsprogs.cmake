@@ -24,6 +24,16 @@ set(INCLUDES
     ${SRC}/core/libcutils/include
     )
 
+# Windows host build: pull in e2fsprogs' own MinGW compat headers (arpa/inet.h,
+# sys/stat.h's lstat/link shims, etc.).  This mirrors AOSP's e2fsprogs-defaults,
+# which adds `include_dirs: ["external/e2fsprogs/include/mingw"]` only for the
+# windows target — kept scoped to e2fsprogs (not the global toolchain flags)
+# because headers like sys/stat.h #define link(a,b) as CreateHardLink, which
+# must not leak into unrelated host code.
+if(PLATFORM_WINDOWS)
+    list(APPEND INCLUDES ${SRC}/e2fsprogs/include/mingw)
+endif()
+
 # libext2_blkid
 add_library(libext2_blkid STATIC
     ${SRC}/e2fsprogs/lib/blkid/cache.c
