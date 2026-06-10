@@ -151,6 +151,11 @@ case "$PLATFORM" in
       thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
       powerpc-*|powerpc64-*)    CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_POWERPC_VSX_OPT=0" ;;
     esac
+    # zig's clang auto-includes ptrauth.h on AArch64, whose typedef of
+    # ptrauth_key clashes with FreeBSD's struct ptrauth_key in <machine/proc.h>.
+    case "$TARGET" in
+      aarch64-*-freebsd-*) CROSS_CFLAGS="$CROSS_CFLAGS -fno-ptrauth-intrinsics" ;;
+    esac
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
     esac

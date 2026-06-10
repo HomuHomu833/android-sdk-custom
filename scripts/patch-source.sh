@@ -389,4 +389,9 @@ sed -i 's/^#if defined(__APPLE__)$/#if defined(__APPLE__) || defined(__FreeBSD__
 sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#elif defined(__EMSCRIPTEN__)/' \
   "${PWD_SRC}/src/libbase/file.cpp"
 
+# libbase logging.cpp: the getprogname() fallback uses program_invocation_short_name
+# which is glibc-only. FreeBSD/NetBSD/OpenBSD have native getprogname().
+sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
+  "${PWD_SRC}/src/libbase/logging.cpp"
+
 log "Source fixups applied"
