@@ -166,7 +166,9 @@ case "$PLATFORM" in
     CROSS_RANLIB="$TC/bin/${TARGET}-ranlib"; CROSS_STRIP="$TC/bin/${TARGET}-strip"
     CROSS_OBJCOPY="$TC/bin/${TARGET}-objcopy"
     SYSTEM_NAME=Windows
-    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
+    # -isystem win-compat supplies POSIX headers llvm-mingw omits (e.g.
+    # <arpa/inet.h>, which e2fsprogs' jfs_compat.h includes unconditionally).
+    CROSS_CFLAGS="-Wno-error=date-time -isystem $ROOTDIR/patches/misc/win-compat -include $ROOTDIR/patches/misc/host_compat.h"
     # Static CRT/libstdc++ so the .exe tools run without shipping the mingw runtime DLLs.
     CROSS_LDFLAGS="-static -static-libstdc++ -static-libgcc"
     ;;
