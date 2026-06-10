@@ -13,6 +13,20 @@
 #include <stdint.h>
 
 /*
+<<<<<<< HEAD
+=======
+ * --- Windows header guards -------------------------------------------------
+ * Windows <wincrypt.h> defines crypto-related macros that conflict with
+ * OpenSSL/BoringSSL typedefs (e.g., X509_NAME). Prevent these conflicts by
+ * defining NOCRYPT, which disables the conflicting wincrypt.h macros while
+ * allowing the header itself to be included for non-crypto functions.
+ */
+#if defined(_WIN32) && !defined(NOCRYPT)
+#define NOCRYPT
+#endif
+
+/*
+>>>>>>> cbdda35 (Add Windows socket constants and prevent wincrypt.h macro conflicts)
  * --- Windows API compat -----------------------------------------------------
  * rand_s() is declared in <stdlib.h> on MSVC but may be hidden in MinGW
  * headers (guarded by _WIN32_WINNT >= 0x0600).  Forward-declare it here;
@@ -164,6 +178,27 @@ int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
 #endif
 
 /*
+<<<<<<< HEAD
+=======
+ * --- Windows socket constants -----------------------------------------------
+ * Socket shutdown flags (SHUT_RD, SHUT_WR, SHUT_RDWR) are POSIX/Unix constants
+ * that don't exist in MinGW's <sys/socket.h>.  ADB and other host code uses them
+ * for graceful socket closure.  Define them here for Windows.
+ */
+#if defined(_WIN32)
+#ifndef SHUT_RD
+#define SHUT_RD SD_RECEIVE
+#endif
+#ifndef SHUT_WR
+#define SHUT_WR SD_SEND
+#endif
+#ifndef SHUT_RDWR
+#define SHUT_RDWR SD_BOTH
+#endif
+#endif
+
+/*
+>>>>>>> cbdda35 (Add Windows socket constants and prevent wincrypt.h macro conflicts)
  * --- Windows stat() macros ----------------------------------------------------
  * MinGW's <sys/stat.h> omits S_ISLNK and S_ISSOCK (Windows has no symlinks
  * or sockets-as-file-types in the traditional sense).  Provide them so that
@@ -294,6 +329,7 @@ int getlogin_r(char *buf, size_t bufsize) {
 #endif /* __ANDROID__ */
 
 /*
+<<<<<<< HEAD
  * --- Windows POSIX types ----------------------------------------------------
  * MinGW's <sys/types.h> omits uid_t and gid_t (they are POSIX concepts that
  * Windows does not natively express).  Provide them so that AOSP host code
@@ -311,6 +347,8 @@ typedef unsigned int gid_t;
 #endif
 
 /*
+=======
+>>>>>>> cbdda35 (Add Windows socket constants and prevent wincrypt.h macro conflicts)
  * --- Windows POSIX identity stubs --------------------------------------------
  * e2fsprogs lib/blkid/cache.c calls getuid/geteuid/getgid/getegid in its
  * safe_getenv() helper.  These POSIX concepts don't exist on Windows; return 0
