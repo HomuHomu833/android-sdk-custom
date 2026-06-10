@@ -167,8 +167,12 @@ case "$PLATFORM" in
     CROSS_OBJCOPY="$TC/bin/${TARGET}-objcopy"
     SYSTEM_NAME=Windows
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
-    # Static CRT/libstdc++ so the .exe tools run without shipping the mingw runtime DLLs.
-    CROSS_LDFLAGS="-static -static-libstdc++ -static-libgcc"
+    # Static libstdc++/libgcc, and whole-archive libwinpthread so the .exe tools
+    # run without shipping the mingw runtime DLLs. --whole-archive pulls in all of
+    # winpthread (incl. its TLS/thread-exit cleanup callbacks, which a plain
+    # -lwinpthread would drop); -Bdynamic restores normal linkage for the ucrt and
+    # system import libs. Matches the llvm-mingw-recommended idiom used by LLVM.
+    CROSS_LDFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
