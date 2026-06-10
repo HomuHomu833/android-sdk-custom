@@ -373,4 +373,20 @@ sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVER
 sed -i 's/wstat(path_wide\.c_str(), &st)/wstat(path_wide.c_str(), reinterpret_cast<struct _stat64*>(\&st))/' \
   ${PWD_SRC}/src/adb/sysdeps/win32/stat.cpp
 
+# abseil stacktrace.cc: NetBSD/OpenBSD declare alloca() in <stdlib.h> as a
+# function (not a macro), so the #if !defined(alloca) guard doesn't catch it
+# and the static definition conflicts with the prior declaration.
+sed -i '/static void\* alloca(size_t) noexcept { return nullptr; }/i #if !defined(__NetBSD__) \&\& !defined(__OpenBSD__)' \
+  "${PWD_SRC}/src/abseil-cpp/absl/debugging/stacktrace.cc"
+sed -i '/static void\* alloca(size_t) noexcept { return nullptr; }/a #endif' \
+  "${PWD_SRC}/src/abseil-cpp/absl/debugging/stacktrace.cc"
+
+# off64_t.h: BSDs don't have a separate off64_t type (off_t is always 64-bit).
+sed -i 's/^#if defined(__APPLE__)$/#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
+  "${PWD_SRC}/src/libbase/include/android-base/off64_t.h"
+
+# libbase file.cpp: GetExecutablePath() has no BSD branch.
+sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#elif defined(__EMSCRIPTEN__)/' \
+  "${PWD_SRC}/src/libbase/file.cpp"
+
 log "Source fixups applied"

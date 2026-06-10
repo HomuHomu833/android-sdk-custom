@@ -121,13 +121,16 @@ const char *getprogname(void) {
 
 /*
  * --- stdio *_unlocked extensions -------------------------------------------
- * bionic, macOS, MinGW and BSDs all lack the glibc/musl GNU stdio *_unlocked
+ * bionic, macOS and MinGW all lack the glibc/musl GNU stdio *_unlocked
  * functions (fgets_unlocked, etc.).  AOSP host code such as libselinux uses
  * them as a single-threaded perf optimization.  Map them to the locked
  * equivalents (functionally identical on single-threaded or host builds).
+ *
+ * FreeBSD (via zig) ships the *_unlocked functions natively, so exclude it.
+ * NetBSD/OpenBSD may still need the shim.
  */
-#if defined(__APPLE__) || defined(_WIN32) || defined(__ANDROID__) || \
-    defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if (defined(__APPLE__) || defined(_WIN32) || defined(__ANDROID__) || \
+     defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(__FreeBSD__)
 #ifndef fgets_unlocked
 #define fgets_unlocked(s, n, f)      fgets((s), (n), (f))
 #endif
