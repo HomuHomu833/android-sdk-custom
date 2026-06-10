@@ -315,6 +315,15 @@ sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32
 sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
   ${PWD_SRC}/src/mdnsresponder/mDNSShared/CommonServices.h
 
+# ADB sysdeps/stat.h redefines lstat/S_IFLNK/S_ISLNK with bare #define, but
+# host_compat.h (force-included via -include) already defined them, causing
+# -Wmacro-redefined warnings.  Add #undef before each redefinition.
+sed -i \
+  -e 's/^#define lstat /#undef lstat\n#define lstat /' \
+  -e 's/^#define S_IFLNK /#undef S_IFLNK\n#define S_IFLNK /' \
+  -e 's/^#define S_ISLNK(/#undef S_ISLNK\n#define S_ISLNK(/' \
+  ${PWD_SRC}/src/adb/sysdeps/stat.h
+
 # ADB Windows: fix time_t to long narrowing conversion in usb_libusb_hotplug.cpp
 # The timeval initialization uses an implicit narrowing cast that clang rejects.
 # Convert time_t to long explicitly.
