@@ -1,15 +1,20 @@
-// BSD ADB USB entry points for the libusb-only build.
+// BSD ADB USB entry points for the libusb build.
 //
-// The legacy BlockingConnection USB path (UsbConnection + usb_read/write/close/
-// kick/reset/get_max_packet_size + register_usb_transport) is excluded from BSD
-// builds via transport_usb.cpp and transport.cpp guards in patch-source.sh — the
-// same approach used for Windows.  Only usb_init() and usb_cleanup() are needed
-// to satisfy the references from client/main.cpp.
+// BSD uses libusb as the only USB backend (no native BSD USB backend is
+// compiled — the legacy BlockingConnection path is excluded via guards in
+// patch-source.sh, same approach as Windows).
 //
-// USB hardware access is not supported in BSD cross-compilation builds; adb
-// operates over TCP/IP connections.  usb_init() and usb_cleanup() are no-ops.
+// usb_init() starts the libusb hotplug scanner; usb_cleanup() closes all open
+// USB device transports.  These mirror the macOS / Linux libusb-enabled path.
 
 #include "client/usb.h"
+#include "client/usb_libusb_hotplug.h"
+#include "transport.h"
 
-void usb_init() {}
-void usb_cleanup() {}
+void usb_init() {
+    libusb::usb_init();
+}
+
+void usb_cleanup() {
+    close_usb_devices();
+}

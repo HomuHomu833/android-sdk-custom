@@ -426,7 +426,7 @@ sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
 # ADB Windows: default to the libusb backend (we build no native AdbWinApi
 # backend on Windows). Only the is_libusb_enabled() body is touched, so the
 # unrelated #if defined(__APPLE__) CHECK_PACKET_OVERFLOW guard is left alone.
-sed -i '/^bool is_libusb_enabled() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(_WIN32)/' \
+sed -i '/^bool is_libusb_enabled() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(_WIN32) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
   ${PWD_SRC}/src/adb/client/transport_usb.cpp
 
 # ADB Windows+BSD: the legacy BlockingConnection USB path (UsbConnection + the

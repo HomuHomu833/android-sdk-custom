@@ -160,14 +160,14 @@ elseif(PLATFORM_WINDOWS)
         ${SRC}/adb/sysdeps/win32/stat.cpp
         )
 elseif(PLATFORM_BSD)
-    # BSD: use the libusb-based USB backend (portable, no Linux usbfs
-    # dependency) and fdevent_poll (epoll is Linux-only; poll is POSIX).
-    # adb_usb_bsd.cpp provides the usb_init()/usb_cleanup() entry points that
-    # client/main.cpp expects; the legacy BlockingConnection USB path is
-    # excluded from BSD builds (see transport_usb.cpp/transport.cpp guards in
-    # patch-source.sh), so only these two entry points are needed.
+    # BSD: libusb is the only USB backend (no native BSD USB backend).
+    # Wire the same libusb hotplug stack that Windows uses; adb_usb_bsd.cpp
+    # provides the global usb_init()/usb_cleanup() entry points.
+    # usb_libusb.cpp is already in the global sources above; not re-added here.
     target_sources(libadb PRIVATE
-        ${SRC}/adb/client/usb_libusb.cpp
+        ${SRC}/adb/client/usb_libusb_device.cpp
+        ${SRC}/adb/client/usb_libusb_hotplug.cpp
+        ${SRC}/adb/client/usb_libusb_inhouse_hotplug.cpp
         ${SRC}/adb/fdevent/fdevent_poll.cpp
         ${CMAKE_SOURCE_DIR}/patches/misc/adb_usb_bsd.cpp
         )
