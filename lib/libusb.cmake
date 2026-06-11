@@ -74,7 +74,7 @@ elseif(PLATFORM_BSD)
     target_include_directories(libusb PRIVATE
         ${SRC}/libusb/libusb
         ${SRC}/libusb/libusb/os
-        ${CMAKE_CURRENT_LIST_DIR}/../patches/libusb-bsd
+        ${SRC}/libusb/darwin
         )
 else()
     target_include_directories(libusb PRIVATE
@@ -84,7 +84,10 @@ else()
         )
 endif()
 target_compile_options(libusb PRIVATE
-    -fvisibility=hidden 
+    -fvisibility=hidden
     -pthread
     -DANDROID_OS
     )
+if(PLATFORM_BSD)
+    target_compile_options(libusb PRIVATE -UHAVE_PTHREAD_THREADID_NP)
+endif()
