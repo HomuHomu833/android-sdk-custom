@@ -74,6 +74,7 @@ elseif(PLATFORM_BSD)
     target_include_directories(libusb PRIVATE
         ${SRC}/libusb/libusb
         ${SRC}/libusb/libusb/os
+        ${CMAKE_CURRENT_LIST_DIR}/../patches/libusb-bsd
         )
 else()
     target_include_directories(libusb PRIVATE

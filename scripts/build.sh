@@ -143,7 +143,7 @@ case "$PLATFORM" in
     # host_compat.h supplies the glibc/bionic-isms BSDs omit (e.g.
     # TEMP_FAILURE_RETRY, reallocarray); its platform-locked sections
     # (Windows/Darwin) stay inert on BSD. Dynamic linking for BSD targets.
-    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
+    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     # Per-arch tuning (SIMD, TLS): same as the linux case — mirrors the
     # sibling NDK/llvm repos.
