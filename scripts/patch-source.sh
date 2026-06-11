@@ -512,6 +512,50 @@ sed -i 's|#include <sys/user.h>|#if !defined(__NetBSD__)\n#include <sys/user.h>\
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   "${PWD_SRC}/src/logging/liblog/logger_write.cpp"
 
+# android-base/endian.h: BSD falls into the final #else block (meant for macOS
+# and Windows) because it defines none of __BIONIC__, __GLIBC__, or
+# ANDROID_HOST_MUSL.  Inside that block the !__APPLE__ inner branch includes
+# <winsock2.h> (absent on BSD) and hard-codes __BYTE_ORDER __LITTLE_ENDIAN
+# (wrong for big-endian BSD targets).  Insert a proper BSD branch before #else
+# that uses the BSD-native <sys/endian.h>.
+python3 << 'PYEOF'
+import sys
+
+path = 'src/libbase/include/android-base/endian.h'
+with open(path, 'r') as f:
+    content = f.read()
+
+bsd_marker = '#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)'
+if bsd_marker in content:
+    print('endian.h BSD branch: already applied')
+else:
+    # Insert BSD elif between the glibc/musl block and the #else
+    old = '#else\n\n#if defined(__APPLE__)'
+    bsd_block = (
+        '#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n'
+        '\n'
+        '/* BSDs have <sys/endian.h> with all byte-order macros (htobe*/htole*/\n'
+        ' * be*toh*/le*toh*) that are correct for the target architecture.\n'
+        ' * htons/htonl/ntohs/ntohl live in <netinet/in.h>. */\n'
+        '#include <sys/endian.h>\n'
+        '#include <netinet/in.h>\n'
+        '\n'
+        '/* BSD does not have glibc\'s 64-bit htonq/ntohq extensions. */\n'
+        '#define htonq(x) htobe64(x)\n'
+        '#define ntohq(x) be64toh(x)\n'
+        '\n'
+    )
+    new = bsd_block + old
+    if old in content:
+        content = content.replace(old, new, 1)
+        with open(path, 'w') as f:
+            f.write(content)
+        print('endian.h BSD branch inserted')
+    else:
+        print('endian.h: pattern not found', file=sys.stderr)
+        sys.exit(1)
+PYEOF
+
 # e2fsprogs bitops.c: NetBSD system headers declare popcount32() non-statically
 # (in <sys/bitops.h>), so the `static unsigned int popcount32(...)` re-declaration
 # in bitops.c triggers "static declaration follows non-static declaration".
