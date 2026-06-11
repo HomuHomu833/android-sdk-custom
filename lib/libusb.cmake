@@ -48,13 +48,13 @@ elseif(PLATFORM_BSD)
         ${SRC}/libusb/libusb/os/threads_posix.c
         )
     # Each BSD needs its own USB backend to define usbi_backend.
-    if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
-        target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/openbsd_usb.c)
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
+    if(CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
         target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/netbsd_usb.c)
     else()
-        # FreeBSD: no FreeBSD-specific backend in this AOSP checkout; null backend
-        # defines usbi_backend so the link succeeds (USB ops return NOT_SUPPORTED).
+        # FreeBSD and OpenBSD: openbsd_usb.c/no FreeBSD backend require kernel
+        # dev/usb/usb.h which is absent from the cross-compilation sysroot.
+        # Use the null backend so usbi_backend is defined and the link succeeds
+        # (USB ops return LIBUSB_ERROR_NOT_SUPPORTED at runtime).
         target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/null_usb.c)
     endif()
 else()

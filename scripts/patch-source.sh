@@ -642,4 +642,37 @@ else:
         print('adb/sysdeps.h: pattern not found, skipping', file=sys.stderr)
 PYEOF
 
+# boringssl cpu_aarch64_openbsd.cc: provides OPENSSL_cpuid_setup only for
+# OpenBSD.  NetBSD and FreeBSD aarch64 targets have no matching cpu detection
+# file, leaving OPENSSL_cpuid_setup undefined at link time.  Append a stub
+# that satisfies the linker (crypto falls back to portable C implementations).
+python3 << 'PYEOF'
+import sys
+
+path = 'src/boringssl/src/crypto/cpu_aarch64_openbsd.cc'
+with open(path, 'r') as f:
+    content = f.read()
+
+marker = '// NetBSD/FreeBSD aarch64 cpuid stub'
+if marker in content:
+    print('cpu_aarch64_openbsd.cc BSD stub: already applied')
+else:
+    stub = r"""
+// NetBSD/FreeBSD aarch64 cpuid stub
+// Cross-compilation sysroots for NetBSD and FreeBSD lack the mechanism used by
+// cpu_aarch64_linux.cc / cpu_aarch64_openbsd.cc to detect hardware crypto
+// extensions.  Provide a minimal definition so the link succeeds; OPENSSL_armcap_P
+// stays at its zero default (all operations use the portable C fallbacks).
+#if defined(OPENSSL_AARCH64) && !defined(OPENSSL_OPENBSD) && \
+    (defined(__NetBSD__) || defined(__FreeBSD__)) && \
+    !defined(OPENSSL_STATIC_ARMCAP) && !defined(OPENSSL_NO_ASM)
+void OPENSSL_cpuid_setup(void) {}
+#endif  // NetBSD/FreeBSD aarch64 cpuid stub
+"""
+    content += stub
+    with open(path, 'w') as f:
+        f.write(content)
+    print('cpu_aarch64_openbsd.cc BSD stub appended')
+PYEOF
+
 log "Source fixups applied"

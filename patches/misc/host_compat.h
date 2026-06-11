@@ -119,6 +119,25 @@
 #endif
 
 /*
+ * --- FreeBSD in_pktinfo / IP_PKTINFO ----------------------------------------
+ * IP_PKTINFO (RFC 3542 IPv4 extension) and struct in_pktinfo were added to
+ * FreeBSD in 14.0.  The zig cross-compilation sysroot for FreeBSD is older and
+ * does not expose them.  ADB's openscreen udp_socket.cpp uses them
+ * unconditionally; provide definitions so the code compiles.  At runtime on a
+ * real FreeBSD 14+ system the kernel will handle the socket option correctly;
+ * on older FreeBSD setsockopt() will return ENOPROTOOPT and the code falls back.
+ */
+#if defined(__FreeBSD__) && !defined(IP_PKTINFO)
+#include <netinet/in.h>
+struct in_pktinfo {
+    struct in_addr  ipi_addr;      /* Header destination address */
+    struct in_addr  ipi_spec_dst;  /* Local source address */
+    unsigned int    ipi_ifindex;   /* Interface index */
+};
+#define IP_PKTINFO 19  /* FreeBSD 14+ socket option value */
+#endif
+
+/*
  * --- BSD MAP_32BIT -----------------------------------------------------------
  * MAP_32BIT is a Linux-specific mmap() flag that restricts a mapping to the
  * lower 2 GB.  libartbase/base/mem_map.cc uses it under #if defined(__LP64__)
