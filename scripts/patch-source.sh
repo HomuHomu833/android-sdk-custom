@@ -146,7 +146,7 @@ esac
 # musl's header is self-contained, so keep including it there.
 sed -i '/#include "os.h"/a\
 #if defined(__arm__)\
-#if defined(__GLIBC__)\
+#if defined(__GLIBC__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\
 extern "C" int cacheflush(void*, int, int);\
 #else\
 #include <sys/cachectl.h>\
@@ -425,7 +425,7 @@ done
 # <sys/sysmacros.h>.  devname.c guards the include on that macro, so exclude
 # _WIN32 from the define (mirroring the existing __APPLE__ exclusion); makedev()
 # itself is supplied for Windows by patches/misc/host_compat.h.
-sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32)/' \
+sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   ${PWD_SRC}/src/e2fsprogs/lib/config.h
 
 # MinGW on case-sensitive Linux: <Ws2tcpip.h> won't match ws2tcpip.h
