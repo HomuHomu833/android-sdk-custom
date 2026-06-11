@@ -45,13 +45,35 @@
 #endif
 
 /*
- * --- FreeBSD mmap64 ----------------------------------------------------------
- * FreeBSD uses 64-bit off_t natively; mmap64 does not exist as a separate
- * symbol.  Map it to plain mmap so that AOSP FileMap.cpp compiles.
+ * --- BSD LFS64 aliases -------------------------------------------------------
+ * AOSP host code uses the Linux LFS64 aliases (lseek64, mmap64, pread64,
+ * pwrite64, ftruncate64, off64_t) that glibc exposes alongside the standard
+ * names.  BSDs do not provide these aliases: their off_t and the standard
+ * functions are already 64-bit.  Map each alias to the plain name.
+ *
+ * FreeBSD declares off64_t in <sys/types.h> itself, so we only need the
+ * function aliases there.  NetBSD and OpenBSD need off64_t as well.
  */
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+# ifndef lseek64
+#  define lseek64      lseek
+# endif
 # ifndef mmap64
-#  define mmap64 mmap
+#  define mmap64       mmap
+# endif
+# ifndef pread64
+#  define pread64      pread
+# endif
+# ifndef pwrite64
+#  define pwrite64     pwrite
+# endif
+# ifndef ftruncate64
+#  define ftruncate64  ftruncate
+# endif
+#endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+# ifndef off64_t
+#  define off64_t off_t
 # endif
 #endif
 
