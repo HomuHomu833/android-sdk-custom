@@ -525,9 +525,9 @@ else:
     bsd_block = (
         '#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n'
         '\n'
-        '/* BSDs have <sys/endian.h> with all byte-order macros (htobe*/htole*/\n'
-        ' * be*toh*/le*toh*) that are correct for the target architecture.\n'
-        ' * htons/htonl/ntohs/ntohl live in <netinet/in.h>. */\n'
+        '/* BSD: sys/endian.h provides htobe16/32/64, htole16/32/64,\n'
+        ' * be16/32/64toh, le16/32/64toh for the target arch;\n'
+        ' * htons/htonl/ntohs/ntohl come from netinet/in.h. */\n'
         '#include <sys/endian.h>\n'
         '#include <netinet/in.h>\n'
         '\n'
