@@ -168,6 +168,20 @@ struct in_pktinfo {
 #endif
 
 /*
+ * --- BSD mempcpy -------------------------------------------------------------
+ * mempcpy() is a GNU extension (copies n bytes, returns dst+n).  AOSP's adb
+ * compression_utils.h and file_sync_client.cpp use it unconditionally.
+ * BSD libcs do not provide it; define an inline fallback.
+ */
+#if (defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(mempcpy)
+#include <string.h>
+static inline __attribute__((__unused__))
+void *mempcpy(void *dst, const void *src, size_t n) {
+    return (char *)memcpy(dst, src, n) + n;
+}
+#endif
+
+/*
  * --- BSD MAP_32BIT -----------------------------------------------------------
  * MAP_32BIT is a Linux-specific mmap() flag that restricts a mapping to the
  * lower 2 GB.  libartbase/base/mem_map.cc uses it under #if defined(__LP64__)
