@@ -10,6 +10,63 @@
 #ifndef HOST_COMPAT_H
 #define HOST_COMPAT_H
 
+/*
+ * --- BSD feature-test macros (MUST precede all #includes) -------------------
+ * host_compat.h's opening #include <stdint.h> transitively pulls in
+ * <sys/cdefs.h> on all three BSD families.  <sys/cdefs.h> evaluates
+ * feature-test macros at that point, so any macro we want to influence its
+ * decisions MUST be defined here, before the first #include.
+ *
+ * NetBSD: _NETBSD_SOURCE enables the full NetBSD extension API (locale_t,
+ * LC_*_MASK, _l-suffixed functions, etc.) that libcxx locale headers need.
+ * featuretest.h would auto-define it when no strict POSIX/XPG macro is set,
+ * but liblog's -D_XOPEN_SOURCE=700 suppresses that auto-define.
+ *
+ * FreeBSD / OpenBSD: __BSD_VISIBLE enables BSD-extension APIs (vasprintf,
+ * getprogname, ...).  On OpenBSD, <sys/cdefs.h> clears __BSD_VISIBLE when
+ * _XOPEN_SOURCE is set unless _BSD_SOURCE is also present; define both so
+ * the check `!defined(_BSD_SOURCE) && defined(__XPG_VISIBLE)` stays false.
+ */
+#if defined(__NetBSD__)
+# ifndef _NETBSD_SOURCE
+#  define _NETBSD_SOURCE 1
+# endif
+#endif
+
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
+# ifndef __BSD_VISIBLE
+#  define __BSD_VISIBLE 1
+# endif
+#endif
+#if defined(__OpenBSD__)
+# ifndef _BSD_SOURCE
+#  define _BSD_SOURCE 1
+# endif
+#endif
+
+/*
+ * --- FreeBSD mmap64 ----------------------------------------------------------
+ * FreeBSD uses 64-bit off_t natively; mmap64 does not exist as a separate
+ * symbol.  Map it to plain mmap so that AOSP FileMap.cpp compiles.
+ */
+#if defined(__FreeBSD__)
+# ifndef mmap64
+#  define mmap64 mmap
+# endif
+#endif
+
+/*
+ * --- NetBSD pthread_rwlockattr_setpshared ------------------------------------
+ * NetBSD's <pthread.h> declares pthread_rwlockattr_setpshared only when
+ * _PTHREAD_PSHARED is defined, which zig's bundled NetBSD headers never set.
+ * AOSP's RWLock.h calls it in an inline constructor that is dead code for
+ * host builds.  Provide a no-op macro so it compiles without depending on a
+ * symbol that may not be in libpthread.
+ */
+#if defined(__NetBSD__) && !defined(_PTHREAD_PSHARED)
+# define pthread_rwlockattr_setpshared(attr, val) (0)
+#endif
+
 #include <stdint.h>
 
 /*
@@ -406,37 +463,6 @@ static inline gid_t getegid(void) { return 0; }
 #include <malloc.h>
 static inline __attribute__((__unused__))
 size_t malloc_usable_size(void *ptr) { return ptr ? _msize(ptr) : 0; }
-#endif
-
-/*
- * --- NetBSD feature test macro ----------------------------------------------
- * zig's clang does not predefine _NETBSD_SOURCE, so locale_t, LC_*_MASK and
- * the _l function family (<locale.h>, <stdio.h>, etc.) are hidden behind
- * feature-test guards.  Define it here so libcxx locale headers compile.
- */
-#if defined(__NetBSD__)
-#ifndef _NETBSD_SOURCE
-#define _NETBSD_SOURCE 1
-#endif
-#endif
-
-/*
- * --- FreeBSD / OpenBSD feature test macros ----------------------------------
- * _XOPEN_SOURCE=700 (passed by some TUs' compile flags) disables __BSD_VISIBLE
- * in <sys/_visible.h> (FreeBSD) or <sys/cdefs.h> (OpenBSD), hiding BSD
- * extensions (getprogname, vasprintf, etc.) that AOSP / libcxx need.  Define
- * __BSD_VISIBLE directly so these symbols are visible.  On OpenBSD we also
- * define _BSD_SOURCE to prevent <sys/cdefs.h> from clearing __BSD_VISIBLE.
- */
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
-#ifndef __BSD_VISIBLE
-#define __BSD_VISIBLE 1
-#endif
-#endif
-#if defined(__OpenBSD__)
-#ifndef _BSD_SOURCE
-#define _BSD_SOURCE 1
-#endif
 #endif
 
 #endif /* HOST_COMPAT_H */
