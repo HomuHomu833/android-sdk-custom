@@ -512,4 +512,44 @@ sed -i 's|#include <sys/user.h>|#if !defined(__NetBSD__)\n#include <sys/user.h>\
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   "${PWD_SRC}/src/logging/liblog/logger_write.cpp"
 
+# e2fsprogs bitops.c: NetBSD system headers declare popcount32() non-statically
+# (in <sys/bitops.h>), so the `static unsigned int popcount32(...)` re-declaration
+# in bitops.c triggers "static declaration follows non-static declaration".
+# Guard the entire inline fallback with #if !defined(__NetBSD__).
+python3 << 'PYEOF'
+import sys
+
+path = 'src/e2fsprogs/lib/ext2fs/bitops.c'
+with open(path, 'r') as f:
+    content = f.read()
+
+marker = 'static unsigned int popcount32(unsigned int w)'
+if '#if !defined(__NetBSD__)' in content:
+    print('popcount32 NetBSD guard: already applied')
+elif marker in content:
+    start = content.find(marker)
+    # Walk forward to find the balanced closing brace of this function
+    depth = 0
+    i = start
+    in_body = False
+    while i < len(content):
+        if content[i] == '{':
+            depth += 1
+            in_body = True
+        elif content[i] == '}':
+            depth -= 1
+            if in_body and depth == 0:
+                i += 1  # include the closing brace
+                break
+        i += 1
+    func = content[start:i]
+    guarded = '#if !defined(__NetBSD__)\n' + func + '\n#endif  /* !__NetBSD__ */'
+    content = content[:start] + guarded + content[i:]
+    with open(path, 'w') as f:
+        f.write(content)
+    print('popcount32 NetBSD guard applied')
+else:
+    print('popcount32: marker not found, skipping', file=sys.stderr)
+PYEOF
+
 log "Source fixups applied"
