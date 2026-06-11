@@ -47,9 +47,6 @@ elseif(PLATFORM_BSD)
         ${SRC}/libusb/libusb/os/events_posix.c
         ${SRC}/libusb/libusb/os/threads_posix.c
         )
-    if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
-        target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/openbsd_usb.c)
-    endif()
 else()
     target_sources(libusb PRIVATE
         ${SRC}/libusb/libusb/os/linux_usbfs.c

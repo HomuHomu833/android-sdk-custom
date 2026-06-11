@@ -118,6 +118,19 @@
 #endif
 
 /*
+ * --- BSD MAP_32BIT -----------------------------------------------------------
+ * MAP_32BIT is a Linux-specific mmap() flag that restricts a mapping to the
+ * lower 2 GB.  libartbase/base/mem_map.cc uses it under #if defined(__LP64__)
+ * to satisfy the low_4gb constraint.  BSDs have no equivalent; 0 makes the
+ * flag a no-op so mmap() falls through without the constraint.
+ */
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+# ifndef MAP_32BIT
+#  define MAP_32BIT 0
+# endif
+#endif
+
+/*
  * --- Windows header guards -------------------------------------------------
  * Windows <wincrypt.h> defines crypto-related macros that conflict with
  * OpenSSL/BoringSSL typedefs (e.g., X509_NAME). Prevent these conflicts by

@@ -317,6 +317,86 @@ case "$TARGET" in
       -e 's/stdout\[/out_fd[/g' \
       -e 's/stderr\[/err_fd[/g' \
       src/base/libs/androidfw/PosixUtils.cpp
+
+    # network_interface_mac.cc: LLADDR() returns const char* on BSD when addr_dl
+    # is const-qualified; caddr_t (char * const) can't hold a const char* rvalue.
+    # Also static_assert(sizeof(pointer) >= 6) fires on 32-bit BSD targets.
+    # Switch to const uint8_t* and drop the misleading sizeof(pointer) assert.
+    sed -i \
+      -e 's/const caddr_t lladdr = LLADDR(addr_dl);/const uint8_t* lladdr = reinterpret_cast<const uint8_t*>(LLADDR(addr_dl));/' \
+      -e '/static_assert(sizeof(lladdr) >= sizeof(interface->hardware_address)/,/Platform defines too-small link addresses/d' \
+      src/openscreen/platform/impl/network_interface_mac.cc
+
+    # utils.cc: GetTid() falls through to syscall(__NR_gettid) which is
+    # Linux-only. Add a BSD branch using pthread_self() cast to uint32_t.
+    # SetThreadName(): the existing #if defined(__linux__) || defined(_WIN32)
+    # guard misses BSD. FreeBSD has the same 2-arg pthread_setname_np as Linux;
+    # NetBSD has a 3-arg printf-style form; OpenBSD lacks pthread_setname_np.
+    python3 << 'PYEOF'
+import sys
+
+with open('src/art/libartbase/base/utils.cc', 'r') as f:
+    content = f.read()
+
+# GetTid(): add BSD elif before generic #else that uses __NR_gettid
+old1 = ('#elif defined(_WIN32)\n'
+        '  return static_cast<pid_t>(::GetCurrentThreadId());\n'
+        '#else\n'
+        '  return syscall(__NR_gettid);')
+new1 = ('#elif defined(_WIN32)\n'
+        '  return static_cast<pid_t>(::GetCurrentThreadId());\n'
+        '#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n'
+        '  return static_cast<uint32_t>((uintptr_t)pthread_self());\n'
+        '#else\n'
+        '  return syscall(__NR_gettid);')
+if old1 in content:
+    content = content.replace(old1, new1, 1)
+    print('GetTid BSD patch applied')
+else:
+    print('GetTid BSD patch: pattern not found (already applied?)')
+
+# SetThreadName(): extend Linux/Win guard to include FreeBSD (same 2-arg API)
+old2 = '#if defined(__linux__) || defined(_WIN32)\n  // pthread_setname_np fails rather than truncating long strings.'
+new2 = '#if defined(__linux__) || defined(_WIN32) || defined(__FreeBSD__)\n  // pthread_setname_np fails rather than truncating long strings.'
+if old2 in content:
+    content = content.replace(old2, new2, 1)
+    print('SetThreadName FreeBSD guard patch applied')
+else:
+    print('SetThreadName FreeBSD guard patch: pattern not found (already applied?)')
+
+# SetThreadName(): insert NetBSD (3-arg) and OpenBSD (no-op) before macOS else
+old3 = """#else  // __APPLE__
+  if (pthread_equal(thr, pthread_self())) {
+    pthread_setname_np(thread_name);
+  } else {
+    PLOG(WARNING) << "Unable to set the name of another thread to '" << thread_name << "'";
+  }
+#endif"""
+new3 = """#elif defined(__NetBSD__)
+  {
+    char buf_netbsd[16];
+    strncpy(buf_netbsd, s, sizeof(buf_netbsd) - 1);
+    buf_netbsd[sizeof(buf_netbsd) - 1] = '\\0';
+    pthread_setname_np(thr, "%s", buf_netbsd);
+  }
+#elif defined(__OpenBSD__)
+  (void)thr; (void)s;
+#else  // __APPLE__
+  if (pthread_equal(thr, pthread_self())) {
+    pthread_setname_np(thread_name);
+  } else {
+    PLOG(WARNING) << "Unable to set the name of another thread to '" << thread_name << "'";
+  }
+#endif"""
+if old3 in content:
+    content = content.replace(old3, new3, 1)
+    print('SetThreadName BSD elif patch applied')
+else:
+    print('SetThreadName BSD elif patch: pattern not found (already applied?)')
+
+with open('src/art/libartbase/base/utils.cc', 'w') as f:
+    f.write(content)
+PYEOF
     ;;
 esac
 
