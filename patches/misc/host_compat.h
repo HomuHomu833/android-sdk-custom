@@ -145,22 +145,26 @@ struct ip_mreqn {
 #endif
 
 /*
- * --- FreeBSD in_pktinfo / IP_PKTINFO ----------------------------------------
- * IP_PKTINFO (RFC 3542 IPv4 extension) and struct in_pktinfo were added to
- * FreeBSD in 14.0.  The zig cross-compilation sysroot for FreeBSD is older and
- * does not expose them.  ADB's openscreen udp_socket.cpp uses them
- * unconditionally; provide definitions so the code compiles.  At runtime on a
- * real FreeBSD 14+ system the kernel will handle the socket option correctly;
- * on older FreeBSD setsockopt() will return ENOPROTOOPT and the code falls back.
+ * --- FreeBSD/OpenBSD in_pktinfo / IP_PKTINFO ---------------------------------
+ * IP_PKTINFO and struct in_pktinfo were added to FreeBSD in 14.0 and OpenBSD
+ * in 7.3.  The zig cross-compilation sysroots for both are older and do not
+ * expose them.  ADB's openscreen udp_socket.cpp uses them unconditionally;
+ * provide definitions so the code compiles.  At runtime on a real system that
+ * supports the option the kernel handles it correctly; on older kernels
+ * setsockopt() returns ENOPROTOOPT and the code falls back gracefully.
  */
-#if defined(__FreeBSD__) && !defined(IP_PKTINFO)
+#if (defined(__FreeBSD__) || defined(__OpenBSD__)) && !defined(IP_PKTINFO)
 #include <netinet/in.h>
 struct in_pktinfo {
     struct in_addr  ipi_addr;      /* Header destination address */
     struct in_addr  ipi_spec_dst;  /* Local source address */
     unsigned int    ipi_ifindex;   /* Interface index */
 };
-#define IP_PKTINFO 19  /* FreeBSD 14+ socket option value */
+#if defined(__FreeBSD__)
+#define IP_PKTINFO 19  /* FreeBSD 14+ */
+#else
+#define IP_PKTINFO 26  /* OpenBSD 7.3+ */
+#endif
 #endif
 
 /*
