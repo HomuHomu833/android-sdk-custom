@@ -587,4 +587,59 @@ else:
     print('popcount32: marker not found, skipping', file=sys.stderr)
 PYEOF
 
+# adb/sysdeps.h: adb_thread_setname falls into the #else branch (bionic/glibc)
+# which calls pthread_setname_np(tid, name) with 2 args.  BSD thread-naming APIs
+# differ per family:
+#   OpenBSD: pthread_set_name_np(tid, name)  — different name, void return
+#   NetBSD:  pthread_setname_np(tid, fmt, arg) — 3 args (printf-style)
+#   FreeBSD: pthread_setname_np(tid, name) — 2 args, GNU-compatible (since 12.2)
+python3 << 'PYEOF'
+import sys
+
+path = 'src/adb/sysdeps.h'
+with open(path, 'r') as f:
+    content = f.read()
+
+marker = '#elif defined(__OpenBSD__)\n    pthread_set_name_np(pthread_self(), name.c_str());'
+if marker in content:
+    print('adb/sysdeps.h BSD thread-name patch: already applied')
+else:
+    old = (
+        '#ifdef __APPLE__\n'
+        '    return pthread_setname_np(name.c_str());\n'
+        '#else\n'
+        '    // Both bionic and glibc\'s pthread_setname_np fails rather than truncating long strings.\n'
+        '    // glibc doesn\'t have strlcpy, so we have to fake it.\n'
+        '    char buf[16];  // MAX_TASK_COMM_LEN, but that\'s not exported by the kernel headers.\n'
+        '    strncpy(buf, name.c_str(), sizeof(buf) - 1);\n'
+        '    buf[sizeof(buf) - 1] = \'\\0\';\n'
+        '    return pthread_setname_np(pthread_self(), buf);\n'
+        '#endif\n'
+    )
+    new = (
+        '#ifdef __APPLE__\n'
+        '    return pthread_setname_np(name.c_str());\n'
+        '#elif defined(__OpenBSD__)\n'
+        '    pthread_set_name_np(pthread_self(), name.c_str());\n'
+        '    return 0;\n'
+        '#elif defined(__NetBSD__)\n'
+        '    return pthread_setname_np(pthread_self(), "%s", (void*)name.c_str());\n'
+        '#else\n'
+        '    // Both bionic and glibc\'s pthread_setname_np fails rather than truncating long strings.\n'
+        '    // glibc doesn\'t have strlcpy, so we have to fake it.\n'
+        '    char buf[16];  // MAX_TASK_COMM_LEN, but that\'s not exported by the kernel headers.\n'
+        '    strncpy(buf, name.c_str(), sizeof(buf) - 1);\n'
+        '    buf[sizeof(buf) - 1] = \'\\0\';\n'
+        '    return pthread_setname_np(pthread_self(), buf);\n'
+        '#endif\n'
+    )
+    if old in content:
+        content = content.replace(old, new, 1)
+        with open(path, 'w') as f:
+            f.write(content)
+        print('adb/sysdeps.h BSD thread-name patch applied')
+    else:
+        print('adb/sysdeps.h: pattern not found, skipping', file=sys.stderr)
+PYEOF
+
 log "Source fixups applied"
