@@ -43,9 +43,13 @@ target_compile_definitions(sqlite3 PRIVATE
     -DSQLITE_DEFAULT_LEGACY_ALTER_TABLE
     -DUSE_PREAD64
     -Dfdatasync=fdatasync
-    -DHAVE_MALLOC_H=1
-    -DHAVE_MALLOC_USABLE_SIZE
     -DSQLITE_ENABLE_DBSTAT_VTAB
     -DNO_ANDROID_FUNCS=1
     )
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+    target_compile_definitions(sqlite3 PRIVATE
+        -DHAVE_MALLOC_H=1
+        -DHAVE_MALLOC_USABLE_SIZE
+    )
+endif()
 target_link_libraries(sqlite3 ${CMAKE_DL_LIBS} m ${CMAKE_PREFIX_PATH}/lib/libz.a)
