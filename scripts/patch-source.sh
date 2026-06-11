@@ -302,6 +302,24 @@ sed -i 's/__INTRODUCED_IN([0-9]*)//g' ${PWD_SRC}/src/logging/liblog/include/andr
 sed -i 's/^#if !defined(__BIONIC__)$/#if !defined(__BIONIC__) || __ANDROID_API__ < 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
 sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
 
+# PosixUtils.cpp uses 'stdout'/'stderr' as local variable names in
+# ExecuteBinary(). On BSD, stdout/stderr are macros (e.g. NetBSD defines
+# stdout as (&__sF[1])), so `int stdout[2]` expands to invalid C++.
+# Rename the local vars to out_fd/err_fd. result.stdout_str is a member
+# access and is not affected by these patterns.
+case "$TARGET" in
+  *-freebsd-*|*-netbsd-*|*-openbsd-*)
+    sed -i \
+      -e 's/int stdout\[2\]/int out_fd[2]/g' \
+      -e 's/int stderr\[2\]/int err_fd[2]/g' \
+      -e 's/pipe(stdout)/pipe(out_fd)/g' \
+      -e 's/pipe(stderr)/pipe(err_fd)/g' \
+      -e 's/stdout\[/out_fd[/g' \
+      -e 's/stderr\[/err_fd[/g' \
+      src/base/libs/androidfw/PosixUtils.cpp
+    ;;
+esac
+
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
