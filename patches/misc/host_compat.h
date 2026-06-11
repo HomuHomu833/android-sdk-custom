@@ -102,19 +102,20 @@
 #include <stdint.h>
 
 /*
- * --- FreeBSD sys/socket.h + netinet/in.h -------------------------------------
- * FreeBSD's zig sysroot <netinet/in.h> and <arpa/inet.h> do not transitively
+ * --- BSD sys/socket.h + netinet/in.h -------------------------------------
+ * BSD zig sysroots' <netinet/in.h> and <arpa/inet.h> do not transitively
  * include <sys/socket.h>, unlike glibc.  AOSP code (e.g. libsepol's
- * kernel_to_cil.c) uses AF_INET/AF_INET6 after including only netinet/in.h;
- * include sys/socket.h here so those constants are always available.
+ * kernel_to_cil.c and kernel_to_conf.c) uses AF_INET/AF_INET6 after
+ * including only netinet/in.h; include sys/socket.h for all BSDs.
  *
- * Additionally, cil_internal.h uses `struct in6_addr` as a union field without
- * including any networking header.  On FreeBSD, struct in6_addr is defined in
- * <netinet6/in6.h>, which FreeBSD's <netinet/in.h> includes at line 708.
- * Include <netinet/in.h> after <sys/socket.h> to bring in struct in6_addr.
+ * FreeBSD only: cil_internal.h uses `struct in6_addr` as a union field.
+ * struct in6_addr is defined in <netinet6/in6.h>, which FreeBSD's
+ * <netinet/in.h> includes at line 708.  Add netinet/in.h for FreeBSD.
  */
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 # include <sys/socket.h>
+#endif
+#if defined(__FreeBSD__)
 # include <netinet/in.h>
 #endif
 
