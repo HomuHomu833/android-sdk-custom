@@ -318,15 +318,6 @@ case "$TARGET" in
       -e 's/stderr\[/err_fd[/g' \
       src/base/libs/androidfw/PosixUtils.cpp
 
-    # network_interface_mac.cc: LLADDR() returns const char* on BSD when addr_dl
-    # is const-qualified; caddr_t (char * const) can't hold a const char* rvalue.
-    # Also static_assert(sizeof(pointer) >= 6) fires on 32-bit BSD targets.
-    # Switch to const uint8_t* and drop the misleading sizeof(pointer) assert.
-    sed -i \
-      -e 's/const caddr_t lladdr = LLADDR(addr_dl);/const uint8_t* lladdr = reinterpret_cast<const uint8_t*>(LLADDR(addr_dl));/' \
-      -e '/static_assert(sizeof(lladdr) >= sizeof(interface->hardware_address)/,/Platform defines too-small link addresses/d' \
-      src/openscreen/platform/impl/network_interface_mac.cc
-
     # utils.cc: GetTid() falls through to syscall(__NR_gettid) which is
     # Linux-only. Add a BSD branch using pthread_self() cast to uint32_t.
     # SetThreadName(): the existing #if defined(__linux__) || defined(_WIN32)
