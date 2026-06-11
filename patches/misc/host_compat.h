@@ -119,6 +119,32 @@
 #endif
 
 /*
+ * --- OpenBSD pthread non-portable extensions ---------------------------------
+ * pthread_set_name_np() is declared in <pthread_np.h> on OpenBSD, not in the
+ * main <pthread.h>.  adb/sysdeps.h calls it for BSD thread naming; include the
+ * extension header so the declaration is visible.
+ */
+#if defined(__OpenBSD__)
+#include <pthread_np.h>
+#endif
+
+/*
+ * --- NetBSD ip_mreqn ---------------------------------------------------------
+ * struct ip_mreqn (with imr_ifindex) is a Linux/FreeBSD/OpenBSD extension that
+ * NetBSD does not provide.  openscreen's udp_socket.cpp uses decltype(ip_mreqn()
+ * .imr_ifindex) to obtain the interface-index type.  Provide a compatible
+ * definition; it is only used for type introspection, not actual socket I/O.
+ */
+#if defined(__NetBSD__) && !defined(IP_MULTICAST_IFINDEX)
+#include <netinet/in.h>
+struct ip_mreqn {
+    struct in_addr imr_multiaddr;
+    struct in_addr imr_address;
+    int            imr_ifindex;
+};
+#endif
+
+/*
  * --- FreeBSD in_pktinfo / IP_PKTINFO ----------------------------------------
  * IP_PKTINFO (RFC 3542 IPv4 extension) and struct in_pktinfo were added to
  * FreeBSD in 14.0.  The zig cross-compilation sysroot for FreeBSD is older and

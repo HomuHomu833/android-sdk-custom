@@ -162,9 +162,14 @@ elseif(PLATFORM_WINDOWS)
 elseif(PLATFORM_BSD)
     # BSD: use the libusb-based USB backend (portable, no Linux usbfs
     # dependency) and fdevent_poll (epoll is Linux-only; poll is POSIX).
+    # adb_usb_bsd.cpp provides the usb_init()/usb_cleanup() entry points that
+    # client/main.cpp expects; the legacy BlockingConnection USB path is
+    # excluded from BSD builds (see transport_usb.cpp/transport.cpp guards in
+    # patch-source.sh), so only these two entry points are needed.
     target_sources(libadb PRIVATE
         ${SRC}/adb/client/usb_libusb.cpp
         ${SRC}/adb/fdevent/fdevent_poll.cpp
+        ${CMAKE_SOURCE_DIR}/patches/misc/adb_usb_bsd.cpp
         )
 else()
     # linux (host)

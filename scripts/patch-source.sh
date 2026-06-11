@@ -429,21 +429,22 @@ sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
 sed -i '/^bool is_libusb_enabled() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(_WIN32)/' \
   ${PWD_SRC}/src/adb/client/transport_usb.cpp
 
-# ADB Windows: the legacy BlockingConnection USB path (UsbConnection + the free
-# usb_read/usb_write/... helpers, and init_usb_transport) belongs to the native
-# backends (usb_linux/osx/windows.cpp), none of which we build on Windows. The
-# modern libusb backend uses LibUsbConnection instead, so this code is dead and
-# its references to the (absent) native usb_* helpers would fail to link. Exclude
-# it on Windows, keeping only is_adb_interface()/is_libusb_enabled().
-sed -i '/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i #if !defined(_WIN32)  // legacy native BlockingConnection USB path' \
+# ADB Windows+BSD: the legacy BlockingConnection USB path (UsbConnection + the
+# free usb_read/usb_write/... helpers, and init_usb_transport) belongs to the
+# native backends (usb_linux/osx/windows.cpp), none of which we build on
+# Windows or BSD.  The modern libusb backend uses LibUsbConnection instead, so
+# this code is dead and its references to the (absent) native usb_* helpers
+# would fail to link.  Exclude it on Windows and BSD, keeping only
+# is_adb_interface()/is_libusb_enabled().
+sed -i '/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path' \
   ${PWD_SRC}/src/adb/client/transport_usb.cpp
-sed -i '/^bool is_adb_interface(int usb_class/i #endif  // !defined(_WIN32)\n' \
+sed -i '/^bool is_adb_interface(int usb_class/i #endif  // native USB path\n' \
   ${PWD_SRC}/src/adb/client/transport_usb.cpp
 # ...and the matching native-transport registration helpers in transport.cpp
 # (register_usb_transport calls the now-absent init_usb_transport).
-sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(_WIN32)  // native usb_handle transport registration' \
+sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
   ${PWD_SRC}/src/adb/transport.cpp
-sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^#endif/ { /^#endif/i #endif  // !defined(_WIN32)
+sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^#endif/ { /^#endif/i #endif  // native USB path
 }' ${PWD_SRC}/src/adb/transport.cpp
 
 # ADB Windows: fix time_t to long narrowing conversion in usb_libusb_hotplug.cpp
@@ -663,16 +664,52 @@ else:
 // cpu_aarch64_linux.cc / cpu_aarch64_openbsd.cc to detect hardware crypto
 // extensions.  Provide a minimal definition so the link succeeds; OPENSSL_armcap_P
 // stays at its zero default (all operations use the portable C fallbacks).
+// extern "C" is required: this .cc file is compiled as C++ but OPENSSL_cpuid_setup
+// is declared with C linkage in internal.h; without it the linker sees a mangled
+// C++ symbol instead of the expected unmangled C symbol.
 #if defined(OPENSSL_AARCH64) && !defined(OPENSSL_OPENBSD) && \
     (defined(__NetBSD__) || defined(__FreeBSD__)) && \
     !defined(OPENSSL_STATIC_ARMCAP) && !defined(OPENSSL_NO_ASM)
-void OPENSSL_cpuid_setup(void) {}
+extern "C" void OPENSSL_cpuid_setup(void) {}
 #endif  // NetBSD/FreeBSD aarch64 cpuid stub
 """
     content += stub
     with open(path, 'w') as f:
         f.write(content)
     print('cpu_aarch64_openbsd.cc BSD stub appended')
+PYEOF
+
+# boringssl cpu_arm_freebsd.cc: provides OPENSSL_cpuid_setup only for FreeBSD
+# 32-bit ARM.  NetBSD and OpenBSD 32-bit ARM targets (armeb/armel) have no
+# matching file, leaving OPENSSL_cpuid_setup undefined at link time.  Append a
+# no-op stub; OPENSSL_armcap_P stays zero (portable C fallbacks used).
+python3 << 'PYEOF'
+import sys
+
+path = 'src/boringssl/src/crypto/cpu_arm_freebsd.cc'
+with open(path, 'r') as f:
+    content = f.read()
+
+marker = '// NetBSD/OpenBSD ARM cpuid stub'
+if marker in content:
+    print('cpu_arm_freebsd.cc BSD stub: already applied')
+else:
+    stub = r"""
+// NetBSD/OpenBSD ARM cpuid stub
+// cpu_arm_freebsd.cc covers FreeBSD 32-bit ARM; NetBSD and OpenBSD have no
+// matching file.  Provide a no-op stub so the link succeeds; OPENSSL_armcap_P
+// stays at zero (all operations use the portable C fallbacks).
+// extern "C": this .cc file is C++; OPENSSL_cpuid_setup has C linkage.
+#if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_ARM) && \
+    !defined(OPENSSL_FREEBSD) && !defined(OPENSSL_STATIC_ARMCAP) && \
+    (defined(__NetBSD__) || defined(__OpenBSD__))
+extern "C" void OPENSSL_cpuid_setup(void) {}
+#endif  // NetBSD/OpenBSD ARM cpuid stub
+"""
+    content += stub
+    with open(path, 'w') as f:
+        f.write(content)
+    print('cpu_arm_freebsd.cc BSD stub appended')
 PYEOF
 
 log "Source fixups applied"
