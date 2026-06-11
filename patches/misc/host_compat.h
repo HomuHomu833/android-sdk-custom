@@ -78,18 +78,39 @@
 #endif
 
 /*
- * --- NetBSD pthread_rwlockattr_setpshared ------------------------------------
- * NetBSD's <pthread.h> declares pthread_rwlockattr_setpshared only when
- * _PTHREAD_PSHARED is defined, which zig's bundled NetBSD headers never set.
- * AOSP's RWLock.h calls it in an inline constructor that is dead code for
- * host builds.  Provide a no-op macro so it compiles without depending on a
- * symbol that may not be in libpthread.
+ * --- BSD pthread process-shared stubs ----------------------------------------
+ * AOSP's Mutex.h, Condition.h, and RWLock.h each have a SHARED constructor
+ * that calls pthread_{mutex,cond,rwlock}attr_setpshared().  These are dead
+ * code for host builds but must compile.
+ *
+ * NetBSD: all three are guarded by #ifdef _PTHREAD_PSHARED which zig's
+ * bundled headers never define.
+ * OpenBSD: pthread_mutexattr_setpshared and pthread_condattr_setpshared are
+ * simply absent from <pthread.h>; rwlockattr_setpshared is present.
+ * FreeBSD: all three are declared unconditionally — no stubs needed.
  */
 #if defined(__NetBSD__) && !defined(_PTHREAD_PSHARED)
 # define pthread_rwlockattr_setpshared(attr, val) (0)
+# define pthread_mutexattr_setpshared(attr, val)  (0)
+# define pthread_condattr_setpshared(attr, val)   (0)
+#endif
+#if defined(__OpenBSD__)
+# define pthread_mutexattr_setpshared(attr, val)  (0)
+# define pthread_condattr_setpshared(attr, val)   (0)
 #endif
 
 #include <stdint.h>
+
+/*
+ * --- FreeBSD sys/socket.h ----------------------------------------------------
+ * FreeBSD's zig sysroot <netinet/in.h> and <arpa/inet.h> do not transitively
+ * include <sys/socket.h>, unlike glibc.  AOSP code (e.g. libsepol's
+ * kernel_to_cil.c) uses AF_INET/AF_INET6 after including only netinet/in.h;
+ * include sys/socket.h here so those constants are always available.
+ */
+#if defined(__FreeBSD__)
+# include <sys/socket.h>
+#endif
 
 /*
  * --- Windows header guards -------------------------------------------------
