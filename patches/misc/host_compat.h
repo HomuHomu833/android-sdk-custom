@@ -527,4 +527,16 @@ static inline __attribute__((__unused__))
 size_t malloc_usable_size(void *ptr) { return ptr ? _msize(ptr) : 0; }
 #endif
 
+/*
+ * --- OpenBSD malloc_usable_size stub -----------------------------------------
+ * OpenBSD's security-focused malloc provides no malloc_usable_size().
+ * sqlite3 calls it for memory accounting; returning 0 is safe (it just
+ * disables the "use extra bytes in oversized blocks" optimization).
+ */
+#if defined(__OpenBSD__) && !defined(malloc_usable_size)
+#include <stddef.h>
+static inline __attribute__((__unused__))
+size_t malloc_usable_size(void *ptr) { (void)ptr; return 0; }
+#endif
+
 #endif /* HOST_COMPAT_H */
