@@ -114,8 +114,6 @@
  */
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 # include <sys/socket.h>
-#endif
-#if defined(__FreeBSD__)
 # include <netinet/in.h>
 #endif
 

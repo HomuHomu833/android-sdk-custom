@@ -52,7 +52,9 @@ add_library(libopenscreen STATIC
     )
 
 # Per-OS network-interface enumeration (Android.bp target.{linux,darwin,windows})
-if(PLATFORM_DARWIN)
+# BSD uses the mac implementation: both share the same BSD-origin headers
+# (net/if_dl.h, net/if_media.h, netinet/in_var.h, ifaddrs.h).
+if(PLATFORM_DARWIN OR PLATFORM_BSD)
     target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_mac.cc)
 elseif(PLATFORM_WINDOWS)
     target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_win.cc)
