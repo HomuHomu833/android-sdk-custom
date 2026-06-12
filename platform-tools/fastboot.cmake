@@ -128,6 +128,6 @@ endif()
 # shims in libtermuxadb.a, which references libusb_* (the bionic fastboot doesn't
 # otherwise link libusb, so pull it in too). Group them for order-independent
 # resolution. termux_adb.h is dropped next to the source by patch-source.sh.
-if(TERMUX_ADB)
+if(LIBUSB_TERMUX_IMPL)
     target_link_libraries(fastboot -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
 endif()

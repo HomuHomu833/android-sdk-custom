@@ -1,4 +1,4 @@
-# termux-adb integration (bionic only, opt-in via TERMUX_ADB=1)
+# termux-adb integration (bionic only, opt-in via LIBUSB_TERMUX_IMPL=1)
 
 Lets the bionic `adb`/`fastboot` run inside Termux without root: USB device
 FDs are obtained from the `termux-usb` command (Termux:API) over a Unix socket

@@ -363,7 +363,7 @@ endif()
 # termuxadb_* shims in libtermuxadb.a, which in turn references libusb_*. Group
 # the two so the mutual references resolve regardless of link order. (The
 # termux_adb.h header is dropped next to the source by patch-source.sh.)
-if(TERMUX_ADB)
+if(LIBUSB_TERMUX_IMPL)
     target_link_libraries(adb -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
 endif()
 

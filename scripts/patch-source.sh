@@ -722,13 +722,13 @@ void OPENSSL_cpuid_setup(void) {}
     print('cpu_arm_freebsd.cc BSD cpuid appended')
 PYEOF
 
-# --- termux-adb USB shims (opt-in: TERMUX_ADB=1, android targets only) -------
+# --- termux-adb USB shims (opt-in: LIBUSB_TERMUX_IMPL=1, android targets only) -------
 # Route adb/fastboot USB enumeration through libtermuxadb so they run in Termux
 # without root (FDs come from the termux-usb command, not /dev/bus/usb). Headers
 # land next to the source; build.sh builds libtermuxadb.a and the cmake files
 # link it. See patches/termux/.
 case "$TARGET" in *-android|*-androideabi) TERMUX_OK=1 ;; *) TERMUX_OK=0 ;; esac
-if [ -n "${TERMUX_ADB:-}" ] && [ "${TERMUX_ADB}" != "0" ] && [ "$TERMUX_OK" = 1 ]; then
+if [ -n "${LIBUSB_TERMUX_IMPL:-}" ] && [ "${LIBUSB_TERMUX_IMPL}" != "0" ] && [ "$TERMUX_OK" = 1 ]; then
   log "Applying termux-adb USB shims"
   cp "$ROOTDIR/patches/termux/termux_adb.h"      "${PWD_SRC}/src/adb/client/termux_adb.h"
   cp "$ROOTDIR/patches/termux/termux_fastboot.h" "${PWD_SRC}/src/core/fastboot/termux_adb.h"

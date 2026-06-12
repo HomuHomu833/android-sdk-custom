@@ -115,13 +115,13 @@ case "$PLATFORM" in
     # adb/fastboot run in Termux without root. The .a leaves libusb_* unresolved
     # (libusb1-sys's link feature is off), resolved at link time by our libusb;
     # patch-source.sh applies the matching source shims. See patches/termux/.
-    if [ -n "${TERMUX_ADB:-}" ] && [ "${TERMUX_ADB}" != "0" ]; then
+    if [ -n "${LIBUSB_TERMUX_IMPL:-}" ] && [ "${LIBUSB_TERMUX_IMPL}" != "0" ]; then
       case "$TARGET" in
         aarch64-linux-android)    RUST_TARGET=aarch64-linux-android ;;
         armv7a-linux-androideabi) RUST_TARGET=armv7-linux-androideabi ;;
         i686-linux-android)       RUST_TARGET=i686-linux-android ;;
         x86_64-linux-android)     RUST_TARGET=x86_64-linux-android ;;
-        *) echo "TERMUX_ADB: unsupported target $TARGET" >&2; exit 1 ;;
+        *) echo "LIBUSB_TERMUX_IMPL: unsupported target $TARGET" >&2; exit 1 ;;
       esac
       # CARGO_HOME must be writable (the image installs Rust read-only under /opt);
       # the staticlib needs no target linker, but set one defensively for cargo.
@@ -130,8 +130,8 @@ case "$PLATFORM" in
       log "Building libtermuxadb ($RUST_TARGET)"
       ( cd "$ROOTDIR/patches/termux/libtermuxadb" && cargo build --release --target "$RUST_TARGET" )
       TERMUXADB_A="$ROOTDIR/patches/termux/libtermuxadb/target/$RUST_TARGET/release/libtermuxadb.a"
-      [ -f "$TERMUXADB_A" ] || { echo "TERMUX_ADB: $TERMUXADB_A not built" >&2; exit 1; }
-      CROSS_CMAKE_EXTRA+=(-DTERMUX_ADB=ON "-DTERMUXADB_LIB=$TERMUXADB_A")
+      [ -f "$TERMUXADB_A" ] || { echo "LIBUSB_TERMUX_IMPL: $TERMUXADB_A not built" >&2; exit 1; }
+      CROSS_CMAKE_EXTRA+=(-DLIBUSB_TERMUX_IMPL=ON "-DTERMUXADB_LIB=$TERMUXADB_A")
     fi
     ;;
   bsd)
