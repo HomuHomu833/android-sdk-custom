@@ -705,8 +705,7 @@ void bssl::OPENSSL_cpuid_setup() {
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-using namespace bssl;
-void bssl::OPENSSL_cpuid_setup() {}
+namespace bssl { void OPENSSL_cpuid_setup() {} }
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/FreeBSD aarch64 cpuid
 """
@@ -781,8 +780,7 @@ void bssl::OPENSSL_cpuid_setup() {
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD/OpenBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-using namespace bssl;
-void bssl::OPENSSL_cpuid_setup() {}
+namespace bssl { void OPENSSL_cpuid_setup() {} }
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/OpenBSD ARM 32-bit cpuid
 """
