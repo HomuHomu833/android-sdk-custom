@@ -808,9 +808,9 @@ termux_func = '''static std::unique_ptr<usb_handle> find_usb_device_termux(const
             std::string dev_name = bus_name + "/" + de2->d_name;
 
             writable = 1;
-            if ((fd = termuxadb::open(dev_name.c_str(), O_RDWR)) < 0) {
+            if ((fd = termuxadb::unix_open(dev_name.c_str(), O_RDWR)) < 0) {
                 writable = 0;
-                if ((fd = termuxadb::open(dev_name.c_str(), O_RDONLY)) < 0) {
+                if ((fd = termuxadb::unix_open(dev_name.c_str(), O_RDONLY)) < 0) {
                     continue;
                 }
             }
@@ -827,7 +827,7 @@ termux_func = '''static std::unique_ptr<usb_handle> find_usb_device_termux(const
 
                 n = ioctl(fd, USBDEVFS_CLAIMINTERFACE, &ifc);
                 if (n != 0) {
-                    termuxadb::close(fd);
+                    termuxadb::unix_close(fd);
                     usb.reset();
                     continue;
                 }
@@ -840,13 +840,13 @@ termux_func = '''static std::unique_ptr<usb_handle> find_usb_device_termux(const
                     };
                     n = ioctl(fd, USBDEVFS_SETINTERFACE, &set_ifc);
                     if (n != 0) {
-                        termuxadb::close(fd);
+                        termuxadb::unix_close(fd);
                         usb.reset();
                         continue;
                     }
                 }
             } else {
-                termuxadb::close(fd);
+                termuxadb::unix_close(fd);
             }
         }
     }

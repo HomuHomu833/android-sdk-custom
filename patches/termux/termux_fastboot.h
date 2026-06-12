@@ -1,10 +1,11 @@
-// termux-fastboot USB shim (bionic only) — namespace wrapper over libtermuxadb's
-// C API (fastboot variant: plain open/close, fastboot_start). Ported for 36.x.
+// termux-fastboot USB shim (bionic only) — wrapper over libtermuxadb's C API
+// (fastboot variant: plain open/close, fastboot_start). Ported for 36.x.
 //
-// Runtime-gated on LIBUSB_TERMUX_IMPL (off by default): start()/sendfd() are
-// no-ops and the wrappers fall back to libc when unset, so stock fastboot is
-// unchanged. usb_linux.cpp dispatches to the termux /dev/bus/usb walk only when
-// enabled() (otherwise it keeps 36.x's sysfs scan).
+// On/off gating lives in the Rust shim (LIBUSB_TERMUX_IMPL env, off by default):
+// when disabled the termuxadb_* functions delegate to libc. usb_linux.cpp also
+// uses enabled() to dispatch between the stock sysfs scan and the termux
+// /dev/bus/usb walk. (Gating is in Rust, not via `::open`/`::close`, because
+// those are bionic fortify macros that don't survive a C++ `::` call.)
 #pragma once
 
 #include <dirent.h>
@@ -29,6 +30,8 @@ extern "C" {
 }
 
 namespace termuxadb {
+    // Cached LIBUSB_TERMUX_IMPL check (off by default), used by usb_linux.cpp to
+    // pick the termux /dev/bus/usb walk over the stock sysfs scan.
     static inline bool enabled() {
         static int e = -1;
         if (e < 0) {
@@ -38,42 +41,26 @@ namespace termuxadb {
         return e == 1;
     }
 
-    static inline DIR *opendir(const char *name) {
-        return enabled() ? termuxadb_opendir(name) : ::opendir(name);
-    }
+    static inline DIR *opendir(const char *name) { return termuxadb_opendir(name); }
+    static inline int closedir(DIR *dirp) { return termuxadb_closedir(dirp); }
+    static inline struct dirent *readdir(DIR *dirp) { return termuxadb_readdir(dirp); }
 
-    static inline int closedir(DIR *dirp) {
-        return enabled() ? termuxadb_closedir(dirp) : ::closedir(dirp);
-    }
-
-    static inline struct dirent *readdir(DIR *dirp) {
-        return enabled() ? termuxadb_readdir(dirp) : ::readdir(dirp);
-    }
-
-    static inline int open(std::string_view path, int options, ...) {
-        std::string p(path.begin(), path.end());
+    // Named unix_open/unix_close (not open/close) so the definitions never collide
+    // with bionic's fortify open()/close() macros.
+    static inline int unix_open(std::string_view path, int options, ...) {
+        std::string zero_terminated(path.begin(), path.end());
         if ((options & O_CREAT) == 0) {
-            return TEMP_FAILURE_RETRY(enabled() ? termuxadb_open(p.c_str(), options)
-                                                : ::open(p.c_str(), options));
+            return TEMP_FAILURE_RETRY(termuxadb_open(zero_terminated.c_str(), options));
         }
         int mode;
         va_list args;
         va_start(args, options);
         mode = va_arg(args, int);
         va_end(args);
-        return TEMP_FAILURE_RETRY(enabled() ? termuxadb_create(p.c_str(), options, mode)
-                                            : ::open(p.c_str(), options, mode));
+        return TEMP_FAILURE_RETRY(termuxadb_create(zero_terminated.c_str(), options, mode));
     }
 
-    static inline int close(int fd) {
-        return enabled() ? termuxadb_close(fd) : ::close(fd);
-    }
-
-    static inline bool sendfd() {
-        return enabled() ? termuxadb_sendfd() : false;
-    }
-
-    static inline void start() {
-        if (enabled()) fastboot_start();
-    }
+    static inline int unix_close(int fd) { return termuxadb_close(fd); }
+    static inline bool sendfd() { return termuxadb_sendfd(); }
+    static inline void start() { fastboot_start(); }
 }

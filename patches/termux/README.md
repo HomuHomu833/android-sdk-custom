@@ -22,8 +22,15 @@ Sourced from https://github.com/nohajc/vendor-adb-patched (tag 35.0.2):
   scripts/build.sh, linked by the adb/fastboot CMake files).
 - `termux_adb.h` / `termux_fastboot.h` — C++ wrappers (namespace `termuxadb`)
   over those shims, applied to the adb/fastboot USB enumeration paths by
-  scripts/patch-source.sh. Ported to the 36.x sources this repo builds, with
-  every wrapper runtime-gated on `LIBUSB_TERMUX_IMPL` (`termuxadb::enabled()`).
+  scripts/patch-source.sh. Ported to the 36.x sources this repo builds.
+
+The on/off gating lives in the Rust shim (`termux_impl_enabled()` reads
+`LIBUSB_TERMUX_IMPL`): when disabled the `termuxadb_*` C functions delegate to
+libc / return early, so the wrappers are transparent. (It's done in Rust rather
+than wrapping `::open`/`::close` in C++, because those are bionic fortify macros
+that don't survive a `::`-qualified call.) fastboot additionally uses the C++
+`termuxadb::enabled()` to dispatch between its stock sysfs scan and the termux
+`/dev/bus/usb` walk.
 
 Notes:
 - adb's enumeration already walks `/dev/bus/usb`, so the wrappers are transparent

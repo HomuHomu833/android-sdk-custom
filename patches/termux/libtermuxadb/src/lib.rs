@@ -119,14 +119,28 @@ pub unsafe extern "C" fn termuxadb_create(path: *const c_char, opts: c_int, mode
     open(path, opts, mode)
 }
 
+// LIBUSB_TERMUX_IMPL gates the whole shim at runtime (off by default). When it is
+// unset/empty/"0" the C entry points below delegate to libc / return early, so a
+// patched adb/fastboot behaves exactly like stock. (opendir/readdir/open already
+// fall through to libc for non-virtual paths, so they need no explicit check.)
+fn termux_impl_enabled() -> bool {
+    matches!(env::var("LIBUSB_TERMUX_IMPL"), Ok(v) if !v.is_empty() && v != "0")
+}
+
 #[no_mangle]
-pub unsafe extern "C" fn termuxadb_close(_fd: c_int) -> c_int {
-    // this is called from a patched adb and it's always no-op
+pub unsafe extern "C" fn termuxadb_close(fd: c_int) -> c_int {
+    if !termux_impl_enabled() {
+        return libc::close(fd);
+    }
+    // when enabled this is called from a patched adb and it's always a no-op
     0
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn termuxadb_start() {
+    if !termux_impl_enabled() {
+        return;
+    }
     env_logger::init();
 
     thread::spawn(|| {
@@ -138,6 +152,9 @@ pub unsafe extern "C" fn termuxadb_start() {
 
 #[no_mangle]
 pub unsafe extern "C" fn fastboot_start() {
+    if !termux_impl_enabled() {
+        return;
+    }
     env_logger::init();
 
     if let Err(e) = authorize_connected_devices() {
@@ -147,6 +164,9 @@ pub unsafe extern "C" fn fastboot_start() {
 
 #[no_mangle]
 pub extern "C" fn termuxadb_sendfd() -> bool {
+    if !termux_impl_enabled() {
+        return false;
+    }
     match (env::var("TERMUX_USB_DEV"), env::var("TERMUX_USB_FD"), env::var("TERMUX_ADB_SOCK_FD")) {
         (Ok(termux_usb_dev), Ok(termux_usb_fd), Ok(sock_send_fd)) => {
             if let Err(e) = sendfd_to_adb(&termux_usb_dev, &termux_usb_fd, &sock_send_fd) {
