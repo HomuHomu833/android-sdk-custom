@@ -646,8 +646,8 @@ PYEOF
 # boringssl cpu_aarch64_openbsd.cc: provides OPENSSL_cpuid_setup only for
 # OpenBSD (via sysctl + AA64ISAR0).  FreeBSD and NetBSD aarch64 have no
 # matching cpu detection file; append a real implementation using elf_aux_info
-# (the same ELF auxiliary-vector mechanism used by cpu_aarch64_linux.cc and
-# cpu_arm_freebsd.cc).  Both OSes expose elf_aux_info via <sys/auxv.h>.
+# when <sys/auxv.h> is available (FreeBSD sysroot has it; older NetBSD sysroots
+# bundled with zig may not).  Falls back to an empty body when unavailable.
 python3 << 'PYEOF'
 import sys
 
@@ -662,13 +662,16 @@ else:
     stub = r"""
 // NetBSD/FreeBSD aarch64 CPU feature detection via elf_aux_info.
 // Both OSes expose the ELF auxiliary vector through elf_aux_info() in
-// <sys/auxv.h>, the same mechanism cpu_arm_freebsd.cc uses for ARM32.
-// Read AT_HWCAP and map bits to OPENSSL_armcap_P so BoringSSL can use
-// AES-NI, SHA, PMULL, and other hardware-accelerated crypto extensions.
+// <sys/auxv.h> when the sysroot is new enough (FreeBSD 12+, NetBSD 10+).
+// arm_arch.h declares OPENSSL_armcap_P and the ARMV8_* capability constants
+// used below; it must be included here because it is only included inside
+// the OPENSSL_OPENBSD block in the rest of this file.
 // extern "C": this .cc file is C++; OPENSSL_cpuid_setup has C linkage.
 #if defined(OPENSSL_AARCH64) && !defined(OPENSSL_OPENBSD) && \
     (defined(__NetBSD__) || defined(__FreeBSD__)) && \
     !defined(OPENSSL_STATIC_ARMCAP) && !defined(OPENSSL_NO_ASM)
+#include <openssl/arm_arch.h>
+#if __has_include(<sys/auxv.h>)
 #include <sys/auxv.h>
 
 // AArch64 AT_HWCAP bits (ARM Architecture Reference Manual §D17.2).
@@ -713,6 +716,11 @@ extern "C" void OPENSSL_cpuid_setup(void) {
     if (hwcap & HWCAP_SHA2)   OPENSSL_armcap_P |= ARMV8_SHA256;
     if (hwcap & HWCAP_SHA512) OPENSSL_armcap_P |= ARMV8_SHA512;
 }
+#else
+// <sys/auxv.h> is absent from this sysroot (older NetBSD); no hardware
+// crypto features will be detected.  Safe: BoringSSL falls back to software.
+extern "C" void OPENSSL_cpuid_setup(void) {}
+#endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/FreeBSD aarch64 cpuid
 """
     content += stub
@@ -723,8 +731,9 @@ PYEOF
 
 # boringssl cpu_arm_freebsd.cc: provides OPENSSL_cpuid_setup for FreeBSD ARM32
 # via elf_aux_info.  NetBSD and OpenBSD ARM32 have no matching file; append a
-# real implementation using the same elf_aux_info mechanism — both OSes expose
-# AT_HWCAP and AT_HWCAP2 via <sys/auxv.h>.
+# real implementation using the same elf_aux_info mechanism when <sys/auxv.h>
+# is available.  Older NetBSD/OpenBSD zig sysroots may lack the header; fall
+# back to an empty body so the build still succeeds.
 python3 << 'PYEOF'
 import sys
 
@@ -740,14 +749,16 @@ else:
 // NetBSD/OpenBSD ARM 32-bit CPU feature detection via elf_aux_info.
 // cpu_arm_freebsd.cc already provides OPENSSL_cpuid_setup for FreeBSD ARM32
 // using elf_aux_info(AT_HWCAP, ...) / elf_aux_info(AT_HWCAP2, ...).
-// NetBSD and OpenBSD both expose the same interface.  Mirror the FreeBSD
-// implementation so hardware AES/SHA/PMULL are used when available.
+// NetBSD and OpenBSD expose the same interface when the sysroot is new enough
+// (NetBSD 10+, OpenBSD 5.6+).  Use __has_include to compile the real
+// implementation only when <sys/auxv.h> is present; older sysroots fall back.
 // extern "C": this .cc file is C++; OPENSSL_cpuid_setup has C linkage.
 #if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_ARM) && \
     !defined(OPENSSL_FREEBSD) && !defined(OPENSSL_STATIC_ARMCAP) && \
     (defined(__NetBSD__) || defined(__OpenBSD__))
-#include <sys/auxv.h>
 #include <openssl/arm_arch.h>
+#if __has_include(<sys/auxv.h>)
+#include <sys/auxv.h>
 
 // ARM 32-bit HWCAP bits (ARM ACLE standard, same across Linux/FreeBSD/NetBSD/OpenBSD).
 // AT_HWCAP and AT_HWCAP2 numeric values from the ELF standard for ARM.
@@ -792,6 +803,11 @@ extern "C" void OPENSSL_cpuid_setup(void) {
     if (hwcap2 & HWCAP2_SHA1)  OPENSSL_armcap_P |= ARMV8_SHA1;
     if (hwcap2 & HWCAP2_SHA2)  OPENSSL_armcap_P |= ARMV8_SHA256;
 }
+#else
+// <sys/auxv.h> is absent from this sysroot (older NetBSD/OpenBSD); no hardware
+// crypto features will be detected.  Safe: BoringSSL falls back to software.
+extern "C" void OPENSSL_cpuid_setup(void) {}
+#endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/OpenBSD ARM 32-bit cpuid
 """
     content += stub
