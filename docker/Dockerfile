@@ -106,18 +106,26 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && cd / \
     && rm -rf /tmp/osxcross
 
-# Rust (termux-adb only): builds the libtermuxadb.a USB shim for the bionic
-# adb/fastboot. It's a crate-type=staticlib with libusb1-sys's link feature off,
-# so no C cross-compile or NDK linker is needed — just std for the android targets.
-# Installed read-only under /opt/rust (the build runs non-root); build.sh points
-# CARGO_HOME at a writable dir for the per-build crate cache.
+# Rust (termux-usb shim): builds the libtermuxadb.a the bionic adb/fastboot link.
+# It's a crate-type=staticlib with libusb1-sys's link feature off, so no C cross-
+# compile or NDK linker is needed — just std for the android targets. Installed
+# from the standalone dist tarballs via the aria2c fetch helper (rustup-init needs
+# curl/wget, which this image doesn't ship), read-only under /opt/rust; build.sh
+# points CARGO_HOME at a writable dir. Host toolchain is x86_64 (the CI runner).
 ARG RUST_VERSION=1.84.0
-ENV RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo
-RUN fetch --dir=/tmp -o rustup-init.sh https://sh.rustup.rs \
-    && sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain "${RUST_VERSION}" \
-            --target aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android \
-    && rm /tmp/rustup-init.sh \
-    && chmod -R a+rX /opt/rust
-ENV PATH="/opt/rust/cargo/bin:${PATH}"
+RUN set -eu; \
+    base="https://static.rust-lang.org/dist"; \
+    fetch --dir=/tmp -o rust.tar.xz "$base/rust-${RUST_VERSION}-x86_64-unknown-linux-gnu.tar.xz"; \
+    mkdir -p /tmp/rust && tar -xJf /tmp/rust.tar.xz -C /tmp/rust --strip-components=1; \
+    /tmp/rust/install.sh --prefix=/opt/rust --disable-ldconfig --without=rust-docs; \
+    rm -rf /tmp/rust /tmp/rust.tar.xz; \
+    for t in aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android; do \
+        fetch --dir=/tmp -o "std.tar.xz" "$base/rust-std-${RUST_VERSION}-$t.tar.xz"; \
+        mkdir -p /tmp/std && tar -xJf /tmp/std.tar.xz -C /tmp/std --strip-components=1; \
+        /tmp/std/install.sh --prefix=/opt/rust --disable-ldconfig; \
+        rm -rf /tmp/std /tmp/std.tar.xz; \
+    done; \
+    chmod -R a+rX /opt/rust
+ENV PATH="/opt/rust/bin:${PATH}"
 
 WORKDIR /work
