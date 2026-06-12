@@ -648,6 +648,10 @@ PYEOF
 # matching cpu detection file; append a real implementation using elf_aux_info
 # when <sys/auxv.h> is available (FreeBSD sysroot has it; older NetBSD sysroots
 # bundled with zig may not).  Falls back to an empty body when unavailable.
+# Note: BoringSSL uses bssl::OPENSSL_cpuid_setup() (not extern "C") and gets
+# OPENSSL_armcap_P / ARMV7_NEON etc. from crypto/internal.h, not arm_arch.h.
+# internal.h is only included inside the OPENSSL_OPENBSD block in this file,
+# so we must include it ourselves for the FreeBSD/NetBSD block.
 python3 << 'PYEOF'
 import sys
 
@@ -663,63 +667,46 @@ else:
 // NetBSD/FreeBSD aarch64 CPU feature detection via elf_aux_info.
 // Both OSes expose the ELF auxiliary vector through elf_aux_info() in
 // <sys/auxv.h> when the sysroot is new enough (FreeBSD 12+, NetBSD 10+).
-// arm_arch.h declares OPENSSL_armcap_P and the ARMV8_* capability constants
-// used below; it must be included here because it is only included inside
-// the OPENSSL_OPENBSD block in the rest of this file.
-// extern "C": this .cc file is C++; OPENSSL_cpuid_setup has C linkage.
+// internal.h declares OPENSSL_armcap_P and ARMV7_NEON/ARMV8_* inside the
+// bssl namespace; it is only included inside the OPENSSL_OPENBSD block above,
+// so we include it here for the FreeBSD/NetBSD case.
 #if defined(OPENSSL_AARCH64) && !defined(OPENSSL_OPENBSD) && \
     (defined(__NetBSD__) || defined(__FreeBSD__)) && \
     !defined(OPENSSL_STATIC_ARMCAP) && !defined(OPENSSL_NO_ASM)
-#include <openssl/arm_arch.h>
+#include "internal.h"
 #if __has_include(<sys/auxv.h>)
 #include <sys/auxv.h>
 
 // AArch64 AT_HWCAP bits (ARM Architecture Reference Manual §D17.2).
-// Standard values across Linux/FreeBSD/NetBSD; defined locally as a
-// fallback in case <sys/auxv.h> omits the named constants.
-#ifndef AT_HWCAP
-# define AT_HWCAP  16
-#endif
-#ifndef HWCAP_ASIMD
-# define HWCAP_ASIMD  (1UL << 1)
-#endif
-#ifndef HWCAP_AES
-# define HWCAP_AES    (1UL << 3)
-#endif
-#ifndef HWCAP_PMULL
-# define HWCAP_PMULL  (1UL << 4)
-#endif
-#ifndef HWCAP_SHA1
-# define HWCAP_SHA1   (1UL << 5)
-#endif
-#ifndef HWCAP_SHA2
-# define HWCAP_SHA2   (1UL << 6)
-#endif
-#ifndef HWCAP_SHA512
-# define HWCAP_SHA512 (1UL << 21)
-#endif
+// Inline constants matching cpu_aarch64_linux.cc — avoids relying on
+// which header each BSD sysroot uses to expose HWCAP_*.
+static const unsigned long kAArch64ASIMD  = 1UL << 1;
+static const unsigned long kAArch64AES    = 1UL << 3;
+static const unsigned long kAArch64PMULL  = 1UL << 4;
+static const unsigned long kAArch64SHA1   = 1UL << 5;
+static const unsigned long kAArch64SHA256 = 1UL << 6;
+static const unsigned long kAArch64SHA512 = 1UL << 21;
 
-extern "C" void OPENSSL_cpuid_setup(void) {
-    unsigned long hwcap = 0;
-    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+using namespace bssl;
 
-    // Only report extensions when NEON (ASIMD) is present, matching the
-    // behaviour of cpu_aarch64_linux.cc and cpu_aarch64_openbsd.cc.
-    if (!(hwcap & HWCAP_ASIMD)) {
-        return;
-    }
-    OPENSSL_armcap_P |= ARMV7_NEON;
-
-    if (hwcap & HWCAP_AES)    OPENSSL_armcap_P |= ARMV8_AES;
-    if (hwcap & HWCAP_PMULL)  OPENSSL_armcap_P |= ARMV8_PMULL;
-    if (hwcap & HWCAP_SHA1)   OPENSSL_armcap_P |= ARMV8_SHA1;
-    if (hwcap & HWCAP_SHA2)   OPENSSL_armcap_P |= ARMV8_SHA256;
-    if (hwcap & HWCAP_SHA512) OPENSSL_armcap_P |= ARMV8_SHA512;
+void bssl::OPENSSL_cpuid_setup() {
+  unsigned long hwcap = 0;
+  elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+  if (!(hwcap & kAArch64ASIMD)) {
+    return;
+  }
+  OPENSSL_armcap_P |= ARMV7_NEON;
+  if (hwcap & kAArch64AES)    OPENSSL_armcap_P |= ARMV8_AES;
+  if (hwcap & kAArch64PMULL)  OPENSSL_armcap_P |= ARMV8_PMULL;
+  if (hwcap & kAArch64SHA1)   OPENSSL_armcap_P |= ARMV8_SHA1;
+  if (hwcap & kAArch64SHA256) OPENSSL_armcap_P |= ARMV8_SHA256;
+  if (hwcap & kAArch64SHA512) OPENSSL_armcap_P |= ARMV8_SHA512;
 }
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-extern "C" void OPENSSL_cpuid_setup(void) {}
+using namespace bssl;
+void bssl::OPENSSL_cpuid_setup() {}
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/FreeBSD aarch64 cpuid
 """
@@ -752,22 +739,15 @@ else:
 // NetBSD and OpenBSD expose the same interface when the sysroot is new enough
 // (NetBSD 10+, OpenBSD 5.6+).  Use __has_include to compile the real
 // implementation only when <sys/auxv.h> is present; older sysroots fall back.
-// extern "C": this .cc file is C++; OPENSSL_cpuid_setup has C linkage.
+// internal.h is #included at the top of this file, so OPENSSL_armcap_P and
+// ARMV7_NEON/ARMV8_* are available in the bssl namespace.
 #if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_ARM) && \
     !defined(OPENSSL_FREEBSD) && !defined(OPENSSL_STATIC_ARMCAP) && \
     (defined(__NetBSD__) || defined(__OpenBSD__))
-#include <openssl/arm_arch.h>
 #if __has_include(<sys/auxv.h>)
 #include <sys/auxv.h>
 
-// ARM 32-bit HWCAP bits (ARM ACLE standard, same across Linux/FreeBSD/NetBSD/OpenBSD).
-// AT_HWCAP and AT_HWCAP2 numeric values from the ELF standard for ARM.
-#ifndef AT_HWCAP
-# define AT_HWCAP   16
-#endif
-#ifndef AT_HWCAP2
-# define AT_HWCAP2  26
-#endif
+// ARM 32-bit HWCAP bits — inline constants matching cpu_arm_freebsd.cc style.
 #ifndef HWCAP_NEON
 # define HWCAP_NEON   (1UL << 12)
 #endif
@@ -784,29 +764,25 @@ else:
 # define HWCAP2_SHA2  (1UL << 3)
 #endif
 
-extern "C" void OPENSSL_cpuid_setup(void) {
-    unsigned long hwcap = 0, hwcap2 = 0;
-    // elf_aux_info() returns non-zero on failure; on older kernels that lack
-    // the feature bits the values stay at zero and we report no capabilities.
-    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
-    elf_aux_info(AT_HWCAP2, &hwcap2, sizeof(hwcap2));
+using namespace bssl;
 
-    // Only report crypto extensions when NEON is present, matching the
-    // behaviour of cpu_arm_freebsd.cc and cpu_arm_linux.cc.
-    if (!(hwcap & HWCAP_NEON)) {
-        return;
-    }
+void bssl::OPENSSL_cpuid_setup() {
+  unsigned long hwcap = 0, hwcap2 = 0;
+  elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+  elf_aux_info(AT_HWCAP2, &hwcap2, sizeof(hwcap2));
+  if (hwcap & HWCAP_NEON) {
     OPENSSL_armcap_P |= ARMV7_NEON;
-
     if (hwcap2 & HWCAP2_AES)   OPENSSL_armcap_P |= ARMV8_AES;
     if (hwcap2 & HWCAP2_PMULL) OPENSSL_armcap_P |= ARMV8_PMULL;
     if (hwcap2 & HWCAP2_SHA1)  OPENSSL_armcap_P |= ARMV8_SHA1;
     if (hwcap2 & HWCAP2_SHA2)  OPENSSL_armcap_P |= ARMV8_SHA256;
+  }
 }
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD/OpenBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-extern "C" void OPENSSL_cpuid_setup(void) {}
+using namespace bssl;
+void bssl::OPENSSL_cpuid_setup() {}
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/OpenBSD ARM 32-bit cpuid
 """
