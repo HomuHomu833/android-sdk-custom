@@ -64,16 +64,12 @@ add_executable(fastboot
     ${SRC}/core/fastboot/util.cpp
     )
 
-# Per-OS USB backend (Android.bp fastboot target.{linux,darwin,windows})
 if(PLATFORM_DARWIN)
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_osx.cpp)
 elseif(PLATFORM_WINDOWS)
-    # our libusb backend (installed by patch-source.sh) instead of usb_windows.cpp,
-    # so fastboot builds for windows without the AdbWinApi dependency.
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_libusb.cpp)
     target_include_directories(fastboot PRIVATE ${SRC}/libusb/libusb)
 elseif(PLATFORM_BSD)
-    # BSD: use the portable libusb backend (no Linux usbfs on BSD).
     target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_libusb.cpp)
     target_include_directories(fastboot PRIVATE ${SRC}/libusb/libusb)
 else()
@@ -120,11 +116,9 @@ target_link_libraries(fastboot
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
 
-# Per-OS host libs (Android.bp fastboot target.{darwin,windows} host_ldlibs)
 if(PLATFORM_DARWIN)
     target_link_libraries(fastboot "-framework CoreFoundation" "-framework IOKit")
 elseif(PLATFORM_WINDOWS)
-    # libusb (WinUSB) backend + the Win32 libs it needs; no AdbWinApi.
     target_link_libraries(fastboot libusb setupapi ole32 cfgmgr32 winusb ws2_32)
 elseif(PLATFORM_BSD)
     target_link_libraries(fastboot libusb)

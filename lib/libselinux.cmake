@@ -54,20 +54,6 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/stringrep.c
     )
 
-# Linux-only sources, built on the linux-kernel platforms (Android + host Linux)
-# only; macOS/Windows hosts can't compile them and the host tools don't use them:
-#  - the userspace AVC (avc*.c) talks to the kernel over netlink and pulls in
-#    <linux/netlink.h>/<poll.h>;
-#  - the android/ backend pulls in <fnmatch.h> (android.c) and <linux/magic.h>
-#    (android_seapp.c) and exposes the device-side selinux_android_* APIs;
-#  - the *filecon get/set a single file's security context via the Linux 5-arg
-#    *xattr API (no __APPLE__ handling, unlike the selabel backend label_file.c),
-#    which the host tools don't use;
-#  - load_policy.c mounts selinuxfs/proc via the Linux 5-arg mount(2) + umount/
-#    umount2 (macOS has only the 4-arg BSD mount(); mingw neither), to load policy
-#    into the running kernel -- a device-only operation (callers live in core/init
-#    and policycoreutils, not the host tools, and nothing else in libselinux
-#    references its symbols).
 if(PLATFORM_LINUX_KERNEL)
     target_sources(libselinux PRIVATE
         ${SRC}/selinux/libselinux/src/avc.c
@@ -88,7 +74,6 @@ if(PLATFORM_LINUX_KERNEL)
         )
 endif()
 
-# target.android (Android.bp libselinux): android_device.c
 if(PLATFORM_ANDROID)
     target_sources(libselinux PRIVATE
         ${SRC}/selinux/libselinux/src/android/android_device.c
@@ -109,7 +94,6 @@ target_compile_definitions(libselinux PRIVATE
     -DPCRE2_CODE_UNIT_WIDTH=8
     )
 
-# Per-OS cflags (Android.bp libselinux target.{host,android})
 if(PLATFORM_HOST)
     target_compile_definitions(libselinux PRIVATE -DBUILD_HOST -DHAVE_REALLOCARRAY)
 else()
@@ -127,4 +111,4 @@ target_include_directories(libselinux PRIVATE
     ${SRC}/../include
     )
 
-endif() # PLATFORM_LINUX_KERNEL
+endif()

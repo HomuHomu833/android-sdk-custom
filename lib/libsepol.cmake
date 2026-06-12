@@ -14,10 +14,6 @@
 # limitations under the License.
 #
 
-# libsepol has no target.windows in AOSP either, and is only ever linked
-# alongside libselinux (by the host tools and by checkpolicy/secilc, none of
-# which are built for the mingw host). Skip it on Windows; consumers there link
-# the empty ${SELINUX_LINK_LIBS}.
 if(NOT PLATFORM_WINDOWS)
 
 add_library(libsepol STATIC
@@ -100,4 +96,4 @@ target_include_directories(libsepol PRIVATE
     ${SRC}/selinux/libsepol/cil/include
     )
 
-endif() # NOT PLATFORM_WINDOWS
+endif()

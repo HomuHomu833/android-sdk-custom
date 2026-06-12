@@ -25,8 +25,6 @@ set(LIBUTILS_BINDER_SRC
     ${SRC}/core/libutils/binder/VectorImpl.cpp
     )
 
-# Common srcs (Android.bp: libutils_impl_defaults) + libutils_binder (whole-static,
-# common). Per-OS adds mirror target.{android,linux}.
 add_library(libutils STATIC
     ${SRC}/core/libutils/FileMap.cpp
     ${SRC}/core/libutils/JenkinsHash.cpp
@@ -42,17 +40,14 @@ add_library(libutils STATIC
     ${LIBUTILS_BINDER_SRC}
     )
 
-# target.android
 if(PLATFORM_ANDROID)
     target_sources(libutils PRIVATE ${SRC}/core/libutils/Trace.cpp)
 endif()
 
-# target.linux (android + host Linux): Looper is epoll-based
 if(PLATFORM_LINUX_KERNEL)
     target_sources(libutils PRIVATE ${SRC}/core/libutils/Looper.cpp)
 endif()
 
-# libutils_defaults_nodeps target.windows
 if(PLATFORM_WINDOWS)
     target_compile_definitions(libutils PRIVATE -DMB_CUR_MAX=1)
 endif()

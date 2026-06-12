@@ -22,7 +22,6 @@ add_library(libziparchive STATIC
     ${SRC}/libziparchive/zip_error.cpp
     )
 
-# incfs_support signal-fault handling is POSIX-only (not built on mingw)
 if(NOT PLATFORM_WINDOWS)
     target_sources(libziparchive PRIVATE
         ${SRC}/libziparchive/incfs_support/signal_handling.cpp
@@ -35,8 +34,6 @@ target_compile_definitions(libziparchive PRIVATE
     -DZIPARCHIVE_DISABLE_CALLBACK_API=1
     )
 
-# libziparchive_defaults target.windows: MinGW MS-style bitfields break the zip
-# on-disk struct layout.
 if(PLATFORM_WINDOWS)
     target_compile_options(libziparchive PRIVATE -mno-ms-bitfields)
 endif()

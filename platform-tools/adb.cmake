@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-# ========================= adb proto ============================
 set(ADB_PROTO_SRC)  # adb proto source files
 set(ADB_PROTO_HDRS) # adb proto head files
 set(ADB_PROTO_DIR ${SRC}/adb/proto)
@@ -52,10 +51,7 @@ if(DEFINED PROTOC_PATH)
     set_source_files_properties(${ADB_PROTO_SRC} PROPERTIES GENERATED TRUE)
     set_source_files_properties(${ADB_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 endif()
-# ========================= adb proto ============================
 
-
-# ========================= fastdeploy proto ============================
 # ApkEntry.proto
 set(FASTDEPLOY_PROTO_SRC)  # adb proto source files
 set(FASTDEPLOY_PROTO_HDRS) # adb proto head files
@@ -91,8 +87,6 @@ if(DEFINED PROTOC_PATH)
     set_source_files_properties(${FASTDEPLOY_PROTO_SRC} PROPERTIES GENERATED TRUE)
     set_source_files_properties(${FASTDEPLOY_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 endif()
-# ========================= fastdeploy proto ============================
-
 
 add_library(libadb STATIC
     ${SRC}/adb/adb.cpp
@@ -130,7 +124,6 @@ add_library(libadb STATIC
     ${ADB_PROTO_SRC} ${ADB_PROTO_HDRS}
     )
 
-# Per-OS srcs (Android.bp libadb_host target.{linux,darwin,not_windows,windows}).
 if(NOT PLATFORM_WINDOWS)
     target_sources(libadb PRIVATE
         ${SRC}/adb/sysdeps_unix.cpp
@@ -143,12 +136,6 @@ if(PLATFORM_DARWIN)
         ${SRC}/adb/fdevent/fdevent_poll.cpp
         )
 elseif(PLATFORM_WINDOWS)
-    # Use the libusb backend on windows (WinUSB) instead of the native
-    # usb_windows.cpp, so we don't depend on the prebuilt AdbWinApi (which is only
-    # shipped 32-bit). The legacy BlockingConnection USB path (UsbConnection /
-    # register_usb_transport) is excluded on Windows in patch-source.sh; the modern
-    # LibUsbConnection backend handles all device I/O. usb_windows_libusb.cpp
-    # supplies the global usb_init()/usb_cleanup() entry points main.cpp expects.
     target_sources(libadb PRIVATE
         ${SRC}/adb/client/usb_libusb_device.cpp
         ${SRC}/adb/client/usb_libusb_hotplug.cpp
@@ -160,10 +147,6 @@ elseif(PLATFORM_WINDOWS)
         ${SRC}/adb/sysdeps/win32/stat.cpp
         )
 elseif(PLATFORM_BSD)
-    # BSD: libusb is the only USB backend (no native BSD USB backend).
-    # Wire the same libusb hotplug stack that Windows uses; adb_usb_bsd.cpp
-    # provides the global usb_init()/usb_cleanup() entry points.
-    # usb_libusb.cpp is already in the global sources above; not re-added here.
     target_sources(libadb PRIVATE
         ${SRC}/adb/client/usb_libusb_device.cpp
         ${SRC}/adb/client/usb_libusb_hotplug.cpp
@@ -172,7 +155,6 @@ elseif(PLATFORM_BSD)
         ${CMAKE_SOURCE_DIR}/patches/misc/adb_usb_bsd.cpp
         )
 else()
-    # linux (host)
     target_sources(libadb PRIVATE
         ${SRC}/adb/client/usb_linux.cpp
         ${SRC}/adb/fdevent/fdevent_epoll.cpp
@@ -377,12 +359,8 @@ if(PLATFORM_LINUX_KERNEL)
     target_link_libraries(adb libpackagelistparser)
 endif()
 
-# Per-OS host libs (Android.bp adb/libadb_host target.{darwin,windows} host_ldlibs)
 if(PLATFORM_DARWIN)
     target_link_libraries(adb "-framework CoreFoundation" "-framework IOKit" "-framework Security")
 elseif(PLATFORM_WINDOWS)
-    # No AdbWinApi: the libusb (WinUSB) backend needs these Win32 libs instead.
-    # iphlpapi provides GetAdaptersAddresses(), used by openscreen's
-    # network_interface_win.cc for mDNS.
     target_link_libraries(adb setupapi ole32 cfgmgr32 winusb gdi32 userenv ws2_32 iphlpapi)
 endif()

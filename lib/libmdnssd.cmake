@@ -20,7 +20,6 @@ add_library(libmdnssd STATIC
     ${SRC}/mdnsresponder/mDNSShared/dnssd_ipc.c
     )
 
-# libmdnssd target.windows
 if(PLATFORM_WINDOWS)
     target_sources(libmdnssd PRIVATE
         ${SRC}/mdnsresponder/mDNSWindows/DLL/dllmain.c
@@ -34,7 +33,7 @@ target_compile_options(libmdnssd PRIVATE
     -fno-strict-aliasing
     -fwrapv
     )
-# Common cflags (mdnsresponder_default_cflags)
+
 target_compile_definitions(libmdnssd PRIVATE
     -D_GNU_SOURCE
     -DHAVE_IPV6
@@ -44,7 +43,6 @@ target_compile_definitions(libmdnssd PRIVATE
     -DMDNS_DEBUGMSGS=0
     )
 
-# Per-OS cflags (mdnsresponder_default_cflags target.{linux,darwin,windows}).
 if(PLATFORM_DARWIN)
     target_compile_definitions(libmdnssd PRIVATE
         -DTARGET_OS_MAC
@@ -58,18 +56,12 @@ elseif(PLATFORM_WINDOWS)
         -DMDNS_UDS_SERVERPATH="/dev/socket/mdnsd"
         )
     target_compile_options(libmdnssd PRIVATE "-include" "winsock2.h")
-    # ws2ipdef.h is not available as a standalone header in llvm-mingw and is
-    # already pulled in by winsock2.h in its w32api headers.
-    # target_compile_options(libmdnssd PRIVATE "-include" "ws2ipdef.h")
 elseif(PLATFORM_BSD)
-    # bsd: no HAVE_LINUX, no NETLINK (Linux-specific). mdnsd socket path
-    # follows the FreeBSD convention (/var/run/mdnsd).
     target_compile_definitions(libmdnssd PRIVATE
         -DTARGET_OS_LINUX
         -DMDNS_UDS_SERVERPATH="/var/run/mdnsd"
         )
 else()
-    # target.linux (host Linux + android)
     target_compile_definitions(libmdnssd PRIVATE
         -DTARGET_OS_LINUX -DHAVE_LINUX -DUSES_NETLINK
         -DMDNS_UDS_SERVERPATH="/dev/socket/mdnsd"

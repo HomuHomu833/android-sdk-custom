@@ -51,11 +51,6 @@ add_library(libopenscreen STATIC
     ${SRC}/openscreen/platform/impl/network_interface.cc
     )
 
-# Per-OS network-interface enumeration (Android.bp target.{linux,darwin,windows})
-# BSD uses a minimal stub returning an empty list: the mac implementation relies
-# on in6_ifreq/SIOCGIFAFLAG_IN6/IN6_IFF_DEPRECATED which are not available in
-# zig's BSD sysroots (OpenBSD lacks them entirely; zig's FreeBSD/NetBSD headers
-# don't expose netinet6/in6_var.h).  mDNS discovery is not needed for host tools.
 if(PLATFORM_DARWIN)
     target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_mac.cc)
 elseif(PLATFORM_BSD)

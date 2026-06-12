@@ -58,7 +58,7 @@ add_library(libartbase STATIC
     ${SRC}/art/libartbase/base/zip_archive.cc
     ${SRC}/faked_functions.cpp
     )
-# libartbase per-OS (Android.bp target.{not_windows,windows})
+
 if(PLATFORM_WINDOWS)
     target_sources(libartbase PRIVATE ${SRC}/art/libartbase/base/mem_map_windows.cc)
 else()
@@ -68,8 +68,6 @@ else()
         )
 endif()
 target_include_directories(libartbase PRIVATE ${INCLUDES})
-# ART image base address + reservation deltas. Soong injects these via
-# -DART_BASE_ADDRESS=...; mem_map.cc references them, so define them here.
 target_compile_definitions(libartbase PRIVATE
     ART_BASE_ADDRESS=0x70000000
     ART_BASE_ADDRESS_MIN_DELTA=-0x1000000
@@ -79,8 +77,6 @@ target_compile_definitions(libartbase PRIVATE
 add_library(libartpalette STATIC)
 target_include_directories(libartpalette PRIVATE ${INCLUDES})
 
-# Android.bp: apex/palette.cc (dlopen-based) is android-only; host targets
-# (linux, darwin, windows) use system/palette_fake.cc (fake implementation).
 if(PLATFORM_ANDROID)
     target_sources(libartpalette PRIVATE
         ${SRC}/art/libartpalette/apex/palette.cc

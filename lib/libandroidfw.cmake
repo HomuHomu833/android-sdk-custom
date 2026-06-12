@@ -52,16 +52,11 @@ add_library(libandroidfw STATIC
     ${SRC}/base/libs/androidfw/PathUtils.cpp     
     )
 
-# STATIC_ANDROIDFW_FOR_TOOLS is host-only in Android.bp, but we keep it for all
-# platforms on purpose: our bionic build is host tools that run on-device (Termux),
-# and the tools variant avoids the libbinder/backup deps we don't build (which is
-# why BackupData/BackupHelpers.cpp and CursorWindow.cpp are intentionally omitted).
 target_compile_definitions(libandroidfw PRIVATE
     -DSTATIC_ANDROIDFW_FOR_TOOLS
     -D_GNU_SOURCE -DNDEBUG
     )
 
-# libandroidfw_defaults target.windows
 if(PLATFORM_WINDOWS)
     target_compile_options(libandroidfw PRIVATE -Wno-missing-field-initializers)
 endif()

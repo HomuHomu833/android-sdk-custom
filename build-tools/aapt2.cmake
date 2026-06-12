@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-# ========================= aapt2 proto ============================
 set(AAPT2_PROTO_SRC)  # proto source files
 set(AAPT2_PROTO_HDRS) # proto head files
 set(AAPT2_PROTO_DIR ${SRC}/base/tools/aapt2)
@@ -53,8 +52,6 @@ if(DEFINED PROTOC_PATH)
     set_source_files_properties(${AAPT2_PROTO_SRC} PROPERTIES GENERATED TRUE)
     set_source_files_properties(${AAPT2_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 endif()
-# ========================= aapt2 proto ============================
-
 
 set(INCLUDES
     ${SRC}/base/tools/aapt2
@@ -179,15 +176,6 @@ add_library(libaapt2 STATIC
 target_include_directories(libaapt2 PRIVATE ${INCLUDES})
 target_compile_options(libaapt2 PRIVATE ${COMPILE_FLAGS})
 
-# build the host shared library: aapt2_jni
-#add_library(libaapt2_jni SHARED
-#   ${SRC}/base/tools/aapt2/jni/aapt2_jni.cpp
-#   ${TOOL_SOURCE}
-#   )
-#target_include_directories(libaapt2_jni PRIVATE ${INCLUDES})
-#target_compile_options(libaapt2_jni PRIVATE ${COMPILE_FLAGS})
-#target_link_libraries(libaapt2_jni libaapt2)
-
 # build the executable file aapt2
 add_executable(aapt2
     ${SRC}/base/tools/aapt2/Main.cpp
@@ -220,15 +208,11 @@ if(PLATFORM_LINUX_KERNEL)
     target_link_libraries(aapt2 libpackagelistparser)
 endif()
 
-# Per-OS flags/libs (Android.bp aapt2 target.{darwin,windows}). No per-OS srcs.
 if(PLATFORM_DARWIN)
     target_compile_definitions(libaapt2 PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
     target_compile_definitions(aapt2 PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
     target_link_libraries(aapt2 "-framework CoreFoundation")  # required by protobuf
 elseif(PLATFORM_WINDOWS)
-    # -Wno-maybe-uninitialized is a GCC-only warning name (AOSP's mingw used GCC).
-    # The llvm-mingw toolchain here is clang, which has no such warning and rejects
-    # the flag with -Wunknown-warning-option, so only pass it under GCC.
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(libaapt2 PRIVATE -Wno-maybe-uninitialized)
         target_compile_options(aapt2 PRIVATE -Wno-maybe-uninitialized)

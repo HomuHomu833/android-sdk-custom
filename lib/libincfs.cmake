@@ -19,8 +19,6 @@ add_library(libincfs STATIC
     ${SRC}/incremental_delivery/sysprop/IncrementalProperties.sysprop.cpp
     )
 
-# Android.bp: libincfs (incfs_ndk.c, incfs.cpp, MountRegistry.cpp, path.cpp)
-# and libincfs_headers (kernel-headers) are linux+bionic only
 if(PLATFORM_LINUX_KERNEL)
     target_sources(libincfs PRIVATE
         ${SRC}/incremental_delivery/incfs/incfs_ndk.c

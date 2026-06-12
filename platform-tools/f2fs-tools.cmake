@@ -76,10 +76,6 @@ target_link_libraries(make_f2fs_casefold
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
 
-# sload_f2fs is the only f2fs host tool that uses SELinux labelling, so AOSP
-# leaves it on f2fs-tools' `windows: { enabled: false }` -- only make_f2fs and
-# make_f2fs_casefold (above) ship in the Windows SDK. Mirror that: don't build
-# sload_f2fs on macOS/Windows, where libselinux/libsepol aren't built.
 if(PLATFORM_LINUX_KERNEL)
 
 add_executable(sload_f2fs
@@ -123,5 +119,5 @@ target_link_libraries(sload_f2fs
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
 
-endif() # PLATFORM_LINUX_KERNEL
+endif()
 

@@ -89,7 +89,6 @@ if(PLATFORM_LINUX_KERNEL)
     target_link_libraries(aapt libpackagelistparser libprocessgroup)
 endif()
 
-# libaapt Android.bp target.darwin (no per-OS srcs for aapt)
 if(PLATFORM_DARWIN)
     target_compile_definitions(libaapt PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
     target_compile_definitions(aapt PRIVATE -D_DARWIN_UNLIMITED_STREAMS)

@@ -23,11 +23,6 @@ add_library(libusb STATIC
     ${SRC}/libusb/libusb/strerror.c
     )
 
-# Per-OS backend (Android.bp libusb target.{linux_glibc,darwin,windows}).
-# NB: libusb's config.h also needs per-OS defines (PLATFORM_POSIX/WINDOWS, etc.)
-# for darwin/windows beyond these sources.
-# BSD uses the POSIX event/thread layer and (if available) openbsd_usb.c;
-# fall back to bare POSIX if AOSP's libusb checkout lacks a BSD backend.
 if(PLATFORM_DARWIN)
     target_sources(libusb PRIVATE
         ${SRC}/libusb/libusb/os/darwin_usb.c
@@ -47,14 +42,9 @@ elseif(PLATFORM_BSD)
         ${SRC}/libusb/libusb/os/events_posix.c
         ${SRC}/libusb/libusb/os/threads_posix.c
         )
-    # Each BSD needs its own USB backend to define usbi_backend.
     if(CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
         target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/netbsd_usb.c)
     else()
-        # FreeBSD and OpenBSD: openbsd_usb.c/no FreeBSD backend require kernel
-        # dev/usb/usb.h which is absent from the cross-compilation sysroot.
-        # Use the null backend so usbi_backend is defined and the link succeeds
-        # (USB ops return LIBUSB_ERROR_NOT_SUPPORTED at runtime).
         target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/null_usb.c)
     endif()
 else()

@@ -14,12 +14,7 @@
 # limitations under the License.
 #
 
-# libcutils = AOSP libcutils + libcutils_sockets merged. Per-OS source selection
-# mirrors core/libcutils/Android.bp target.{linux,host,not_windows,android,windows}.
-# faked_functions.cpp is our addition: cacheflush everywhere + the host property
-# fakes (host has no Android property system).
 add_library(libcutils STATIC
-    # libcutils common srcs
     ${SRC}/core/libcutils/config_utils.cpp
     ${SRC}/core/libcutils/iosched_policy.cpp
     ${SRC}/core/libcutils/load_file.cpp
@@ -27,12 +22,10 @@ add_library(libcutils STATIC
     ${SRC}/core/libcutils/properties.cpp
     ${SRC}/core/libcutils/record_stream.cpp
     ${SRC}/core/libcutils/strlcpy.c
-    # libcutils_sockets common
     ${SRC}/core/libcutils/sockets.cpp
     ${SRC}/faked_functions.cpp
     )
 
-# target.linux (android + host Linux)
 if(PLATFORM_LINUX_KERNEL)
     target_sources(libcutils PRIVATE
         ${SRC}/core/libcutils/canned_fs_config.cpp
@@ -40,7 +33,6 @@ if(PLATFORM_LINUX_KERNEL)
         )
 endif()
 
-# target.not_windows (host non-windows + android) -- incl. the unix sockets
 if(NOT PLATFORM_WINDOWS)
     target_sources(libcutils PRIVATE
         ${SRC}/core/libcutils/fs.cpp
@@ -55,7 +47,6 @@ if(NOT PLATFORM_WINDOWS)
         )
 endif()
 
-# target.host (everything but the android device): host stubs for atrace/ashmem
 if(PLATFORM_HOST)
     target_sources(libcutils PRIVATE
         ${SRC}/core/libcutils/trace-host.cpp
@@ -63,7 +54,6 @@ if(PLATFORM_HOST)
         )
 endif()
 
-# target.android (bionic device): the real device implementations
 if(PLATFORM_ANDROID)
     target_sources(libcutils PRIVATE
         ${SRC}/core/libcutils/android_get_control_file.cpp
@@ -77,7 +67,6 @@ if(PLATFORM_ANDROID)
         )
 endif()
 
-# target.windows
 if(PLATFORM_WINDOWS)
     target_sources(libcutils PRIVATE
         ${SRC}/core/libcutils/socket_inaddr_any_server_windows.cpp

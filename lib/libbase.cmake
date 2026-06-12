@@ -14,8 +14,6 @@
 # limitations under the License.
 #
 
-# Common srcs (Android.bp: libbase_defaults). cmsg.cpp is excluded on windows
-# (see below), so it lives in the per-OS block.
 add_library(libbase STATIC
     ${SRC}/libbase/chrono_utils.cpp
     ${SRC}/libbase/file.cpp
@@ -34,20 +32,14 @@ add_library(libbase STATIC
     ${SRC}/libbase/test_utils.cpp
     )
 
-# Per-OS srcs (Android.bp: libbase_defaults target.{linux,darwin,windows}).
 if(PLATFORM_WINDOWS)
     target_sources(libbase PRIVATE
         ${SRC}/libbase/errors_windows.cpp
         ${SRC}/libbase/utf8.cpp
         )
-    # libbase_cflags_defaults target.windows
     target_compile_definitions(libbase PRIVATE -D_POSIX_THREAD_SAFE_FUNCTIONS)
-    # clock_gettime (and its clock_gettime64 alias) come from winpthreads on
-    # MinGW; propagate so every consumer of libbase resolves the symbol.
     target_link_libraries(libbase PUBLIC pthread)
 else()
-    # target.linux (android + host Linux) and target.darwin both add errors_unix;
-    # cmsg.cpp is built everywhere except windows.
     target_sources(libbase PRIVATE
         ${SRC}/libbase/cmsg.cpp
         ${SRC}/libbase/errors_unix.cpp

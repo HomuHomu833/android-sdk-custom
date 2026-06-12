@@ -14,8 +14,6 @@
 # limitations under the License.
 #
 
-# Common srcs (Android.bp: liblog_sources). Per-OS adds mirror liblog.defaults
-# target.{not_windows,android}.
 add_library(liblog STATIC
     ${SRC}/logging/liblog/log_event_list.cpp
     ${SRC}/logging/liblog/log_event_write.cpp
@@ -26,14 +24,12 @@ add_library(liblog STATIC
     ${SRC}/logging/liblog/properties.cpp
     )
 
-# target.not_windows (host non-windows + android)
 if(NOT PLATFORM_WINDOWS)
     target_sources(liblog PRIVATE
         ${SRC}/logging/liblog/event_tag_map.cpp
         )
 endif()
 
-# target.android (device logging: logd/pmsg readers+writers, log_time)
 if(PLATFORM_ANDROID)
     target_sources(liblog PRIVATE
         ${SRC}/logging/liblog/log_time.cpp

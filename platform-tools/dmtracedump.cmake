@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-# this tool has removed by google
 add_executable(dmtracedump 
     ${SRC}/art/tools/dmtracedump/tracedump.cc
     )
