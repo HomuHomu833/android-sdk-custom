@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
-# Cross-build the Android SDK host tools for one target. Driven entirely by env
-# vars so it runs identically in CI and in `docker run`.
+# Cross-build the Android SDK host tools for one target. All inputs are env vars
+# so CI and `docker run` behave identically. Run fetch-source.sh first.
 #
-#   PLATFORM   linux | bionic | bsd   (see the per-PLATFORM case below)
-#   TARGET     target triple, e.g. x86_64-linux-musl / aarch64-linux-gnu (linux)
-#                                  aarch64-linux-android                  (bionic)
-#                                  aarch64-freebsd-none / x86_64-netbsd-none
-#                                  arm-openbsd-eabi                       (bsd)
+#   PLATFORM   linux | bionic | macos | windows | bsd
+#   TARGET     target triple (e.g. x86_64-linux-musl, aarch64-linux-android,
+#              aarch64-freebsd-none, arm-openbsd-eabi)
 #   ARCH       CMAKE_SYSTEM_PROCESSOR (default: triple's arch field)
 #   ROOTDIR    checkout root (default: cwd)
-#   OUT        where the stripped host tools land (default: $ROOTDIR/out)
+#   OUT        stripped host tools land here (default: $ROOTDIR/out)
 #   JOBS       parallelism (default: nproc)
-#   NDK_VERSION   official NDK to pull for the bionic clang, e.g. 27 (bionic only)
-#   NDK_REVISION  optional NDK revision letter, e.g. c (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 25, riscv64 forced to 35; bionic only)
-#
-# Expects fetch-source.sh to have run first (sources + patches in place).
+#   NDK_VERSION/NDK_REVISION  official NDK for the bionic clang (bionic only)
+#   ANDROID_PLATFORM  bionic API level (default 25, riscv64 forced 35; bionic only)
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -29,9 +24,8 @@ cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
-# Download with retries: re-run aria2c on any failure so transient GitHub 501/504
-# (and the like) recover. Doesn't rely on aria2's --retry-on-unknown, which older
-# aria2 builds don't have. Pass aria2c args, e.g. fetch --dir=/tmp -o f.zip URL.
+# Re-run aria2c on any failure so transient GitHub 5xx recover (older aria2 lacks
+# --retry-on-unknown). Args pass through, e.g. fetch --dir=/tmp -o f.zip URL.
 fetch() {
   local i=0
   until aria2c --console-log-level=error --check-certificate=false \
@@ -41,9 +35,8 @@ fetch() {
   done
 }
 
-# --- toolchain selection ----------------------------------------------------
-# Structured as a per-PLATFORM case: linux (zig), bionic (NDK clang), macos
-# (osxcross), windows (llvm-mingw), bsd (zig) — mirrors the sibling NDK/llvm repos.
+# --- toolchain selection (per-PLATFORM: linux/bsd zig, bionic NDK clang, macos
+# osxcross, windows llvm-mingw) ----------------------------------------------
 CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
 case "$PLATFORM" in
   linux)
@@ -55,57 +48,45 @@ case "$PLATFORM" in
     CROSS_AR="$TC/bin/ar"; CROSS_RANLIB="$TC/bin/ranlib"
     CROSS_STRIP="$TC/bin/strip"; CROSS_OBJCOPY="$TC/bin/objcopy"
     SYSTEM_NAME=Linux
-    # musl is fully static and needs the LFS/64-bit aliases that musl omits, plus
-    # the ANDROID_HOST_MUSL define the AOSP sources key off; glibc ships the LFS
-    # aliases natively and links dynamically with just the runtime statified
-    # (mirrors how the sibling repos split musl vs gnu).
+    # musl: fully static, needs the LFS aliases + ANDROID_HOST_MUSL the AOSP
+    # sources key off. glibc: ships LFS natively, links dynamically.
     case "$TARGET" in
       *musl*)
-        # host_compat.h supplies the GNU/bionic-isms musl omits (e.g.
-        # TEMP_FAILURE_RETRY); its platform-locked sections stay inert on musl,
-        # and its reallocarray fallback is gated off for musl (libc provides it).
+        # host_compat.h supplies GNU/bionic-isms musl omits (e.g.
+        # TEMP_FAILURE_RETRY); its reallocarray fallback is gated off for musl.
         CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
-        # _GNU_SOURCE: AOSP/host code (and bundled deps like zstd's cover.c, which
-        # calls qsort_r) assume GNU extensions that glibc hides behind it; musl
-        # exposes them unconditionally, so this only matters for gnu. Passed
-        # valueless (-D_GNU_SOURCE=, not -D_GNU_SOURCE which clang makes `1`) to
-        # match the bare #define upstream sources emit, dodging -Wmacro-redefined.
-        # strlcpy/strlcat shim: glibc only declares them from 2.38. Force-include
-        # a shim that supplies them on older glibc instead of raising the
-        # binaries' runtime glibc requirement. HAVE_STRLCPY/HAVE_STRLCAT make
-        # deps that ship their own fallback (e.g. selinux's #ifndef HAVE_STRLCPY)
-        # yield to the shim, avoiding a duplicate definition.
+        # _GNU_SOURCE: AOSP/host code (and deps like zstd cover.c's qsort_r) need
+        # GNU extensions glibc hides; musl exposes them anyway. Passed valueless
+        # (clang's bare -D makes `1`) to match upstream's bare #define and dodge
+        # -Wmacro-redefined.
+        # strlcpy/strlcat: glibc declares them only from 2.38, so force-include a
+        # shim rather than raise the runtime glibc floor. HAVE_STRLCPY/HAVE_STRLCAT
+        # make deps with their own fallback (e.g. selinux) yield to it.
         CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE= -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
-    # libpng ships SIMD code that doesn't build/link on every target: the 32-bit
-    # Thumb encodings lack the Neon asm impl (undefined png_*_neon symbols), and
-    # 32-bit/BE PowerPC lacks the VSX/AltiVec the intrinsics require. Disable the
-    # relevant SIMD path so libpng falls back to portable C. (aarch64 Neon and
-    # ppc64le VSX build fine and are left enabled.) PowerPC uses libpng's
-    # PNG_POWERPC_VSX=off option, not a global -DPNG_POWERPC_VSX_OPT=0 that would
-    # clash with libpng's own -D...=2 (-Wmacro-redefined); thumb keeps the global
-    # -D since libpng's arch regex skips "thumb" and defines nothing to clash.
+    # libpng SIMD doesn't build on every target: 32-bit Thumb lacks the Neon asm
+    # (undefined png_*_neon), 32-bit/BE PowerPC lacks VSX/AltiVec. Fall back to C
+    # (aarch64 Neon and ppc64le VSX stay on). PowerPC uses libpng's
+    # PNG_POWERPC_VSX=off; a global -DPNG_POWERPC_VSX_OPT=0 would clash with
+    # libpng's own -D...=2 (-Wmacro-redefined). Thumb keeps the global -D (libpng's
+    # arch regex ignores "thumb", so nothing collides).
     case "$TARGET" in
       thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
       powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
-    # x32 ABI (x86_64 ISA, 32-bit pointers): clang emits initial-exec TLS with
-    # 32-bit MOV/ADD, but lld's R_X86_64_GOTTPOFF relaxation requires a 64-bit
-    # MOVQ/ADDQ, so the link fails. These are fully-static executables, so force
-    # local-exec TLS (no GOTTPOFF) which is the correct model here anyway.
+    # x32: force local-exec TLS. lld can't relax R_X86_64_GOTTPOFF to clang's
+    # 32-bit initial-exec sequence (link fails); these are static, so local-exec fits.
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
     esac
     ;;
   bionic)
-    # Android host tools built against bionic with the official NDK's clang, so the
-    # binaries run on-device. The NDK ships its own sysroot + libc, so none of the
-    # musl/glibc LFS juggling from the linux case applies. SYSTEM_NAME stays Linux
-    # (not Android) so CMake just uses the clang we point it at instead of taking
-    # over with its own NDK toolchain machinery — mirrors the sibling NDK repo.
+    # Android host tools against bionic via the official NDK clang, so they run
+    # on-device. NDK ships its own sysroot, so no musl/glibc LFS juggling.
+    # SYSTEM_NAME stays Linux so CMake uses our clang, not its NDK machinery.
     : "${NDK_VERSION:?set NDK_VERSION for the bionic build}"
     NDK_REVISION="${NDK_REVISION:-}"
     API="${ANDROID_PLATFORM:-25}"; [ "$TARGET" = riscv64-linux-android ] && API=35
@@ -126,14 +107,13 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    # reallocarray() is API 29+ in bionic but selinux is built -DHAVE_REALLOCARRAY;
-    # force-include a shim that supplies it on the lower API levels we target.
+    # reallocarray is API 29+ in bionic but selinux builds -DHAVE_REALLOCARRAY;
+    # force-include a shim that supplies it on the lower API levels.
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     ;;
   bsd)
-    # BSD host tools via zig-as-llvm (same zig-based LLVM wrappers as the linux
-    # case). Zig provides the cross C/C++ toolchain for all BSD targets.
+    # BSD host tools via zig-as-llvm (same wrappers as linux), all BSD targets.
     TC=/opt/zig-as-llvm
     export ZIG_TARGET="$TARGET"
     [ -d "$ROOTDIR/patches/musl/zig" ] && cp -R "$ROOTDIR/patches/musl/zig/." /opt/zig/ || true
@@ -145,13 +125,11 @@ case "$PLATFORM" in
       netbsd)  SYSTEM_NAME=NetBSD ;;
       openbsd) SYSTEM_NAME=OpenBSD ;;
     esac
-    # host_compat.h supplies the glibc/bionic-isms BSDs omit (e.g.
-    # TEMP_FAILURE_RETRY, reallocarray); its platform-locked sections
-    # (Windows/Darwin) stay inert on BSD. Dynamic linking for BSD targets.
+    # host_compat.h supplies glibc/bionic-isms BSDs omit (TEMP_FAILURE_RETRY,
+    # reallocarray); Windows/Darwin sections stay inert. BSD links dynamically.
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
-    # Per-arch tuning (SIMD, TLS): same as the linux case — mirrors the sibling
-    # NDK/llvm repos (see the linux case for the libpng PNG_POWERPC_VSX rationale).
+    # Per-arch SIMD/TLS, same as linux (see there for the PNG_POWERPC_VSX why).
     case "$TARGET" in
       thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
       powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
@@ -161,9 +139,8 @@ case "$PLATFORM" in
     esac
     ;;
   macos)
-    # macOS host tools via osxcross (cctools-port + clang wrappers that carry the
-    # macOS SDK sysroot). zig segfaults building macOS binaries, so darwin uses
-    # osxcross — mirrors the sibling NDK/llvm repos.
+    # macOS host tools via osxcross (cctools-port + clang wrappers carrying the
+    # SDK sysroot); zig segfaults building Darwin binaries.
     TC=/opt/osxcross
     export PATH="$TC/bin:$PATH"
     case "$TARGET" in
@@ -173,7 +150,7 @@ case "$PLATFORM" in
       x86_64-*)          OSX_ARCH=x86_64 ;;
       *) echo "Unsupported macOS arch in TARGET='$TARGET'" >&2; exit 1 ;;
     esac
-    # osxcross names wrappers with the SDK's darwin version (e.g.
+    # osxcross wrappers carry the SDK's darwin version (e.g.
     # arm64-apple-darwin24.5-clang); resolve the prefix by globbing.
     CCWRAP="$(ls "$TC/bin/${OSX_ARCH}-apple-darwin"*-clang 2>/dev/null | head -n1 || true)"
     [ -n "$CCWRAP" ] || { echo "osxcross clang wrapper for $OSX_ARCH not found in $TC/bin" >&2; exit 1; }
@@ -189,8 +166,7 @@ case "$PLATFORM" in
     SDKROOT="$(ls -d "$TC/SDK/MacOSX"*.sdk 2>/dev/null | head -n1 || true)"
     CROSS_CMAKE_EXTRA=(-DCMAKE_OSX_ARCHITECTURES="$OSX_ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
     [ -n "$SDKROOT" ] && CROSS_CMAKE_EXTRA+=(-DCMAKE_OSX_SYSROOT="$SDKROOT")
-    # cctools libtool under the plain `libtool` name on PATH, in case any archive
-    # merge step shells out to it (parity with the sibling repos).
+    # cctools libtool under the plain `libtool` name, in case a step shells out to it.
     LIBTOOLBIN="$(ls "$TC/bin/${OSX_ARCH}-apple-darwin"*-libtool 2>/dev/null | head -n1 || true)"
     if [ -n "$LIBTOOLBIN" ]; then
       mkdir -p "$BUILD_DIR/.macos-shims"; ln -sf "$LIBTOOLBIN" "$BUILD_DIR/.macos-shims/libtool"
@@ -206,20 +182,17 @@ case "$PLATFORM" in
     CROSS_OBJCOPY="$TC/bin/${TARGET}-objcopy"
     SYSTEM_NAME=Windows
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
-    # Static libstdc++/libgcc, and whole-archive libwinpthread so the .exe tools
-    # run without shipping the mingw runtime DLLs. --whole-archive pulls in all of
-    # winpthread (incl. its TLS/thread-exit cleanup callbacks, which a plain
-    # -lwinpthread would drop); -Bdynamic restores normal linkage for the ucrt and
-    # system import libs. Matches the llvm-mingw-recommended idiom used by LLVM.
+    # Static libstdc++/libgcc + whole-archive libwinpthread so the .exe tools need
+    # no mingw DLLs. --whole-archive keeps winpthread's TLS/thread-exit callbacks a
+    # plain -lwinpthread would drop; -Bdynamic restores linkage for ucrt/system libs.
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
 export CROSS_CC CROSS_CXX CROSS_LD CROSS_AR CROSS_RANLIB CROSS_STRIP CROSS_OBJCOPY CROSS_LDFLAGS
 
-# --- native protoc (runs on the build host during codegen) ------------------
-# Built with the host compiler, NOT the zig cross toolchain, since the cross
-# build invokes it at generate time.
+# --- native protoc: built with the host compiler (not the cross toolchain),
+# since the cross build invokes it at codegen time ---------------------------
 PROTOC="$ROOTDIR/src/protobuf/build/protoc"
 if [ ! -f "$PROTOC" ]; then
   log "Building native protoc"
@@ -232,11 +205,9 @@ if [ ! -f "$PROTOC" ]; then
   ninja -C "$ROOTDIR/src/protobuf/build" -j"$JOBS"
 fi
 
-# --- extra deps (zlib + bzip2, static archives, cross-compiled for target) --
-# We only consume the static .a archives, so -static is only meaningful for the
-# tools' throwaway test binaries. Pass it for musl (proven path); never for gnu
-# or bsd, since zig refuses to statically link glibc or bsd libc ("libc ...
-# requires dynamic linking").
+# --- extra deps: zlib + bzip2 static archives, cross-compiled. -static only
+# affects the throwaway test binaries; pass it for musl only (zig refuses to
+# statically link glibc/bsd libc) ------------------------------------------------
 case "$TARGET" in
   *musl*) DEP_STATIC="-static" ;;
   *)      DEP_STATIC="" ;;
@@ -261,10 +232,9 @@ if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
 fi
 
 # --- the SDK host tools -----------------------------------------------------
-# TARGET_OS maps our PLATFORM to the AOSP Android.bp os axis (android | linux |
-# darwin | windows), so the module CMake files can do the same per-OS source/flag
-# selection the .bp files do. (bionic builds set CMAKE_SYSTEM_NAME=Linux, so this
-# is the only way CMake can tell android apart from a Linux host.)
+# TARGET_OS maps PLATFORM to the AOSP Android.bp os axis so module CMake files do
+# the same per-OS selection. (bionic sets CMAKE_SYSTEM_NAME=Linux, so this is the
+# only way CMake distinguishes android from a Linux host.)
 case "$PLATFORM" in
   bionic)  TARGET_OS=android ;;
   macos)   TARGET_OS=darwin ;;

@@ -1,13 +1,9 @@
-# Prebuilt build image for the android-sdk-custom builds. Bakes the build tools
-# and the zig / zig-as-llvm toolchain so CI only pulls (fast). zig drives the
-# linux musl/gnu and bsd host-tool cross builds.
+# Prebuilt build image for the android-sdk-custom builds: bakes the build tools
+# and toolchains so CI only pulls. All five platforms: linux/bsd (zig), bionic
+# (NDK clang, pulled at run time), windows (llvm-mingw), macos (osxcross).
 #
-# All five platforms are wired: linux (zig), bsd (zig), bionic (NDK clang,
-# pulled at run time), windows (llvm-mingw) and macos (osxcross) — laid out
-# like the sibling android-ndk-custom / llvm-custom images.
-#
-# The build scripts are NOT copied in — they are bind-mounted from the checkout
-# at run time, so editing scripts/ needs no image rebuild.
+# Build scripts are NOT copied in — they're bind-mounted from the checkout at run
+# time, so editing scripts/ needs no rebuild.
 #
 #   docker run --rm -v "$PWD:/work" -w /work \
 #     -e PLATFORM=linux -e TARGET=x86_64-linux-musl -e TAG=android-16.0.0_r4 \
@@ -21,16 +17,13 @@ ARG REPO_OWNER=HomuHomu833
 ARG MACOS_SDK_VERSION=15.5
 
 ENV DEBIAN_FRONTEND=noninteractive
-# - build-essential/clang/lld: host compiler used to build the native protoc
-#   that the cross build runs during code generation.
-# - go/bison/flex/m4: required by several AOSP sources (selinux, e2fsprogs,
-#   aidl, soong tooling).
-# - autoconf/automake/libtool/autoconf-archive/pkg-config: autotools deps for
-#   the bundled zlib/bzip2 + any source that regenerates configure.
-# - jq: scripts/fetch-source.sh reads repos.json with it.
-# - file/zip/unzip/xz-utils: SDK splice + archive steps.
-# - openjdk-21-jre-headless: sdkmanager (make-sdk.sh) needs a JRE to fetch the
-#   official build-tools/platform-tools that the built host tools are spliced into.
+# - build-essential/clang/lld: host compiler for the native protoc the cross
+#   build runs at codegen.
+# - go/bison/flex/m4: needed by selinux, e2fsprogs, aidl, soong tooling.
+# - autoconf/automake/libtool/autoconf-archive/pkg-config: autotools deps for the
+#   bundled zlib/bzip2 and sources that regenerate configure.
+# - jq: fetch-source.sh reads repos.json. file/zip/unzip/xz: splice + archive.
+# - openjdk-21-jre-headless: sdkmanager needs a JRE to fetch the official SDK.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates aria2 xz-utils unzip zip p7zip-full git make cmake ninja-build \
         build-essential clang lld file tree jq openjdk-21-jre-headless \
@@ -39,15 +32,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev libssl-dev libxml2-dev liblzma-dev libbz2-dev uuid-dev cpio bzip2 \
     && rm -rf /var/lib/apt/lists/*
 
-# fetch: download with retries (transient GitHub 501/504 etc.), no dependence on
-# aria2's --retry-on-unknown. build.sh defines an identical helper for standalone runs.
+# fetch: aria2c with retries (transient GitHub 5xx), no --retry-on-unknown
+# dependence. build.sh defines an identical helper for standalone runs.
 RUN printf '%s\n' '#!/bin/sh' \
     'i=0; until aria2c --console-log-level=error --check-certificate=false --max-tries=5 --retry-wait=2 --connect-timeout=15 "$@"; do' \
     '  i=$((i+1)); [ "$i" -ge 5 ] && { echo "fetch: giving up after $i attempts" >&2; exit 1; }' \
     '  echo "fetch: aria2c failed, retry $i/5 in 2s..." >&2; sleep 2' \
     'done' > /usr/local/bin/fetch && chmod +x /usr/local/bin/fetch
 
-# zig (provides the cross C/C++ toolchain for the linux musl/gnu and bsd targets)
+# zig: cross C/C++ toolchain for the linux musl/gnu and bsd targets.
 RUN arch="$(uname -m)"; \
     case "$arch" in \
         x86_64)        zig_arch="x86_64" ;; \
@@ -74,8 +67,8 @@ RUN arch="$(uname -m)"; \
         && chmod -R a+w /opt/zig/lib; \
     fi   # build.sh overlays patches/zig here at run time (non-root)
 
-# zig-as-llvm: thin cc/c++/ar/strip/... wrappers around zig, keyed off $ZIG_TARGET.
-# The wrappers `exec zig ...`, so zig must be on PATH (below) for the cross builds.
+# zig-as-llvm: thin cc/c++/ar/strip/... wrappers around zig (keyed off
+# $ZIG_TARGET); they `exec zig`, so zig must be on PATH (below).
 RUN if [ ! -f /opt/.no-zig ]; then \
         git clone --depth 1 "https://github.com/${REPO_OWNER}/zig-as-llvm" /opt/zig-as-llvm; \
     fi
@@ -83,8 +76,7 @@ RUN if [ ! -f /opt/.no-zig ]; then \
 # zig on PATH so the zig-as-llvm wrappers resolve it.
 ENV PATH="/opt/zig:${PATH}"
 
-# bionic targets: the official NDK (clang + sysroot) is downloaded by build.sh at
-#                 run time, so no image change is needed.
+# bionic: build.sh downloads the official NDK (clang + sysroot) at run time.
 
 # llvm-mingw (windows targets; only x86_64 / aarch64 linux hosts can run it)
 RUN arch="$(uname -m)"; \
@@ -97,13 +89,11 @@ RUN arch="$(uname -m)"; \
             && mv "/opt/llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-22.04-${arch}" /opt/llvm-mingw ;; \
         *) echo "WARNING: llvm-mingw does not support host arch '$arch'; Windows cross-builds will be unavailable" ;; \
     esac
-# llvm-mingw is intentionally NOT on PATH — build.sh calls it by absolute path, and
-# keeping its windows-targeting clang off PATH avoids it shadowing the host clang
-# used to build the native protoc.
+# Intentionally NOT on PATH — build.sh calls it by absolute path; keeping its
+# windows clang off PATH avoids shadowing the host clang used for native protoc.
 
-# osxcross -> /opt/osxcross: the macOS cross toolchain (cctools-port: ld64/ar/
-# ranlib/strip/lipo/... + clang wrappers) with the macOS SDK baked into
-# /opt/osxcross/SDK. zig segfaults building macOS binaries, so darwin uses osxcross.
+# osxcross: macOS cross toolchain (cctools-port + clang wrappers) with the macOS
+# SDK baked into /opt/osxcross/SDK; zig segfaults building Darwin binaries.
 ARG OSXCROSS_REF=master
 RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && git -C /tmp/osxcross checkout "$OSXCROSS_REF" \

@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# Clone the AOSP sources listed in repos.json, drop in the prebuilt patch files,
-# and rewrite the proto include paths — the sh port of the old get_source.py.
-# Then hand off to patch-source.sh for the in-place source fixups.
+# Clone the AOSP sources from repos.json, then hand off to patch-source.sh for the
+# in-place source fixups. Runs identically in CI and in `docker run`.
 #
 #   TAG       AOSP source tag/branch to clone (default: master)
 #   ROOTDIR   checkout root holding repos.json / patches/ (default: cwd)
 #   TARGET    target triple, forwarded to patch-source.sh (optional here)
-#
-# Runs identically in CI and in `docker run`.
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"

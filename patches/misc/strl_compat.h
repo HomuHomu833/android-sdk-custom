@@ -1,31 +1,25 @@
 /* strlcpy/strlcat compatibility shim.
  *
- * glibc only declares strlcpy()/strlcat() from 2.38; AOSP host code (e.g.
- * liblog's logd_reader.cpp) uses them unconditionally because bionic and musl
- * always provide them. Rather than bumping the targeted glibc version (which
- * would raise the runtime glibc requirement of the produced binaries), this
- * header is force-included (-include) on the gnu builds and supplies the BSD
- * functions only when the C library doesn't already declare them.
- *
- * Gated on __GLIBC__ + version, so on glibc >= 2.38 (and on musl/bionic, where
- * this header is not force-included anyway) it expands to nothing and the
- * libc's own strlcpy/strlcat are used.
- */
+ * glibc declares strlcpy/strlcat only from 2.38, but AOSP host code (e.g. liblog's
+ * logd_reader.cpp) uses them unconditionally (bionic/musl always provide them).
+ * Rather than raise the binaries' runtime glibc floor, force-include this on gnu
+ * builds to supply the BSD functions when the libc doesn't. Gated on __GLIBC__ +
+ * version, so on glibc >= 2.38 (and musl/bionic, where it isn't included) it's a
+ * no-op. */
 #ifndef ANDROID_SDK_STRL_COMPAT_H
 #define ANDROID_SDK_STRL_COMPAT_H
 
-/* This header is force-included (-include) before the translation unit's own
- * includes, so __GLIBC__/__GLIBC_PREREQ aren't defined yet -- they come from
- * <features.h>, which <string.h> pulls in. Include it first (it also declares
- * strlcpy/strlcat on glibc >= 2.38), then decide whether the shim is needed. */
+/* Force-included before the TU's own includes, so __GLIBC__/__GLIBC_PREREQ aren't
+ * set yet — they come from <features.h> via <string.h>. Include it first (it also
+ * declares strlcpy/strlcat on glibc >= 2.38), then decide if the shim is needed. */
 #include <string.h>
 
 #if defined(__GLIBC__) && (!defined(__GLIBC_PREREQ) || !__GLIBC_PREREQ(2, 38))
 
 #include <stddef.h>
 
-/* Don't duplicate definitions when compiling the implementation file
- * (strlcpy.c) itself; it defines strlcpy as a real (extern) function. */
+/* Skip when compiling the implementation file (strlcpy.c), which defines strlcpy
+ * as a real extern function. */
 #ifndef ANDROID_SDK_STRL_COMPAT_IMPLEMENTATION
 
 static inline __attribute__((__unused__))

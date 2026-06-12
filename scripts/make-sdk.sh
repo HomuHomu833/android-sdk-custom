@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Splice the freshly cross-built host tools into Google's official Android SDK
-# (build-tools + platform-tools) and archive the result — the sh port of the
-# "make" job in the old make_sdk.yml.
+# (build-tools + platform-tools) and archive the result.
 #
 #   TARGET               target triple (names the artifact, locates the binaries)
-#   BUILT_BIN            dir holding the built host tools (default: $OUT/bin-$TARGET)
+#   BUILT_BIN            dir of built host tools (default: $OUT/bin-$TARGET)
 #   BUILD_TOOLS_VERSION  sdkmanager build-tools package (default: 36.1.0)
 #   CMDLINE_TOOLS_URL    commandline-tools zip (default: linux 13114758)
 #   ROOTDIR              work dir (default: cwd)
@@ -23,9 +22,8 @@ cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
-# Download with retries: re-run aria2c on any failure so transient GitHub 501/504
-# (and the like) recover. Doesn't rely on aria2's --retry-on-unknown, which older
-# aria2 builds don't have. Pass aria2c args, e.g. fetch --dir=. -o f.zip URL.
+# Re-run aria2c on any failure so transient GitHub 5xx recover (older aria2 lacks
+# --retry-on-unknown). Args pass through, e.g. fetch --dir=. -o f.zip URL.
 fetch() {
   local i=0
   until aria2c --console-log-level=error --check-certificate=false \
@@ -38,11 +36,9 @@ fetch() {
 [ -d "$BUILT_BIN" ] || { echo "built binaries not found at $BUILT_BIN" >&2; exit 1; }
 
 # REPO_OS_OVERRIDE makes sdkmanager fetch a specific OS's packages regardless of
-# the (Linux) build host, so each platform gets the matching official SDK to
-# splice into — windows .exe + .bat launchers, macOS Mach-O, etc. bionic splices
-# its android ELF binaries into the linux SDK (the Java/shell tooling runs on
-# device via Termux's JRE). BSD also uses the Linux SDK as the base (ELF format,
-# Java launcher scripts), since no BSD-specific SDK is published.
+# the Linux build host, so each platform gets the matching SDK to splice into
+# (windows .exe/.bat, macOS Mach-O). bionic and BSD reuse the Linux SDK (ELF +
+# Java launchers); no BSD SDK is published, and bionic runs on-device via Termux JRE.
 case "$PLATFORM" in
   windows) REPO_OS_OVERRIDE=windows ;;
   macos)   REPO_OS_OVERRIDE=macosx ;;
@@ -58,9 +54,8 @@ rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
   fetch --dir=. -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
   unzip -q commandlinetools.zip
   rm commandlinetools.zip
-  # Feed a bounded stream of "y" rather than `yes`: under `set -o pipefail`, the
-  # infinite `yes` gets SIGPIPE (exit 141) when sdkmanager closes stdin after the
-  # last prompt, which would abort the script even though licenses were accepted.
+  # Feed a bounded "y" stream, not `yes`: under pipefail the infinite `yes` takes
+  # SIGPIPE (141) when sdkmanager closes stdin, aborting the script post-accept.
   printf 'y\n%.0s' {1..100} | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
   cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;$BUILD_TOOLS_VERSION" "platform-tools" )
 
@@ -85,17 +80,16 @@ rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
 rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscript*
 
 # --- drop now-useless DLLs (windows base) -----------------------------------
-# - AdbWinApi/AdbWinUsbApi: only the official adb/fastboot used them; ours use libusb.
-# - libwinpthread-1: our windows tools are statically linked, so it's unused.
-# - libbcc/libbcinfo/libclang_android/libLLVM_android: RenderScript libs, dead now
-#   that its tools (pruned above) are gone.
+# Ours don't need them: AdbWin*Api (ours use libusb), libwinpthread-1 (we link
+# static), and the RenderScript libs (libbcc/libbcinfo/libclang_android/
+# libLLVM_android) whose tools were pruned above.
 rm -f "$HOST_SDK/platform-tools/AdbWinApi.dll" "$HOST_SDK/platform-tools/AdbWinUsbApi.dll"
 rm -f "$BT/libbcc.dll" "$BT/libbcinfo.dll" "$BT/libclang_android.dll" "$BT/libLLVM_android.dll"
 find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true
 
 # --- convert the bash launcher scripts to POSIX sh --------------------------
-# Unix-host SDKs (linux/macosx, and the linux base used for bionic) ship bash
-# launchers; windows ships .bat instead, so skip the conversion there.
+# Unix-host SDKs (linux/macosx, and the linux base for bionic) ship bash
+# launchers; windows ships .bat, so skip there.
 if [ "$PLATFORM" != windows ]; then
   sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
          -e 's/^declare -a javaOpts=()/javaOpts=""/' \
