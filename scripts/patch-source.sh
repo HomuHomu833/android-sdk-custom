@@ -644,9 +644,10 @@ else:
 PYEOF
 
 # boringssl cpu_aarch64_openbsd.cc: provides OPENSSL_cpuid_setup only for
-# OpenBSD.  NetBSD and FreeBSD aarch64 targets have no matching cpu detection
-# file, leaving OPENSSL_cpuid_setup undefined at link time.  Append a stub
-# that satisfies the linker (crypto falls back to portable C implementations).
+# OpenBSD (via sysctl + AA64ISAR0).  FreeBSD and NetBSD aarch64 have no
+# matching cpu detection file; append a real implementation using elf_aux_info
+# (the same ELF auxiliary-vector mechanism used by cpu_aarch64_linux.cc and
+# cpu_arm_freebsd.cc).  Both OSes expose elf_aux_info via <sys/auxv.h>.
 python3 << 'PYEOF'
 import sys
 
@@ -654,35 +655,76 @@ path = 'src/boringssl/src/crypto/cpu_aarch64_openbsd.cc'
 with open(path, 'r') as f:
     content = f.read()
 
-marker = '// NetBSD/FreeBSD aarch64 cpuid stub'
+marker = '// NetBSD/FreeBSD aarch64 cpuid'
 if marker in content:
-    print('cpu_aarch64_openbsd.cc BSD stub: already applied')
+    print('cpu_aarch64_openbsd.cc BSD cpuid: already applied')
 else:
     stub = r"""
-// NetBSD/FreeBSD aarch64 cpuid stub
-// Cross-compilation sysroots for NetBSD and FreeBSD lack the mechanism used by
-// cpu_aarch64_linux.cc / cpu_aarch64_openbsd.cc to detect hardware crypto
-// extensions.  Provide a minimal definition so the link succeeds; OPENSSL_armcap_P
-// stays at its zero default (all operations use the portable C fallbacks).
-// extern "C" is required: this .cc file is compiled as C++ but OPENSSL_cpuid_setup
-// is declared with C linkage in internal.h; without it the linker sees a mangled
-// C++ symbol instead of the expected unmangled C symbol.
+// NetBSD/FreeBSD aarch64 CPU feature detection via elf_aux_info.
+// Both OSes expose the ELF auxiliary vector through elf_aux_info() in
+// <sys/auxv.h>, the same mechanism cpu_arm_freebsd.cc uses for ARM32.
+// Read AT_HWCAP and map bits to OPENSSL_armcap_P so BoringSSL can use
+// AES-NI, SHA, PMULL, and other hardware-accelerated crypto extensions.
+// extern "C": this .cc file is C++; OPENSSL_cpuid_setup has C linkage.
 #if defined(OPENSSL_AARCH64) && !defined(OPENSSL_OPENBSD) && \
     (defined(__NetBSD__) || defined(__FreeBSD__)) && \
     !defined(OPENSSL_STATIC_ARMCAP) && !defined(OPENSSL_NO_ASM)
-extern "C" void OPENSSL_cpuid_setup(void) {}
-#endif  // NetBSD/FreeBSD aarch64 cpuid stub
+#include <sys/auxv.h>
+
+// AArch64 AT_HWCAP bits (ARM Architecture Reference Manual §D17.2).
+// Standard values across Linux/FreeBSD/NetBSD; defined locally as a
+// fallback in case <sys/auxv.h> omits the named constants.
+#ifndef AT_HWCAP
+# define AT_HWCAP  16
+#endif
+#ifndef HWCAP_ASIMD
+# define HWCAP_ASIMD  (1UL << 1)
+#endif
+#ifndef HWCAP_AES
+# define HWCAP_AES    (1UL << 3)
+#endif
+#ifndef HWCAP_PMULL
+# define HWCAP_PMULL  (1UL << 4)
+#endif
+#ifndef HWCAP_SHA1
+# define HWCAP_SHA1   (1UL << 5)
+#endif
+#ifndef HWCAP_SHA2
+# define HWCAP_SHA2   (1UL << 6)
+#endif
+#ifndef HWCAP_SHA512
+# define HWCAP_SHA512 (1UL << 21)
+#endif
+
+extern "C" void OPENSSL_cpuid_setup(void) {
+    unsigned long hwcap = 0;
+    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+
+    // Only report extensions when NEON (ASIMD) is present, matching the
+    // behaviour of cpu_aarch64_linux.cc and cpu_aarch64_openbsd.cc.
+    if (!(hwcap & HWCAP_ASIMD)) {
+        return;
+    }
+    OPENSSL_armcap_P |= ARMV7_NEON;
+
+    if (hwcap & HWCAP_AES)    OPENSSL_armcap_P |= ARMV8_AES;
+    if (hwcap & HWCAP_PMULL)  OPENSSL_armcap_P |= ARMV8_PMULL;
+    if (hwcap & HWCAP_SHA1)   OPENSSL_armcap_P |= ARMV8_SHA1;
+    if (hwcap & HWCAP_SHA2)   OPENSSL_armcap_P |= ARMV8_SHA256;
+    if (hwcap & HWCAP_SHA512) OPENSSL_armcap_P |= ARMV8_SHA512;
+}
+#endif  // NetBSD/FreeBSD aarch64 cpuid
 """
     content += stub
     with open(path, 'w') as f:
         f.write(content)
-    print('cpu_aarch64_openbsd.cc BSD stub appended')
+    print('cpu_aarch64_openbsd.cc BSD cpuid appended')
 PYEOF
 
-# boringssl cpu_arm_freebsd.cc: provides OPENSSL_cpuid_setup only for FreeBSD
-# 32-bit ARM.  NetBSD and OpenBSD 32-bit ARM targets (armeb/armel) have no
-# matching file, leaving OPENSSL_cpuid_setup undefined at link time.  Append a
-# no-op stub; OPENSSL_armcap_P stays zero (portable C fallbacks used).
+# boringssl cpu_arm_freebsd.cc: provides OPENSSL_cpuid_setup for FreeBSD ARM32
+# via elf_aux_info.  NetBSD and OpenBSD ARM32 have no matching file; append a
+# real implementation using the same elf_aux_info mechanism — both OSes expose
+# AT_HWCAP and AT_HWCAP2 via <sys/auxv.h>.
 python3 << 'PYEOF'
 import sys
 
@@ -690,26 +732,72 @@ path = 'src/boringssl/src/crypto/cpu_arm_freebsd.cc'
 with open(path, 'r') as f:
     content = f.read()
 
-marker = '// NetBSD/OpenBSD ARM cpuid stub'
+marker = '// NetBSD/OpenBSD ARM 32-bit cpuid'
 if marker in content:
-    print('cpu_arm_freebsd.cc BSD stub: already applied')
+    print('cpu_arm_freebsd.cc BSD cpuid: already applied')
 else:
     stub = r"""
-// NetBSD/OpenBSD ARM cpuid stub
-// cpu_arm_freebsd.cc covers FreeBSD 32-bit ARM; NetBSD and OpenBSD have no
-// matching file.  Provide a no-op stub so the link succeeds; OPENSSL_armcap_P
-// stays at zero (all operations use the portable C fallbacks).
+// NetBSD/OpenBSD ARM 32-bit CPU feature detection via elf_aux_info.
+// cpu_arm_freebsd.cc already provides OPENSSL_cpuid_setup for FreeBSD ARM32
+// using elf_aux_info(AT_HWCAP, ...) / elf_aux_info(AT_HWCAP2, ...).
+// NetBSD and OpenBSD both expose the same interface.  Mirror the FreeBSD
+// implementation so hardware AES/SHA/PMULL are used when available.
 // extern "C": this .cc file is C++; OPENSSL_cpuid_setup has C linkage.
 #if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_ARM) && \
     !defined(OPENSSL_FREEBSD) && !defined(OPENSSL_STATIC_ARMCAP) && \
     (defined(__NetBSD__) || defined(__OpenBSD__))
-extern "C" void OPENSSL_cpuid_setup(void) {}
-#endif  // NetBSD/OpenBSD ARM cpuid stub
+#include <sys/auxv.h>
+#include <openssl/arm_arch.h>
+
+// ARM 32-bit HWCAP bits (ARM ACLE standard, same across Linux/FreeBSD/NetBSD/OpenBSD).
+// AT_HWCAP and AT_HWCAP2 numeric values from the ELF standard for ARM.
+#ifndef AT_HWCAP
+# define AT_HWCAP   16
+#endif
+#ifndef AT_HWCAP2
+# define AT_HWCAP2  26
+#endif
+#ifndef HWCAP_NEON
+# define HWCAP_NEON   (1UL << 12)
+#endif
+#ifndef HWCAP2_AES
+# define HWCAP2_AES   (1UL << 0)
+#endif
+#ifndef HWCAP2_PMULL
+# define HWCAP2_PMULL (1UL << 1)
+#endif
+#ifndef HWCAP2_SHA1
+# define HWCAP2_SHA1  (1UL << 2)
+#endif
+#ifndef HWCAP2_SHA2
+# define HWCAP2_SHA2  (1UL << 3)
+#endif
+
+extern "C" void OPENSSL_cpuid_setup(void) {
+    unsigned long hwcap = 0, hwcap2 = 0;
+    // elf_aux_info() returns non-zero on failure; on older kernels that lack
+    // the feature bits the values stay at zero and we report no capabilities.
+    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+    elf_aux_info(AT_HWCAP2, &hwcap2, sizeof(hwcap2));
+
+    // Only report crypto extensions when NEON is present, matching the
+    // behaviour of cpu_arm_freebsd.cc and cpu_arm_linux.cc.
+    if (!(hwcap & HWCAP_NEON)) {
+        return;
+    }
+    OPENSSL_armcap_P |= ARMV7_NEON;
+
+    if (hwcap2 & HWCAP2_AES)   OPENSSL_armcap_P |= ARMV8_AES;
+    if (hwcap2 & HWCAP2_PMULL) OPENSSL_armcap_P |= ARMV8_PMULL;
+    if (hwcap2 & HWCAP2_SHA1)  OPENSSL_armcap_P |= ARMV8_SHA1;
+    if (hwcap2 & HWCAP2_SHA2)  OPENSSL_armcap_P |= ARMV8_SHA256;
+}
+#endif  // NetBSD/OpenBSD ARM 32-bit cpuid
 """
     content += stub
     with open(path, 'w') as f:
         f.write(content)
-    print('cpu_arm_freebsd.cc BSD stub appended')
+    print('cpu_arm_freebsd.cc BSD cpuid appended')
 PYEOF
 
 log "Source fixups applied"
