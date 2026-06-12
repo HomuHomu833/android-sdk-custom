@@ -106,4 +106,17 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && cd / \
     && rm -rf /tmp/osxcross
 
+# Rust (termux-adb only): builds the libtermuxadb.a USB shim for the bionic
+# adb/fastboot. It's a crate-type=staticlib with libusb1-sys's link feature off,
+# so no C cross-compile or NDK linker is needed — just std for the android targets.
+# Installed read-only under /opt/rust (the build runs non-root); build.sh points
+# CARGO_HOME at a writable dir for the per-build crate cache.
+ARG RUST_VERSION=1.84.0
+ENV RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+        sh -s -- -y --no-modify-path --profile minimal --default-toolchain "${RUST_VERSION}" \
+            --target aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android \
+    && chmod -R a+rX /opt/rust
+ENV PATH="/opt/rust/cargo/bin:${PATH}"
+
 WORKDIR /work

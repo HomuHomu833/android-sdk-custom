@@ -722,4 +722,147 @@ void OPENSSL_cpuid_setup(void) {}
     print('cpu_arm_freebsd.cc BSD cpuid appended')
 PYEOF
 
+# --- termux-adb USB shims (opt-in: TERMUX_ADB=1, android targets only) -------
+# Route adb/fastboot USB enumeration through libtermuxadb so they run in Termux
+# without root (FDs come from the termux-usb command, not /dev/bus/usb). Headers
+# land next to the source; build.sh builds libtermuxadb.a and the cmake files
+# link it. See patches/termux/.
+case "$TARGET" in *-android|*-androideabi) TERMUX_OK=1 ;; *) TERMUX_OK=0 ;; esac
+if [ -n "${TERMUX_ADB:-}" ] && [ "${TERMUX_ADB}" != "0" ] && [ "$TERMUX_OK" = 1 ]; then
+  log "Applying termux-adb USB shims"
+  cp "$ROOTDIR/patches/termux/termux_adb.h"      "${PWD_SRC}/src/adb/client/termux_adb.h"
+  cp "$ROOTDIR/patches/termux/termux_fastboot.h" "${PWD_SRC}/src/core/fastboot/termux_adb.h"
+
+  # adb client/usb_linux.cpp: the /dev/bus/usb walk -> termuxadb:: shims.
+  af="${PWD_SRC}/src/adb/client/usb_linux.cpp"
+  sed -i '/#include "sysdeps.h"/i #include "termux_adb.h"' "$af"
+  sed -i \
+    -e 's/opendir(base.c_str()), closedir/termuxadb::opendir(base.c_str()), termuxadb::closedir/' \
+    -e 's/opendir(bus_name.c_str()), closedir/termuxadb::opendir(bus_name.c_str()), termuxadb::closedir/' \
+    -e 's/readdir(bus_dir.get())/termuxadb::readdir(bus_dir.get())/' \
+    -e 's/readdir(dev_dir.get())/termuxadb::readdir(dev_dir.get())/' \
+    -e 's/unix_open(dev_name,/termuxadb::unix_open(dev_name,/' \
+    -e 's/unix_open(usb->path,/termuxadb::unix_open(usb->path,/' \
+    -e 's/\bunix_close(fd)/termuxadb::unix_close(fd)/g' \
+    -e 's/android::base::ReadFileToString(serial_path, &serial)/termuxadb::ReadFileToString(serial_path, \&serial)/' \
+    "$af"
+
+  # adb client/main.cpp: start the termux scanner (daemon path); the sendfd helper
+  # mode lets termux-usb hand a device FD back to the parent and exit.
+  am="${PWD_SRC}/src/adb/client/main.cpp"
+  sed -i '/#include "commandline.h"/a #include "termux_adb.h"' "$am"
+  sed -i '/setup_daemon_logging();/a\        termuxadb::start();' "$am"
+  sed -i '/return adb_commandline/i\    if (termuxadb::sendfd()) { return 0; }' "$am"
+
+  # fastboot main.cpp + fastboot.cpp: sendfd helper mode + scanner start.
+  fm="${PWD_SRC}/src/core/fastboot/main.cpp"
+  sed -i '/#include "fastboot.h"/a #include "termux_adb.h"' "$fm"
+  sed -i '/int main(int argc, char\* argv\[\]) {/a\    if (termuxadb::sendfd()) { return 0; }' "$fm"
+  ff="${PWD_SRC}/src/core/fastboot/fastboot.cpp"
+  sed -i '/#include "fastboot.h"/a #include "termux_adb.h"' "$ff"
+  sed -i '/int FastBootTool::Main(int argc, char\* argv\[\]) {/a\    termuxadb::start();' "$ff"
+
+  # fastboot usb_linux.cpp: 36.x enumerates via sysfs (no good under Termux), so
+  # rewrite find_usb_device to the /dev/bus/usb walk through termuxadb:: (keeping
+  # 36.x's claim/altsetting logic) and point the caller at /dev/bus/usb.
+  sed -i '/#include "usb.h"/a #include "termux_adb.h"' "${PWD_SRC}/src/core/fastboot/usb_linux.cpp"
+  TERMUX_FB="${PWD_SRC}/src/core/fastboot/usb_linux.cpp" python3 << 'PYEOF'
+import os, sys
+path = os.environ['TERMUX_FB']
+with open(path) as f: content = f.read()
+
+sig = 'static std::unique_ptr<usb_handle> find_usb_device(const char* base, ifc_match_func callback)'
+start = content.find(sig)
+if start == -1:
+    print('termux fastboot: find_usb_device not found, skipping', file=sys.stderr); sys.exit(1)
+i = content.find('{', start); depth = 0; j = i
+while j < len(content):
+    if content[j] == '{': depth += 1
+    elif content[j] == '}':
+        depth -= 1
+        if depth == 0: j += 1; break
+    j += 1
+
+new_func = '''static std::unique_ptr<usb_handle> find_usb_device(const char* base, ifc_match_func callback)
+{
+    std::unique_ptr<usb_handle> usb;
+    char desc[1024];
+    int n, in, out, ifc, cfg, alt_ifc;
+    struct dirent* de;
+    int fd;
+    int writable;
+
+    // termux-adb: walk /dev/bus/usb/<bus>/<dev> via the termux-usb shims instead
+    // of scanning sysfs (Termux can't enumerate /sys without root).
+    std::unique_ptr<DIR, int(*)(DIR*)> busdir(termuxadb::opendir(base), termuxadb::closedir);
+    if (busdir == nullptr) return usb;
+
+    while ((de = termuxadb::readdir(busdir.get())) && (usb == nullptr)) {
+        if (badname(de->d_name)) continue;
+
+        std::string bus_name = std::string(base) + "/" + de->d_name;
+        std::unique_ptr<DIR, int(*)(DIR*)> devdir(termuxadb::opendir(bus_name.c_str()), termuxadb::closedir);
+        if (devdir == nullptr) continue;
+
+        struct dirent* de2;
+        while ((de2 = termuxadb::readdir(devdir.get())) && (usb == nullptr)) {
+            if (badname(de2->d_name)) continue;
+
+            std::string dev_name = bus_name + "/" + de2->d_name;
+
+            writable = 1;
+            if ((fd = termuxadb::open(dev_name.c_str(), O_RDWR)) < 0) {
+                writable = 0;
+                if ((fd = termuxadb::open(dev_name.c_str(), O_RDONLY)) < 0) {
+                    continue;
+                }
+            }
+
+            n = read(fd, desc, sizeof(desc));
+
+            if (filter_usb_device(de2->d_name, desc, n, writable, callback,
+                                  &in, &out, &ifc, &cfg, &alt_ifc) == 0) {
+                usb.reset(new usb_handle());
+                strcpy(usb->fname, dev_name.c_str());
+                usb->ep_in = in;
+                usb->ep_out = out;
+                usb->desc = fd;
+
+                n = ioctl(fd, USBDEVFS_CLAIMINTERFACE, &ifc);
+                if (n != 0) {
+                    termuxadb::close(fd);
+                    usb.reset();
+                    continue;
+                }
+                // Skip the sysfs bConfigurationValue recheck: de2->d_name is the
+                // /dev devnum here, not a sysfs node.
+                if (alt_ifc != 0) {
+                    struct usbdevfs_setinterface set_ifc = {
+                        .interface = (unsigned int)ifc,
+                        .altsetting = (unsigned int)alt_ifc,
+                    };
+                    n = ioctl(fd, USBDEVFS_SETINTERFACE, &set_ifc);
+                    if (n != 0) {
+                        termuxadb::close(fd);
+                        usb.reset();
+                        continue;
+                    }
+                }
+            } else {
+                termuxadb::close(fd);
+            }
+        }
+    }
+
+    return usb;
+}'''
+
+content = content[:start] + new_func + content[j:]
+content = content.replace('find_usb_device("/sys/bus/usb/devices", callback)',
+                          'find_usb_device("/dev/bus/usb", callback)')
+with open(path, 'w') as f: f.write(content)
+print('termux fastboot: find_usb_device rewritten')
+PYEOF
+fi
+
 log "Source fixups applied"

@@ -359,6 +359,14 @@ if(PLATFORM_LINUX_KERNEL)
     target_link_libraries(adb libpackagelistparser)
 endif()
 
+# termux-adb (bionic only, set by build.sh): libadb's usb_linux.cpp calls the
+# termuxadb_* shims in libtermuxadb.a, which in turn references libusb_*. Group
+# the two so the mutual references resolve regardless of link order. (The
+# termux_adb.h header is dropped next to the source by patch-source.sh.)
+if(TERMUX_ADB)
+    target_link_libraries(adb -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
+endif()
+
 if(PLATFORM_DARWIN)
     target_link_libraries(adb "-framework CoreFoundation" "-framework IOKit" "-framework Security")
 elseif(PLATFORM_WINDOWS)

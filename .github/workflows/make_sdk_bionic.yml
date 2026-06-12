@@ -19,6 +19,11 @@ on:
         description: "Official NDK revision letter (optional)"
         required: false
         default: "c"
+      termux_adb:
+        description: "Patch adb/fastboot for Termux (rootless USB via termux-usb)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -34,5 +39,6 @@ jobs:
       tag: ${{ inputs.tag }}
       ndk_version: ${{ inputs.ndk_version }}
       ndk_revision: ${{ inputs.ndk_revision }}
+      termux_adb: ${{ inputs.termux_adb }}
       # riscv64-linux-android
       targets: '["aarch64-linux-android", "armv7a-linux-androideabi", "i686-linux-android", "x86_64-linux-android"]'

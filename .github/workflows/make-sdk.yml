@@ -33,6 +33,11 @@ on:
         required: false
         type: string
         default: ""
+      termux_adb:
+        description: "Patch adb/fastboot for Termux rootless USB (bionic only)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -95,6 +100,7 @@ jobs:
             -e BUILD_TOOLS_VERSION='${{ inputs.build_tools_version }}' \
             -e NDK_VERSION='${{ inputs.ndk_version }}' \
             -e NDK_REVISION='${{ inputs.ndk_revision }}' \
+            -e TERMUX_ADB=${{ inputs.termux_adb && '1' || '' }} \
             -e ROOTDIR=/work \
             "$IMAGE" \
             bash -c 'scripts/fetch-source.sh && scripts/build.sh && scripts/make-sdk.sh'
