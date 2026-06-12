@@ -47,8 +47,9 @@ namespace termuxadb {
         return TEMP_FAILURE_RETRY(termuxadb_create(zero_terminated.c_str(), options, mode));
     }
 
+    // Only adb_close is defined: adb's sysdeps.h has `#define unix_close adb_close`,
+    // so the termuxadb::unix_close(fd) call sites resolve here via that macro.
     static inline int adb_close(int fd) { return termuxadb_close(fd); }
-    static inline int unix_close(int fd) { return termuxadb_close(fd); }
     static inline bool sendfd() { return termuxadb_sendfd(); }
     static inline void start() { termuxadb_start(); }
 
