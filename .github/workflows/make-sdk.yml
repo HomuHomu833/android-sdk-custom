@@ -33,11 +33,6 @@ on:
         required: false
         type: string
         default: ""
-      libusb_termux_impl:
-        description: "Patch adb/fastboot for Termux rootless USB (bionic only)"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -100,7 +95,6 @@ jobs:
             -e BUILD_TOOLS_VERSION='${{ inputs.build_tools_version }}' \
             -e NDK_VERSION='${{ inputs.ndk_version }}' \
             -e NDK_REVISION='${{ inputs.ndk_revision }}' \
-            -e LIBUSB_TERMUX_IMPL=${{ inputs.libusb_termux_impl && '1' || '' }} \
             -e ROOTDIR=/work \
             "$IMAGE" \
             bash -c 'scripts/fetch-source.sh && scripts/build.sh && scripts/make-sdk.sh'

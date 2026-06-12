@@ -124,10 +124,11 @@ elseif(PLATFORM_BSD)
     target_link_libraries(fastboot libusb)
 endif()
 
-# termux-adb (bionic only, set by build.sh): usb_linux.cpp calls the termuxadb_*
+# termux-usb shim (bionic, set by build.sh): usb_linux.cpp calls the termuxadb_*
 # shims in libtermuxadb.a, which references libusb_* (the bionic fastboot doesn't
 # otherwise link libusb, so pull it in too). Group them for order-independent
-# resolution. termux_adb.h is dropped next to the source by patch-source.sh.
-if(LIBUSB_TERMUX_IMPL)
+# resolution. Inert at runtime unless LIBUSB_TERMUX_IMPL=1; header dropped next to
+# the source by patch-source.sh.
+if(TERMUX_USB_SHIM)
     target_link_libraries(fastboot -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
 endif()

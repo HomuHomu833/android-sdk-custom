@@ -1,11 +1,16 @@
 // termux-fastboot USB shim (bionic only) — namespace wrapper over libtermuxadb's
-// C API. Sourced from nohajc/vendor-adb-patched@35.0.2 (fastboot variant: plain
-// open/close, fastboot_start). Ported for 36.x core/fastboot.
+// C API (fastboot variant: plain open/close, fastboot_start). Ported for 36.x.
+//
+// Runtime-gated on LIBUSB_TERMUX_IMPL (off by default): start()/sendfd() are
+// no-ops and the wrappers fall back to libc when unset, so stock fastboot is
+// unchanged. usb_linux.cpp dispatches to the termux /dev/bus/usb walk only when
+// enabled() (otherwise it keeps 36.x's sysfs scan).
 #pragma once
 
 #include <dirent.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <string>
@@ -24,41 +29,51 @@ extern "C" {
 }
 
 namespace termuxadb {
+    static inline bool enabled() {
+        static int e = -1;
+        if (e < 0) {
+            const char *v = ::getenv("LIBUSB_TERMUX_IMPL");
+            e = (v && v[0] && !(v[0] == '0' && v[1] == '\0')) ? 1 : 0;
+        }
+        return e == 1;
+    }
+
     static inline DIR *opendir(const char *name) {
-        return termuxadb_opendir(name);
+        return enabled() ? termuxadb_opendir(name) : ::opendir(name);
     }
 
     static inline int closedir(DIR *dirp) {
-        return termuxadb_closedir(dirp);
+        return enabled() ? termuxadb_closedir(dirp) : ::closedir(dirp);
     }
 
     static inline struct dirent *readdir(DIR *dirp) {
-        return termuxadb_readdir(dirp);
+        return enabled() ? termuxadb_readdir(dirp) : ::readdir(dirp);
     }
 
     static inline int open(std::string_view path, int options, ...) {
-        std::string zero_terminated(path.begin(), path.end());
+        std::string p(path.begin(), path.end());
         if ((options & O_CREAT) == 0) {
-            return TEMP_FAILURE_RETRY(termuxadb_open(zero_terminated.c_str(), options));
-        } else {
-            int mode;
-            va_list args;
-            va_start(args, options);
-            mode = va_arg(args, int);
-            va_end(args);
-            return TEMP_FAILURE_RETRY(termuxadb_create(zero_terminated.c_str(), options, mode));
+            return TEMP_FAILURE_RETRY(enabled() ? termuxadb_open(p.c_str(), options)
+                                                : ::open(p.c_str(), options));
         }
+        int mode;
+        va_list args;
+        va_start(args, options);
+        mode = va_arg(args, int);
+        va_end(args);
+        return TEMP_FAILURE_RETRY(enabled() ? termuxadb_create(p.c_str(), options, mode)
+                                            : ::open(p.c_str(), options, mode));
     }
 
     static inline int close(int fd) {
-        return termuxadb_close(fd);
+        return enabled() ? termuxadb_close(fd) : ::close(fd);
     }
 
     static inline bool sendfd() {
-        return termuxadb_sendfd();
+        return enabled() ? termuxadb_sendfd() : false;
     }
 
     static inline void start() {
-        fastboot_start();
+        if (enabled()) fastboot_start();
     }
 }

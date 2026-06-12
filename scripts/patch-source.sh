@@ -722,14 +722,15 @@ void OPENSSL_cpuid_setup(void) {}
     print('cpu_arm_freebsd.cc BSD cpuid appended')
 PYEOF
 
-# --- termux-adb USB shims (opt-in: LIBUSB_TERMUX_IMPL=1, android targets only) -------
-# Route adb/fastboot USB enumeration through libtermuxadb so they run in Termux
-# without root (FDs come from the termux-usb command, not /dev/bus/usb). Headers
-# land next to the source; build.sh builds libtermuxadb.a and the cmake files
-# link it. See patches/termux/.
+# --- termux-usb shims (android targets; runtime-gated by LIBUSB_TERMUX_IMPL) --
+# Route adb/fastboot USB enumeration through libtermuxadb so non-rooted Termux
+# users can get device FDs from the termux-usb command (FDs over a Unix socket,
+# not /dev/bus/usb). Always applied to the android build; the termuxadb:: wrappers
+# fall back to libc unless LIBUSB_TERMUX_IMPL=1 at runtime. build.sh builds
+# libtermuxadb.a and the cmake files link it. See patches/termux/.
 case "$TARGET" in *-android|*-androideabi) TERMUX_OK=1 ;; *) TERMUX_OK=0 ;; esac
-if [ -n "${LIBUSB_TERMUX_IMPL:-}" ] && [ "${LIBUSB_TERMUX_IMPL}" != "0" ] && [ "$TERMUX_OK" = 1 ]; then
-  log "Applying termux-adb USB shims"
+if [ "$TERMUX_OK" = 1 ]; then
+  log "Applying termux-usb shims"
   cp "$ROOTDIR/patches/termux/termux_adb.h"      "${PWD_SRC}/src/adb/client/termux_adb.h"
   cp "$ROOTDIR/patches/termux/termux_fastboot.h" "${PWD_SRC}/src/core/fastboot/termux_adb.h"
 
@@ -762,28 +763,24 @@ if [ -n "${LIBUSB_TERMUX_IMPL:-}" ] && [ "${LIBUSB_TERMUX_IMPL}" != "0" ] && [ "
   sed -i '/#include "fastboot.h"/a #include "termux_adb.h"' "$ff"
   sed -i '/int FastBootTool::Main(int argc, char\* argv\[\]) {/a\    termuxadb::start();' "$ff"
 
-  # fastboot usb_linux.cpp: 36.x enumerates via sysfs (no good under Termux), so
-  # rewrite find_usb_device to the /dev/bus/usb walk through termuxadb:: (keeping
-  # 36.x's claim/altsetting logic) and point the caller at /dev/bus/usb.
+  # fastboot usb_linux.cpp: 36.x enumerates via sysfs (no good under Termux). Add
+  # a find_usb_device_termux that walks /dev/bus/usb through termuxadb:: (keeping
+  # 36.x's claim/altsetting logic); dispatch to it only when enabled() — the
+  # original sysfs find_usb_device stays for the default (off) path.
   sed -i '/#include "usb.h"/a #include "termux_adb.h"' "${PWD_SRC}/src/core/fastboot/usb_linux.cpp"
   TERMUX_FB="${PWD_SRC}/src/core/fastboot/usb_linux.cpp" python3 << 'PYEOF'
 import os, sys
 path = os.environ['TERMUX_FB']
 with open(path) as f: content = f.read()
 
+if 'find_usb_device_termux' in content:
+    print('termux fastboot: already applied'); sys.exit(0)
 sig = 'static std::unique_ptr<usb_handle> find_usb_device(const char* base, ifc_match_func callback)'
 start = content.find(sig)
 if start == -1:
     print('termux fastboot: find_usb_device not found, skipping', file=sys.stderr); sys.exit(1)
-i = content.find('{', start); depth = 0; j = i
-while j < len(content):
-    if content[j] == '{': depth += 1
-    elif content[j] == '}':
-        depth -= 1
-        if depth == 0: j += 1; break
-    j += 1
 
-new_func = '''static std::unique_ptr<usb_handle> find_usb_device(const char* base, ifc_match_func callback)
+termux_func = '''static std::unique_ptr<usb_handle> find_usb_device_termux(const char* base, ifc_match_func callback)
 {
     std::unique_ptr<usb_handle> usb;
     char desc[1024];
@@ -857,11 +854,14 @@ new_func = '''static std::unique_ptr<usb_handle> find_usb_device(const char* bas
     return usb;
 }'''
 
-content = content[:start] + new_func + content[j:]
-content = content.replace('find_usb_device("/sys/bus/usb/devices", callback)',
-                          'find_usb_device("/dev/bus/usb", callback)')
+content = content[:start] + termux_func + '\n\n' + content[start:]
+content = content.replace(
+    'find_usb_device("/sys/bus/usb/devices", callback)',
+    'termuxadb::enabled()\n        ? find_usb_device_termux("/dev/bus/usb", callback)\n'
+    '        : find_usb_device("/sys/bus/usb/devices", callback)',
+    1)
 with open(path, 'w') as f: f.write(content)
-print('termux fastboot: find_usb_device rewritten')
+print('termux fastboot: find_usb_device_termux added + dispatch')
 PYEOF
 fi
 
