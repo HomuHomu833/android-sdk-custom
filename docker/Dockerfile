@@ -113,9 +113,10 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
 # CARGO_HOME at a writable dir for the per-build crate cache.
 ARG RUST_VERSION=1.84.0
 ENV RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-        sh -s -- -y --no-modify-path --profile minimal --default-toolchain "${RUST_VERSION}" \
+RUN fetch --dir=/tmp -o rustup-init.sh https://sh.rustup.rs \
+    && sh /tmp/rustup-init.sh -y --no-modify-path --profile minimal --default-toolchain "${RUST_VERSION}" \
             --target aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android \
+    && rm /tmp/rustup-init.sh \
     && chmod -R a+rX /opt/rust
 ENV PATH="/opt/rust/cargo/bin:${PATH}"
 
