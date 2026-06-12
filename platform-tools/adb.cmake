@@ -360,10 +360,8 @@ if(PLATFORM_LINUX_KERNEL)
 endif()
 
 # termux-usb shim (bionic, set by build.sh): libadb's usb_linux.cpp calls the
-# termuxadb_* shims in libtermuxadb.a, which in turn references libusb_*. Group
-# the two so the mutual references resolve regardless of link order. (Inert at
-# runtime unless LIBUSB_TERMUX_IMPL=1; header dropped next to the source by
-# patch-source.sh.)
+# termuxadb_* shims in libtermuxadb.a, which reference libusb_* — group them so the
+# mutual refs resolve regardless of link order. Inert unless LIBUSB_TERMUX_IMPL=1.
 if(TERMUX_USB_SHIM)
     target_link_libraries(adb -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
 endif()

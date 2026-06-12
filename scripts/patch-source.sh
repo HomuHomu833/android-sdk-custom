@@ -722,12 +722,10 @@ void OPENSSL_cpuid_setup(void) {}
     print('cpu_arm_freebsd.cc BSD cpuid appended')
 PYEOF
 
-# --- termux-usb shims (android targets; runtime-gated by LIBUSB_TERMUX_IMPL) --
-# Route adb/fastboot USB enumeration through libtermuxadb so non-rooted Termux
-# users can get device FDs from the termux-usb command (FDs over a Unix socket,
-# not /dev/bus/usb). Always applied to the android build; the termuxadb:: wrappers
-# fall back to libc unless LIBUSB_TERMUX_IMPL=1 at runtime. build.sh builds
-# libtermuxadb.a and the cmake files link it. See patches/termux/.
+# --- termux-usb shims (android targets) -------------------------------------
+# Route adb/fastboot USB enumeration through libtermuxadb (FDs from termux-usb, not
+# /dev/bus/usb). Always applied; inert at runtime unless LIBUSB_TERMUX_IMPL=1. See
+# patches/termux/.
 case "$TARGET" in *-android|*-androideabi) TERMUX_OK=1 ;; *) TERMUX_OK=0 ;; esac
 if [ "$TERMUX_OK" = 1 ]; then
   log "Applying termux-usb shims"
@@ -748,8 +746,7 @@ if [ "$TERMUX_OK" = 1 ]; then
     -e 's/android::base::ReadFileToString(serial_path, &serial)/termuxadb::ReadFileToString(serial_path, \&serial)/' \
     "$af"
 
-  # adb client/main.cpp: start the termux scanner (daemon path); the sendfd helper
-  # mode lets termux-usb hand a device FD back to the parent and exit.
+  # adb client/main.cpp: start the scanner (daemon path) + the sendfd helper mode.
   am="${PWD_SRC}/src/adb/client/main.cpp"
   sed -i '/#include "commandline.h"/a #include "termux_adb.h"' "$am"
   sed -i '/setup_daemon_logging();/a\        termuxadb::start();' "$am"
@@ -763,10 +760,9 @@ if [ "$TERMUX_OK" = 1 ]; then
   sed -i '/#include "fastboot.h"/a #include "termux_adb.h"' "$ff"
   sed -i '/int FastBootTool::Main(int argc, char\* argv\[\]) {/a\    termuxadb::start();' "$ff"
 
-  # fastboot usb_linux.cpp: 36.x enumerates via sysfs (no good under Termux). Add
-  # a find_usb_device_termux that walks /dev/bus/usb through termuxadb:: (keeping
-  # 36.x's claim/altsetting logic); dispatch to it only when enabled() — the
-  # original sysfs find_usb_device stays for the default (off) path.
+  # fastboot usb_linux.cpp: 36.x enumerates via sysfs (no good under Termux). Add a
+  # find_usb_device_termux (/dev/bus/usb walk via termuxadb::), dispatched only when
+  # enabled(); the stock sysfs find_usb_device stays for the off path.
   sed -i '/#include "usb.h"/a #include "termux_adb.h"' "${PWD_SRC}/src/core/fastboot/usb_linux.cpp"
   TERMUX_FB="${PWD_SRC}/src/core/fastboot/usb_linux.cpp" python3 << 'PYEOF'
 import os, sys
@@ -789,8 +785,8 @@ termux_func = '''static std::unique_ptr<usb_handle> find_usb_device_termux(const
     int fd;
     int writable;
 
-    // termux-adb: walk /dev/bus/usb/<bus>/<dev> via the termux-usb shims instead
-    // of scanning sysfs (Termux can't enumerate /sys without root).
+    // termux: walk /dev/bus/usb/<bus>/<dev> via the shims (sysfs is unusable in
+    // Termux without root).
     std::unique_ptr<DIR, int(*)(DIR*)> busdir(termuxadb::opendir(base), termuxadb::closedir);
     if (busdir == nullptr) return usb;
 

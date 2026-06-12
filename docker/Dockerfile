@@ -106,12 +106,11 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && cd / \
     && rm -rf /tmp/osxcross
 
-# Rust (termux-usb shim): builds the libtermuxadb.a the bionic adb/fastboot link.
-# It's a crate-type=staticlib with libusb1-sys's link feature off, so no C cross-
-# compile or NDK linker is needed — just std for the android targets. Installed
-# from the standalone dist tarballs via the aria2c fetch helper (rustup-init needs
-# curl/wget, which this image doesn't ship), read-only under /opt/rust; build.sh
-# points CARGO_HOME at a writable dir. Host toolchain is x86_64 (the CI runner).
+# Rust (termux-usb shim): builds libtermuxadb.a for the bionic adb/fastboot. As a
+# staticlib (libusb1-sys link feature off) it needs no C cross-compile/NDK linker,
+# just std for the android targets. Installed from the standalone dist tarballs via
+# the aria2c fetch helper (rustup-init needs curl/wget, absent here), read-only
+# under /opt/rust; build.sh uses a writable CARGO_HOME. Host x86_64 (the CI runner).
 ARG RUST_VERSION=1.84.0
 RUN set -eu; \
     base="https://static.rust-lang.org/dist"; \

@@ -1,11 +1,7 @@
-// termux-adb USB shim (bionic only) — namespace wrapper over libtermuxadb's C
-// API (nohajc/vendor-adb-patched@35.0.2, reconciled for 36.x adb).
-//
-// On/off gating lives in the Rust shim (LIBUSB_TERMUX_IMPL env, off by default):
-// when disabled the termuxadb_* functions delegate to libc, so these wrappers are
-// transparent and adb behaves like stock. The gating is done in Rust, not here,
-// because bionic's open/close are fortify macros that don't survive a `::open`
-// call from C++.
+// termux-adb USB shim (bionic) — namespace wrapper over libtermuxadb's C API
+// (nohajc/vendor-adb-patched@35.0.2, ported to 36.x). Gating is in the Rust shim
+// (LIBUSB_TERMUX_IMPL, off by default → termuxadb_* delegate to libc), not via
+// ::open/::close here, since those are bionic fortify macros.
 #pragma once
 
 #include <android-base/file.h>
@@ -47,8 +43,8 @@ namespace termuxadb {
         return TEMP_FAILURE_RETRY(termuxadb_create(zero_terminated.c_str(), options, mode));
     }
 
-    // Only adb_close is defined: adb's sysdeps.h has `#define unix_close adb_close`,
-    // so the termuxadb::unix_close(fd) call sites resolve here via that macro.
+    // unix_close is `#define`d to adb_close in adb's sysdeps.h, so call sites land
+    // here; defining unix_close too would redefine adb_close.
     static inline int adb_close(int fd) { return termuxadb_close(fd); }
     static inline bool sendfd() { return termuxadb_sendfd(); }
     static inline void start() { termuxadb_start(); }

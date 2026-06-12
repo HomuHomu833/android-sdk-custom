@@ -119,10 +119,9 @@ pub unsafe extern "C" fn termuxadb_create(path: *const c_char, opts: c_int, mode
     open(path, opts, mode)
 }
 
-// LIBUSB_TERMUX_IMPL gates the whole shim at runtime (off by default). When it is
-// unset/empty/"0" the C entry points below delegate to libc / return early, so a
-// patched adb/fastboot behaves exactly like stock. (opendir/readdir/open already
-// fall through to libc for non-virtual paths, so they need no explicit check.)
+// LIBUSB_TERMUX_IMPL gates the shim at runtime (off by default): the entry points
+// below delegate to libc / return early when unset. (opendir/readdir/open already
+// fall through to libc for non-virtual paths.)
 fn termux_impl_enabled() -> bool {
     matches!(env::var("LIBUSB_TERMUX_IMPL"), Ok(v) if !v.is_empty() && v != "0")
 }

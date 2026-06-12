@@ -1,11 +1,8 @@
-// termux-fastboot USB shim (bionic only) — wrapper over libtermuxadb's C API
-// (fastboot variant: plain open/close, fastboot_start). Ported for 36.x.
-//
-// On/off gating lives in the Rust shim (LIBUSB_TERMUX_IMPL env, off by default):
-// when disabled the termuxadb_* functions delegate to libc. usb_linux.cpp also
-// uses enabled() to dispatch between the stock sysfs scan and the termux
-// /dev/bus/usb walk. (Gating is in Rust, not via `::open`/`::close`, because
-// those are bionic fortify macros that don't survive a C++ `::` call.)
+// termux-fastboot USB shim (bionic) — wrapper over libtermuxadb's C API (fastboot
+// variant: fastboot_start). Gating is in the Rust shim (LIBUSB_TERMUX_IMPL, off by
+// default → termuxadb_* delegate to libc); usb_linux.cpp uses enabled() to pick
+// the termux /dev/bus/usb walk over the stock sysfs scan. Wrappers are unix_*
+// (not open/close) to dodge bionic's fortify macros.
 #pragma once
 
 #include <dirent.h>
@@ -30,8 +27,7 @@ extern "C" {
 }
 
 namespace termuxadb {
-    // Cached LIBUSB_TERMUX_IMPL check (off by default), used by usb_linux.cpp to
-    // pick the termux /dev/bus/usb walk over the stock sysfs scan.
+    // Cached LIBUSB_TERMUX_IMPL check; usb_linux.cpp uses it for the scan dispatch.
     static inline bool enabled() {
         static int e = -1;
         if (e < 0) {
@@ -45,8 +41,6 @@ namespace termuxadb {
     static inline int closedir(DIR *dirp) { return termuxadb_closedir(dirp); }
     static inline struct dirent *readdir(DIR *dirp) { return termuxadb_readdir(dirp); }
 
-    // Named unix_open/unix_close (not open/close) so the definitions never collide
-    // with bionic's fortify open()/close() macros.
     static inline int unix_open(std::string_view path, int options, ...) {
         std::string zero_terminated(path.begin(), path.end());
         if ((options & O_CREAT) == 0) {

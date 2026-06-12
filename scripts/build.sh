@@ -111,12 +111,10 @@ case "$PLATFORM" in
     # force-include a shim that supplies it on the lower API levels.
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
-    # termux-usb shim: always built into the bionic adb/fastboot, but inert until
-    # the user sets LIBUSB_TERMUX_IMPL=1 at runtime (off by default). That lets
-    # non-rooted Termux users get USB device FDs from the termux-usb helper while
-    # normal/rooted use is unchanged. libtermuxadb.a leaves libusb_* unresolved
-    # (libusb1-sys's link feature is off), resolved at link by our libusb;
-    # patch-source.sh applies the matching source shims. See patches/termux/.
+    # termux-usb shim: always built into the bionic adb/fastboot, inert until the
+    # user sets LIBUSB_TERMUX_IMPL=1 at runtime (lets non-rooted Termux users get
+    # USB FDs from termux-usb). libtermuxadb.a's libusb_* refs resolve against our
+    # libusb at link. See patches/termux/.
     case "$TARGET" in
       aarch64-linux-android)    RUST_TARGET=aarch64-linux-android ;;
       armv7a-linux-androideabi) RUST_TARGET=armv7-linux-androideabi ;;
