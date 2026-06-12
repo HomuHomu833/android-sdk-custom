@@ -69,23 +69,28 @@ case "$PLATFORM" in
       *)
         # _GNU_SOURCE: AOSP/host code (and bundled deps like zstd's cover.c, which
         # calls qsort_r) assume GNU extensions that glibc hides behind it; musl
-        # exposes them unconditionally, so this only matters for gnu.
+        # exposes them unconditionally, so this only matters for gnu. Passed
+        # valueless (-D_GNU_SOURCE=, not -D_GNU_SOURCE which clang makes `1`) to
+        # match the bare #define upstream sources emit, dodging -Wmacro-redefined.
         # strlcpy/strlcat shim: glibc only declares them from 2.38. Force-include
         # a shim that supplies them on older glibc instead of raising the
         # binaries' runtime glibc requirement. HAVE_STRLCPY/HAVE_STRLCAT make
         # deps that ship their own fallback (e.g. selinux's #ifndef HAVE_STRLCPY)
         # yield to the shim, avoiding a duplicate definition.
-        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
+        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE= -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
     # libpng ships SIMD code that doesn't build/link on every target: the 32-bit
     # Thumb encodings lack the Neon asm impl (undefined png_*_neon symbols), and
     # 32-bit/BE PowerPC lacks the VSX/AltiVec the intrinsics require. Disable the
     # relevant SIMD path so libpng falls back to portable C. (aarch64 Neon and
-    # ppc64le VSX build fine and are left enabled.)
+    # ppc64le VSX build fine and are left enabled.) PowerPC uses libpng's
+    # PNG_POWERPC_VSX=off option, not a global -DPNG_POWERPC_VSX_OPT=0 that would
+    # clash with libpng's own -D...=2 (-Wmacro-redefined); thumb keeps the global
+    # -D since libpng's arch regex skips "thumb" and defines nothing to clash.
     case "$TARGET" in
       thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
-      powerpc-*|powerpc64-*)    CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_POWERPC_VSX_OPT=0" ;;
+      powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
     # x32 ABI (x86_64 ISA, 32-bit pointers): clang emits initial-exec TLS with
     # 32-bit MOV/ADD, but lld's R_X86_64_GOTTPOFF relaxation requires a 64-bit
@@ -145,11 +150,11 @@ case "$PLATFORM" in
     # (Windows/Darwin) stay inert on BSD. Dynamic linking for BSD targets.
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
-    # Per-arch tuning (SIMD, TLS): same as the linux case — mirrors the
-    # sibling NDK/llvm repos.
+    # Per-arch tuning (SIMD, TLS): same as the linux case — mirrors the sibling
+    # NDK/llvm repos (see the linux case for the libpng PNG_POWERPC_VSX rationale).
     case "$TARGET" in
       thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
-      powerpc-*|powerpc64-*)    CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_POWERPC_VSX_OPT=0" ;;
+      powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;

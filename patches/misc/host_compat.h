@@ -239,10 +239,12 @@ typedef unsigned int gid_t;
  * or transitively-included library headers define _XOPEN_SOURCE=700, which
  * hides BSD extensions (flock, LOCK_EX, getprogname, etc.).  Restore them
  * unconditionally so the host-tool build sees a consistent POSIX+BSD API.
+ * Valueless (not `1`) to match e2fsprogs' bare `#define _DARWIN_C_SOURCE`;
+ * cdefs.h only tests defined(), so this stays clear of -Wmacro-redefined.
  */
 #if defined(__APPLE__)
 #ifndef _DARWIN_C_SOURCE
-#define _DARWIN_C_SOURCE 1
+#define _DARWIN_C_SOURCE
 #endif
 /* RFC 3542 IPv6 socket options (IPV6_PKTINFO, IPV6_RECVPKTINFO, etc.) are
  * hidden behind this macro in <netinet/in.h> on macOS.  AOSP/Chromium code
@@ -309,12 +311,14 @@ const char *getprogname(void) {
  * equivalents (functionally identical on single-threaded or host builds).
  *
  * FreeBSD (via zig) ships the *_unlocked functions natively, so exclude it.
- * NetBSD/OpenBSD may still need the shim.
+ * NetBSD/OpenBSD may still need the shim.  fgets_unlocked matches libselinux
+ * label_internal.h's exact spelling (it redefines the macro unconditionally),
+ * so the two stay token-identical and avoid -Wmacro-redefined.
  */
 #if (defined(__APPLE__) || defined(_WIN32) || defined(__ANDROID__) || \
      defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(__FreeBSD__)
 #ifndef fgets_unlocked
-#define fgets_unlocked(s, n, f)      fgets((s), (n), (f))
+#define fgets_unlocked(buf, size, fp) fgets(buf, size, fp)
 #endif
 #ifndef fputs_unlocked
 #define fputs_unlocked(s, f)         fputs((s), (f))
