@@ -7,7 +7,8 @@
 #   BUILD_TOOLS_VERSION  sdkmanager build-tools package (default: 36.1.0)
 #   CMDLINE_TOOLS_URL    commandline-tools zip (default: linux 13114758)
 #   ROOTDIR              work dir (default: cwd)
-#   DEST                 where the .tar.xz is written (default: $ROOTDIR)
+#   DEST                 where the archive is written (default: $ROOTDIR)
+#                        windows -> .7z, everything else -> .tar.xz
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -101,7 +102,15 @@ fi
 
 # --- archive ----------------------------------------------------------------
 mkdir -p "$DEST"
-ARCHIVE="$DEST/android-sdk-$TARGET.tar.xz"
-log "Archiving -> $ARCHIVE"
-tar -cf - -C "$ROOTDIR" android-sdk | xz -T0 -9e --lzma2=dict=256MiB > "$ARCHIVE"
+if [ "$PLATFORM" = windows ]; then
+  ARCHIVE="$DEST/android-sdk-$TARGET.7z"
+  log "Archiving -> $ARCHIVE"
+  rm -f "$ARCHIVE"
+  ( cd "$ROOTDIR"
+    7z a -snl -t7z -mx=9 -m0=LZMA2 -md=256m -mfb=273 -mtc=on -mmt=on "$ARCHIVE" android-sdk >/dev/null )
+else
+  ARCHIVE="$DEST/android-sdk-$TARGET.tar.xz"
+  log "Archiving -> $ARCHIVE"
+  tar -cf - -C "$ROOTDIR" android-sdk | xz -T0 -9e --lzma2=dict=256MiB > "$ARCHIVE"
+fi
 log "Done -> $ARCHIVE"
