@@ -82,8 +82,7 @@ int __get_resolv_conf(struct resolvconf *conf, char *search, size_t search_sz)
 			continue;
 		for (p=line+7; isspace((unsigned char)*p); p++);
 		size_t l = strlen(p);
-		/* This can never happen anyway with chosen buffer sizes. */
-		if (l >= search_sz) continue;
+		if (l >= search_sz) l = search_sz - 1;
 		memcpy(search, p, l+1);
 	}
 
