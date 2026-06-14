@@ -189,4 +189,4 @@ target_include_directories(protoc PRIVATE
     ${SRC}/protobuf/android
     ${SRC}/protobuf/src
     )
-target_link_libraries(protoc libprotoc liblog dl ${CMAKE_PREFIX_PATH}/lib/libz.a)
+target_link_libraries(protoc libprotoc liblog ${CMAKE_DL_LIBS} ${CMAKE_PREFIX_PATH}/lib/libz.a)

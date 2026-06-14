@@ -49,8 +49,17 @@ add_library(libopenscreen STATIC
     ${SRC}/openscreen/util/big_endian.cc
     ${SRC}/openscreen/platform/impl/time.cc
     ${SRC}/openscreen/platform/impl/network_interface.cc
-    ${SRC}/openscreen/platform/impl/network_interface_linux.cc
     )
+
+if(PLATFORM_DARWIN)
+    target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_mac.cc)
+elseif(PLATFORM_BSD)
+    target_sources(libopenscreen PRIVATE ${CMAKE_SOURCE_DIR}/patches/bsd-compat/network_interface_bsd.cc)
+elseif(PLATFORM_WINDOWS)
+    target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_win.cc)
+else()
+    target_sources(libopenscreen PRIVATE ${SRC}/openscreen/platform/impl/network_interface_linux.cc)
+endif()
 
 target_compile_options(libopenscreen PRIVATE 
     -fno-exceptions

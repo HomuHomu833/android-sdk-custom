@@ -16,7 +16,6 @@
 
 add_library(libbase STATIC
     ${SRC}/libbase/chrono_utils.cpp
-    ${SRC}/libbase/cmsg.cpp
     ${SRC}/libbase/file.cpp
     ${SRC}/libbase/hex.cpp
     ${SRC}/libbase/logging.cpp
@@ -31,12 +30,26 @@ add_library(libbase STATIC
     ${SRC}/libbase/strings.cpp
     ${SRC}/libbase/threads.cpp
     ${SRC}/libbase/test_utils.cpp
-    ${SRC}/libbase/errors_unix.cpp
     )
+
+if(PLATFORM_WINDOWS)
+    target_sources(libbase PRIVATE
+        ${SRC}/libbase/errors_windows.cpp
+        ${SRC}/libbase/utf8.cpp
+        )
+    target_compile_definitions(libbase PRIVATE -D_POSIX_THREAD_SAFE_FUNCTIONS)
+    target_link_libraries(libbase PUBLIC pthread)
+else()
+    target_sources(libbase PRIVATE
+        ${SRC}/libbase/cmsg.cpp
+        ${SRC}/libbase/errors_unix.cpp
+        )
+endif()
 
 target_include_directories(libbase PRIVATE
     ${SRC}/libbase/include
     ${SRC}/core/include
     ${SRC}/fmtlib/include 
     ${SRC}/logging/liblog/include
+    ${SRC}/../include
     )

@@ -21,18 +21,70 @@ add_library(libusb STATIC
     ${SRC}/libusb/libusb/io.c
     ${SRC}/libusb/libusb/sync.c
     ${SRC}/libusb/libusb/strerror.c
-    ${SRC}/libusb/libusb/os/linux_usbfs.c
-    ${SRC}/libusb/libusb/os/events_posix.c
-    ${SRC}/libusb/libusb/os/threads_posix.c
-    ${SRC}/libusb/libusb/os/linux_netlink.c
     )
-target_include_directories(libusb PRIVATE
-    ${SRC}/libusb/libusb
-    ${SRC}/libusb/libusb/os
-    ${SRC}/libusb/linux
-    )
+
+if(PLATFORM_DARWIN)
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/darwin_usb.c
+        ${SRC}/libusb/libusb/os/events_posix.c
+        ${SRC}/libusb/libusb/os/threads_posix.c
+        )
+elseif(PLATFORM_WINDOWS)
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/events_windows.c
+        ${SRC}/libusb/libusb/os/threads_windows.c
+        ${SRC}/libusb/libusb/os/windows_common.c
+        ${SRC}/libusb/libusb/os/windows_usbdk.c
+        ${SRC}/libusb/libusb/os/windows_winusb.c
+        )
+elseif(PLATFORM_BSD)
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/events_posix.c
+        ${SRC}/libusb/libusb/os/threads_posix.c
+        )
+    if(CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
+        target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/netbsd_usb.c)
+    else()
+        target_sources(libusb PRIVATE ${SRC}/libusb/libusb/os/null_usb.c)
+    endif()
+else()
+    target_sources(libusb PRIVATE
+        ${SRC}/libusb/libusb/os/linux_usbfs.c
+        ${SRC}/libusb/libusb/os/events_posix.c
+        ${SRC}/libusb/libusb/os/threads_posix.c
+        ${SRC}/libusb/libusb/os/linux_netlink.c
+        )
+endif()
+if(PLATFORM_DARWIN)
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
+        ${SRC}/libusb/darwin
+        )
+elseif(PLATFORM_WINDOWS)
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
+        ${SRC}/libusb/windows
+        )
+elseif(PLATFORM_BSD)
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
+        ${SRC}/libusb/darwin
+        )
+else()
+    target_include_directories(libusb PRIVATE
+        ${SRC}/libusb/libusb
+        ${SRC}/libusb/libusb/os
+        ${SRC}/libusb/linux
+        )
+endif()
 target_compile_options(libusb PRIVATE
-    -fvisibility=hidden 
+    -fvisibility=hidden
     -pthread
     -DANDROID_OS
     )
+if(PLATFORM_BSD)
+    target_compile_options(libusb PRIVATE -UHAVE_PTHREAD_THREADID_NP)
+endif()

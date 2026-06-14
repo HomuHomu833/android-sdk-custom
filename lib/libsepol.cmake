@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 
+if(NOT PLATFORM_WINDOWS)
+
 add_library(libsepol STATIC
     ${SRC}/selinux/libsepol/src/assertion.c
     ${SRC}/selinux/libsepol/src/avrule_block.c
@@ -61,6 +63,7 @@ add_library(libsepol STATIC
     ${SRC}/selinux/libsepol/cil/src/cil_build_ast.c
     ${SRC}/selinux/libsepol/cil/src/cil.c
     ${SRC}/selinux/libsepol/cil/src/cil_copy_ast.c
+    ${SRC}/selinux/libsepol/cil/src/cil_deny.c
     ${SRC}/selinux/libsepol/cil/src/cil_find.c
     ${SRC}/selinux/libsepol/cil/src/cil_fqn.c
     ${SRC}/selinux/libsepol/cil/src/cil_lexer.l
@@ -92,3 +95,5 @@ target_include_directories(libsepol PRIVATE
     ${SRC}/selinux/libsepol/src
     ${SRC}/selinux/libsepol/cil/include
     )
+
+endif()

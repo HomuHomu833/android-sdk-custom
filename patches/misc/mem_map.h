@@ -32,7 +32,7 @@
 namespace art {
 
 #if defined(__LP64__) && !defined(__Fuchsia__) && \
-    (defined(__aarch64__) || defined(__riscv) || defined(__APPLE__) || defined(__loongarch__) || defined(__powerpc__) || defined(__s390x__))
+    (defined(__aarch64__) || defined(__riscv) || defined(__APPLE__) || defined(__loongarch__) || defined(__powerpc__) || defined(__s390x__) || defined(__mips64))
 #define USE_ART_LOW_4G_ALLOCATOR 1
 #else
 #if defined(__LP64__) && !defined(__Fuchsia__) && !defined(__x86_64__)

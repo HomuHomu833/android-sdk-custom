@@ -20,14 +20,23 @@ add_library(libziparchive STATIC
     ${SRC}/libziparchive/zip_cd_entry_map.cc
     ${SRC}/libziparchive/zip_writer.cc
     ${SRC}/libziparchive/zip_error.cpp
-    ${SRC}/libziparchive/incfs_support/signal_handling.cpp
     )
 
-target_compile_definitions(libziparchive PRIVATE 
+if(NOT PLATFORM_WINDOWS)
+    target_sources(libziparchive PRIVATE
+        ${SRC}/libziparchive/incfs_support/signal_handling.cpp
+        )
+endif()
+
+target_compile_definitions(libziparchive PRIVATE
     -DZLIB_CONST
     -D_FILE_OFFSET_BITS=64
     -DZIPARCHIVE_DISABLE_CALLBACK_API=1
     )
+
+if(PLATFORM_WINDOWS)
+    target_compile_options(libziparchive PRIVATE -mno-ms-bitfields)
+endif()
     
 target_include_directories(libziparchive PRIVATE
     ${SRC}/libziparchive/include 

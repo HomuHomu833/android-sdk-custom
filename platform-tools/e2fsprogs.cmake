@@ -24,6 +24,10 @@ set(INCLUDES
     ${SRC}/core/libcutils/include
     )
 
+if(PLATFORM_WINDOWS)
+    list(APPEND INCLUDES ${SRC}/e2fsprogs/include/mingw)
+endif()
+
 # libext2_blkid
 add_library(libext2_blkid STATIC
     ${SRC}/e2fsprogs/lib/blkid/cache.c
@@ -191,7 +195,8 @@ add_library(libext2fs STATIC
     ${SRC}/e2fsprogs/lib/ext2fs/swapfs.c
     ${SRC}/e2fsprogs/lib/ext2fs/symlink.c
     ${SRC}/e2fsprogs/lib/ext2fs/undo_io.c
-    ${SRC}/e2fsprogs/lib/ext2fs/unix_io.c
+    $<$<NOT:$<BOOL:${PLATFORM_WINDOWS}>>:${SRC}/e2fsprogs/lib/ext2fs/unix_io.c>
+    $<$<BOOL:${PLATFORM_WINDOWS}>:${SRC}/e2fsprogs/lib/ext2fs/windows_io.c>
     ${SRC}/e2fsprogs/lib/ext2fs/sparse_io.c
     ${SRC}/e2fsprogs/lib/ext2fs/unlink.c
     ${SRC}/e2fsprogs/lib/ext2fs/valid_blk.c
@@ -225,6 +230,6 @@ target_link_libraries(mke2fs
     libext2_quota 
     libsparse 
     libbase 
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )

@@ -1,0 +1,38 @@
+name: Make SDK (Bionic)
+run-name: Make SDK ${{ inputs.version }}
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Platform Tools Version (release tag)"
+        required: true
+        default: "36.0.2"
+      tag:
+        description: "Android Source Tag"
+        required: true
+        default: "android-16.0.0_r4"
+      ndk_version:
+        description: "Official NDK version for the bionic clang"
+        required: true
+        default: "27"
+      ndk_revision:
+        description: "Official NDK revision letter (optional)"
+        required: false
+        default: "c"
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  make:
+    uses: ./.github/workflows/make-sdk.yml
+    secrets: inherit
+    with:
+      platform: bionic
+      version: ${{ inputs.version }}
+      tag: ${{ inputs.tag }}
+      ndk_version: ${{ inputs.ndk_version }}
+      ndk_revision: ${{ inputs.ndk_revision }}
+      # riscv64-linux-android
+      targets: '["aarch64-linux-android", "armv7a-linux-androideabi", "i686-linux-android", "x86_64-linux-android"]'

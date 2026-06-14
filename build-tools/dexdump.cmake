@@ -56,17 +56,36 @@ add_library(libartbase STATIC
     ${SRC}/art/libartbase/base/unix_file/random_access_file_utils.cc
     ${SRC}/art/libartbase/base/utils.cc
     ${SRC}/art/libartbase/base/zip_archive.cc
-    ${SRC}/art/libartbase/base/globals_unix.cc
-    ${SRC}/art/libartbase/base/mem_map_unix.cc
     ${SRC}/faked_functions.cpp
     )
-target_include_directories(libartbase PRIVATE ${INCLUDES})
 
-add_library(libartpalette STATIC
-    ${SRC}/art/libartpalette/apex/palette.cc
-    ${SRC}/art/libartpalette/system/palette_fake.cc
+if(PLATFORM_WINDOWS)
+    target_sources(libartbase PRIVATE ${SRC}/art/libartbase/base/mem_map_windows.cc)
+else()
+    target_sources(libartbase PRIVATE
+        ${SRC}/art/libartbase/base/globals_unix.cc
+        ${SRC}/art/libartbase/base/mem_map_unix.cc
+        )
+endif()
+target_include_directories(libartbase PRIVATE ${INCLUDES})
+target_compile_definitions(libartbase PRIVATE
+    ART_BASE_ADDRESS=0x70000000
+    ART_BASE_ADDRESS_MIN_DELTA=-0x1000000
+    ART_BASE_ADDRESS_MAX_DELTA=0x1000000
     )
+
+add_library(libartpalette STATIC)
 target_include_directories(libartpalette PRIVATE ${INCLUDES})
+
+if(PLATFORM_ANDROID)
+    target_sources(libartpalette PRIVATE
+        ${SRC}/art/libartpalette/apex/palette.cc
+        )
+else()
+    target_sources(libartpalette PRIVATE
+        ${SRC}/art/libartpalette/system/palette_fake.cc
+        )
+endif()
 
 add_library(libdexfile STATIC
     ${SRC}/art/libdexfile/dex/art_dex_file_loader.cc
@@ -100,7 +119,7 @@ target_link_libraries(dexdump
     libbase
     libziparchive
     liblog
-    dl
+    ${CMAKE_DL_LIBS}
     fmt::fmt
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )

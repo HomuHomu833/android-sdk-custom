@@ -20,5 +20,9 @@ add_library(libbuildversion STATIC
 
 target_include_directories(libbuildversion PRIVATE
     ${SRC}/soong/cc/libbuildversion/include
+    # repo include/ ships a sys/system_properties.h with the API-26 guards stripped,
+    # so __system_property_read_callback() is declared even below API 26 (default
+    # 25); the NDK's guarded header would otherwise fail libbuildversion.cpp.
+    ${SRC}/../include
     )
     

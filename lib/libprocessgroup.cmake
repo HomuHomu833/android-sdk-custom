@@ -14,26 +14,27 @@
 # limitations under the License.
 #
 
-add_library(libprocessgroup STATIC
-    ${SRC}/core/libprocessgroup/cgroup_map.cpp
-    ${SRC}/core/libprocessgroup/processgroup.cpp
-    ${SRC}/core/libprocessgroup/sched_policy.cpp
-    ${SRC}/core/libprocessgroup/task_profiles.cpp
-    ${SRC}/core/libprocessgroup/util/cgroup_controller.cpp
-    ${SRC}/core/libprocessgroup/util/cgroup_descriptor.cpp
-    ${SRC}/core/libprocessgroup/cgrouprc/a_cgroup_file.cpp
-    ${SRC}/core/libprocessgroup/cgrouprc/a_cgroup_controller.cpp
-    )
-
-target_include_directories(libprocessgroup PRIVATE 
-    ${SRC}/core/libprocessgroup/include
-    ${SRC}/core/libprocessgroup/cgrouprc/include
-    ${SRC}/core/libprocessgroup/cgrouprc_format/include
-    ${SRC}/core/libprocessgroup/util/include
-    ${SRC}/libbase/include
-    ${SRC}/core/libcutils/include
-    ${SRC}/jsoncpp/include
-    )
-target_include_directories(libprocessgroup PRIVATE
-    ${SRC}/core/libprocessgroup
-    )
+if(PLATFORM_LINUX_KERNEL)
+    add_library(libprocessgroup STATIC
+        ${SRC}/core/libprocessgroup/cgroup_map.cpp
+        ${SRC}/core/libprocessgroup/processgroup.cpp
+        ${SRC}/core/libprocessgroup/sched_policy.cpp
+        ${SRC}/core/libprocessgroup/task_profiles.cpp
+        ${SRC}/core/libprocessgroup/util/cgroup_controller.cpp
+        ${SRC}/core/libprocessgroup/util/cgroup_descriptor.cpp
+        ${SRC}/core/libprocessgroup/cgrouprc/a_cgroup_file.cpp
+        ${SRC}/core/libprocessgroup/cgrouprc/a_cgroup_controller.cpp
+        )
+    target_include_directories(libprocessgroup PRIVATE 
+        ${SRC}/core/libprocessgroup/include
+        ${SRC}/core/libprocessgroup/cgrouprc/include
+        ${SRC}/core/libprocessgroup/cgrouprc_format/include
+        ${SRC}/core/libprocessgroup/util/include
+        ${SRC}/libbase/include
+        ${SRC}/core/libcutils/include
+        ${SRC}/jsoncpp/include
+        )
+    target_include_directories(libprocessgroup PRIVATE
+        ${SRC}/core/libprocessgroup
+        )
+endif()

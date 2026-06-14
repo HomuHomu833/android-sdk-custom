@@ -20,15 +20,25 @@ add_library(liblog STATIC
     ${SRC}/logging/liblog/logger_name.cpp
     ${SRC}/logging/liblog/logger_read.cpp
     ${SRC}/logging/liblog/logger_write.cpp
-    ${SRC}/logging/liblog/properties.cpp
     ${SRC}/logging/liblog/logprint.cpp
-    ${SRC}/logging/liblog/event_tag_map.cpp
-    ${SRC}/logging/liblog/log_time.cpp
-    ${SRC}/logging/liblog/pmsg_reader.cpp
-    ${SRC}/logging/liblog/pmsg_writer.cpp
-    ${SRC}/logging/liblog/logd_reader.cpp
-    ${SRC}/logging/liblog/logd_writer.cpp
+    ${SRC}/logging/liblog/properties.cpp
     )
+
+if(NOT PLATFORM_WINDOWS)
+    target_sources(liblog PRIVATE
+        ${SRC}/logging/liblog/event_tag_map.cpp
+        )
+endif()
+
+if(PLATFORM_ANDROID)
+    target_sources(liblog PRIVATE
+        ${SRC}/logging/liblog/log_time.cpp
+        ${SRC}/logging/liblog/pmsg_reader.cpp
+        ${SRC}/logging/liblog/pmsg_writer.cpp
+        ${SRC}/logging/liblog/logd_reader.cpp
+        ${SRC}/logging/liblog/logd_writer.cpp
+        )
+endif()
 
 target_compile_definitions(liblog PRIVATE
     -DLIBLOG_LOG_TAG=1006 
@@ -43,5 +53,6 @@ target_include_directories(liblog PRIVATE
     ${SRC}/logging/liblog/include
     ${SRC}/core/libcutils/include
     ${SRC}/libbase/include
+    ${SRC}/../include
     )
     

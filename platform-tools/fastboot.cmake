@@ -60,10 +60,21 @@ add_executable(fastboot
     ${SRC}/core/fastboot/task.cpp
     ${SRC}/core/fastboot/tcp.cpp
     ${SRC}/core/fastboot/udp.cpp
-    ${SRC}/core/fastboot/usb_linux.cpp
     ${SRC}/core/fastboot/vendor_boot_img_utils.cpp
     ${SRC}/core/fastboot/util.cpp
     )
+
+if(PLATFORM_DARWIN)
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_osx.cpp)
+elseif(PLATFORM_WINDOWS)
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_libusb.cpp)
+    target_include_directories(fastboot PRIVATE ${SRC}/libusb/libusb)
+elseif(PLATFORM_BSD)
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_libusb.cpp)
+    target_include_directories(fastboot PRIVATE ${SRC}/libusb/libusb)
+else()
+    target_sources(fastboot PRIVATE ${SRC}/core/fastboot/usb_linux.cpp)
+endif()
 
 target_include_directories(fastboot PRIVATE
     ${SRC}/avb
@@ -95,13 +106,28 @@ target_link_libraries(fastboot
     libcutils 
     libfsmgr 
     libutils
-    libbase 
-    libext4 
-    libselinux 
-    libsepol 
+    libbase
+    libext4
+    ${SELINUX_LINK_LIBS}
     liblog
     crypto
     pcre2-8
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(PLATFORM_DARWIN)
+    target_link_libraries(fastboot "-framework CoreFoundation" "-framework IOKit")
+elseif(PLATFORM_WINDOWS)
+    target_link_libraries(fastboot libusb setupapi ole32 cfgmgr32 winusb ws2_32)
+elseif(PLATFORM_BSD)
+    target_link_libraries(fastboot libusb)
+endif()
+
+# termux-usb shim (bionic, set by build.sh): usb_linux.cpp calls the termuxadb_*
+# shims in libtermuxadb.a, which reference libusb_* (bionic fastboot doesn't else
+# link libusb, so pull it in). Group them for order-independent resolution. Inert
+# unless LIBUSB_TERMUX_IMPL=1.
+if(TERMUX_USB_SHIM)
+    target_link_libraries(fastboot -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
+endif()

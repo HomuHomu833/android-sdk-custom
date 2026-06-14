@@ -41,22 +41,23 @@ target_include_directories(split-select PRIVATE
 target_link_libraries(split-select
     libaapt
     libandroidfw
-    libselinux
-    libsepol
+    ${SELINUX_LINK_LIBS}
     libutils
     libcutils
     libincfs
     libbase
     libziparchive
-    libpackagelistparser
-    libprocessgroup
     liblog
     expat
     crypto
     pcre2-8
     jsoncpp_static
     png_static
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(PLATFORM_LINUX_KERNEL)
+    target_link_libraries(split-select libpackagelistparser libprocessgroup)
+endif()
     

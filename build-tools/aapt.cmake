@@ -71,21 +71,27 @@ target_link_libraries(aapt
     libincfs
     libutils
     libcutils
-    libselinux
-    libsepol
+    ${SELINUX_LINK_LIBS}
     libziparchive
-    libpackagelistparser
     libbase
     libbuildversion
-    libprocessgroup
     liblog
     expat
     crypto
     pcre2-8
     jsoncpp_static
     png_static
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(PLATFORM_LINUX_KERNEL)
+    target_link_libraries(aapt libpackagelistparser libprocessgroup)
+endif()
+
+if(PLATFORM_DARWIN)
+    target_compile_definitions(libaapt PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
+    target_compile_definitions(aapt PRIVATE -D_DARWIN_UNLIMITED_STREAMS)
+endif()
     
     

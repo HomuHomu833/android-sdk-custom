@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-# ========================= adb proto ============================
 set(ADB_PROTO_SRC)  # adb proto source files
 set(ADB_PROTO_HDRS) # adb proto head files
 set(ADB_PROTO_DIR ${SRC}/adb/proto)
@@ -52,10 +51,7 @@ if(DEFINED PROTOC_PATH)
     set_source_files_properties(${ADB_PROTO_SRC} PROPERTIES GENERATED TRUE)
     set_source_files_properties(${ADB_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 endif()
-# ========================= adb proto ============================
 
-
-# ========================= fastdeploy proto ============================
 # ApkEntry.proto
 set(FASTDEPLOY_PROTO_SRC)  # adb proto source files
 set(FASTDEPLOY_PROTO_HDRS) # adb proto head files
@@ -91,8 +87,6 @@ if(DEFINED PROTOC_PATH)
     set_source_files_properties(${FASTDEPLOY_PROTO_SRC} PROPERTIES GENERATED TRUE)
     set_source_files_properties(${FASTDEPLOY_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 endif()
-# ========================= fastdeploy proto ============================
-
 
 add_library(libadb STATIC
     ${SRC}/adb/adb.cpp
@@ -127,12 +121,45 @@ add_library(libadb STATIC
     ${SRC}/adb/client/mdns_tracker.cpp
     ${SRC}/adb/client/mdns_utils.cpp
     ${SRC}/adb/client/pairing/pairing_client.cpp
-    ${SRC}/adb/client/usb_linux.cpp
-    ${SRC}/adb/fdevent/fdevent_epoll.cpp
-    ${SRC}/adb/sysdeps_unix.cpp
-    ${SRC}/adb/sysdeps/posix/network.cpp
     ${ADB_PROTO_SRC} ${ADB_PROTO_HDRS}
     )
+
+if(NOT PLATFORM_WINDOWS)
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/sysdeps_unix.cpp
+        ${SRC}/adb/sysdeps/posix/network.cpp
+        )
+endif()
+if(PLATFORM_DARWIN)
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_osx.cpp
+        ${SRC}/adb/fdevent/fdevent_poll.cpp
+        )
+elseif(PLATFORM_WINDOWS)
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_libusb_device.cpp
+        ${SRC}/adb/client/usb_libusb_hotplug.cpp
+        ${SRC}/adb/client/usb_libusb_inhouse_hotplug.cpp
+        ${SRC}/adb/client/usb_windows_libusb.cpp
+        ${SRC}/adb/fdevent/fdevent_poll.cpp
+        ${SRC}/adb/sysdeps_win32.cpp
+        ${SRC}/adb/sysdeps/win32/errno.cpp
+        ${SRC}/adb/sysdeps/win32/stat.cpp
+        )
+elseif(PLATFORM_BSD)
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_libusb_device.cpp
+        ${SRC}/adb/client/usb_libusb_hotplug.cpp
+        ${SRC}/adb/client/usb_libusb_inhouse_hotplug.cpp
+        ${SRC}/adb/fdevent/fdevent_poll.cpp
+        ${CMAKE_SOURCE_DIR}/patches/misc/adb_usb_bsd.cpp
+        )
+else()
+    target_sources(libadb PRIVATE
+        ${SRC}/adb/client/usb_linux.cpp
+        ${SRC}/adb/fdevent/fdevent_epoll.cpp
+        )
+endif()
 target_compile_definitions(libadb PRIVATE 
     -D_GNU_SOURCE
     -DADB_HOST=1
@@ -299,10 +326,8 @@ target_link_libraries(adb
     libcrypto
     libadb_sysdeps
     libfastdeploy
-    libselinux
-    libsepol
+    ${SELINUX_LINK_LIBS}
     libincfs
-    libpackagelistparser
     libbase
     libutils
     libcutils
@@ -326,6 +351,23 @@ target_link_libraries(adb
     brotlienc-static
     libzstd_static
     lz4_static
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(PLATFORM_LINUX_KERNEL)
+    target_link_libraries(adb libpackagelistparser)
+endif()
+
+# termux-usb shim (bionic, set by build.sh): libadb's usb_linux.cpp calls the
+# termuxadb_* shims in libtermuxadb.a, which reference libusb_* — group them so the
+# mutual refs resolve regardless of link order. Inert unless LIBUSB_TERMUX_IMPL=1.
+if(TERMUX_USB_SHIM)
+    target_link_libraries(adb -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
+endif()
+
+if(PLATFORM_DARWIN)
+    target_link_libraries(adb "-framework CoreFoundation" "-framework IOKit" "-framework Security")
+elseif(PLATFORM_WINDOWS)
+    target_link_libraries(adb setupapi ole32 cfgmgr32 winusb gdi32 userenv ws2_32 iphlpapi)
+endif()

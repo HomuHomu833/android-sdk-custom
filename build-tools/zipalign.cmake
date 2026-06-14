@@ -31,12 +31,12 @@ target_include_directories(zipalign PRIVATE
     ${CMAKE_PREFIX_PATH}/include
     )
 
-target_link_libraries(zipalign 
+target_link_libraries(zipalign
     libutils 
     libbase
     libziparchive
     libzopfli
     liblog
-    dl
+    ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )

@@ -9,6 +9,9 @@ compile_commands.json
 CTestTestfile.cmake
 build
 pack
-src
+/src
+# termux-adb: cargo build artifacts + per-build crate cache
+patches/termux/libtermuxadb/target
+.cargo
 # remove git history
 git_remove_history.sh

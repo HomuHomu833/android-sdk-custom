@@ -52,10 +52,14 @@ add_library(libandroidfw STATIC
     ${SRC}/base/libs/androidfw/PathUtils.cpp     
     )
 
-target_compile_definitions(libandroidfw PRIVATE 
+target_compile_definitions(libandroidfw PRIVATE
     -DSTATIC_ANDROIDFW_FOR_TOOLS
     -D_GNU_SOURCE -DNDEBUG
     )
+
+if(PLATFORM_WINDOWS)
+    target_compile_options(libandroidfw PRIVATE -Wno-missing-field-initializers)
+endif()
 
 target_include_directories(libandroidfw PUBLIC
     ${SRC}/base/libs/androidfw/include

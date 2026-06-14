@@ -14,12 +14,9 @@
 # limitations under the License.
 #
 
+if(PLATFORM_LINUX_KERNEL)
+
 add_library(libselinux STATIC
-    ${SRC}/selinux/libselinux/src/android/android.c
-    ${SRC}/selinux/libselinux/src/android/android_seapp.c
-    ${SRC}/selinux/libselinux/src/avc.c
-    ${SRC}/selinux/libselinux/src/avc_internal.c
-    ${SRC}/selinux/libselinux/src/avc_sidtab.c
     ${SRC}/selinux/libselinux/src/booleans.c
     ${SRC}/selinux/libselinux/src/callbacks.c
     ${SRC}/selinux/libselinux/src/canonicalize_context.c
@@ -32,22 +29,15 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/deny_unknown.c
     ${SRC}/selinux/libselinux/src/disable.c
     ${SRC}/selinux/libselinux/src/enabled.c
-    ${SRC}/selinux/libselinux/src/fgetfilecon.c
     ${SRC}/selinux/libselinux/src/freecon.c
-    ${SRC}/selinux/libselinux/src/fsetfilecon.c
     ${SRC}/selinux/libselinux/src/get_initial_context.c
     ${SRC}/selinux/libselinux/src/getenforce.c
-    ${SRC}/selinux/libselinux/src/getfilecon.c
-    ${SRC}/selinux/libselinux/src/getpeercon.c
     ${SRC}/selinux/libselinux/src/hashtab.c
     ${SRC}/selinux/libselinux/src/init.c
     ${SRC}/selinux/libselinux/src/label.c
     ${SRC}/selinux/libselinux/src/label_backends_android.c
     ${SRC}/selinux/libselinux/src/label_file.c
     ${SRC}/selinux/libselinux/src/label_support.c
-    ${SRC}/selinux/libselinux/src/lgetfilecon.c
-    ${SRC}/selinux/libselinux/src/load_policy.c
-    ${SRC}/selinux/libselinux/src/lsetfilecon.c
     ${SRC}/selinux/libselinux/src/mapping.c
     ${SRC}/selinux/libselinux/src/matchpathcon.c
     ${SRC}/selinux/libselinux/src/policyvers.c
@@ -59,26 +49,56 @@ add_library(libselinux STATIC
     ${SRC}/selinux/libselinux/src/sestatus.c
     ${SRC}/selinux/libselinux/src/seusers.c
     ${SRC}/selinux/libselinux/src/setenforce.c
-    ${SRC}/selinux/libselinux/src/setfilecon.c
     ${SRC}/selinux/libselinux/src/setrans_client.c
     ${SRC}/selinux/libselinux/src/sha1.c
     ${SRC}/selinux/libselinux/src/stringrep.c
-    ${SRC}/selinux/libselinux/src/android/android_device.c
     )
 
+if(PLATFORM_LINUX_KERNEL)
+    target_sources(libselinux PRIVATE
+        ${SRC}/selinux/libselinux/src/avc.c
+        ${SRC}/selinux/libselinux/src/avc_internal.c
+        ${SRC}/selinux/libselinux/src/avc_sidtab.c
+        ${SRC}/selinux/libselinux/src/load_policy.c
+        ${SRC}/selinux/libselinux/src/android/android.c
+        ${SRC}/selinux/libselinux/src/android/android_seapp.c
+        ${SRC}/selinux/libselinux/src/fgetfilecon.c
+        ${SRC}/selinux/libselinux/src/fsetfilecon.c
+        ${SRC}/selinux/libselinux/src/getfilecon.c
+        ${SRC}/selinux/libselinux/src/lgetfilecon.c
+        ${SRC}/selinux/libselinux/src/lsetfilecon.c
+        ${SRC}/selinux/libselinux/src/setfilecon.c
+        # getpeercon reads a socket peer's context via getsockopt(SO_PEERSEC);
+        # needs <sys/socket.h>/netlink, absent on mingw and unused by host tools.
+        ${SRC}/selinux/libselinux/src/getpeercon.c
+        )
+endif()
+
+if(PLATFORM_ANDROID)
+    target_sources(libselinux PRIVATE
+        ${SRC}/selinux/libselinux/src/android/android_device.c
+        )
+endif()
+
 target_compile_definitions(libselinux PRIVATE
-    -DAUDITD_LOG_TAG=1003 
-    -D_GNU_SOURCE 
-    -DHOST 
+    -DAUDITD_LOG_TAG=1003
+    -D_GNU_SOURCE
+    -DHOST
     -DUSE_PCRE2
-    -DNO_PERSISTENTLY_STORED_PATTERNS 
+    -DNO_PERSISTENTLY_STORED_PATTERNS
     -DDISABLE_SETRANS
-    -DDISABLE_BOOL 
-    -DNO_MEDIA_BACKEND 
-    -DNO_X_BACKEND 
+    -DDISABLE_BOOL
+    -DNO_MEDIA_BACKEND
+    -DNO_X_BACKEND
     -DNO_DB_BACKEND
     -DPCRE2_CODE_UNIT_WIDTH=8
     )
+
+if(PLATFORM_HOST)
+    target_compile_definitions(libselinux PRIVATE -DBUILD_HOST -DHAVE_REALLOCARRAY)
+else()
+    target_compile_definitions(libselinux PRIVATE -DHAVE_STRLCPY -DHAVE_REALLOCARRAY)
+endif()
     
 target_include_directories(libselinux PRIVATE
     ${SRC}/selinux/libselinux/include 
@@ -90,3 +110,5 @@ target_include_directories(libselinux PRIVATE
     ${SRC}/pcre/include
     ${SRC}/../include
     )
+
+endif()

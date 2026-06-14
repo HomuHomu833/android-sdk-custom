@@ -37,10 +37,20 @@ add_library(libutils STATIC
     ${SRC}/core/libutils/Timers.cpp
     ${SRC}/core/libutils/Tokenizer.cpp
     ${SRC}/core/libutils/misc.cpp
-    ${SRC}/core/libutils/Trace.cpp
-    ${SRC}/core/libutils/Looper.cpp
     ${LIBUTILS_BINDER_SRC}
     )
+
+if(PLATFORM_ANDROID)
+    target_sources(libutils PRIVATE ${SRC}/core/libutils/Trace.cpp)
+endif()
+
+if(PLATFORM_LINUX_KERNEL)
+    target_sources(libutils PRIVATE ${SRC}/core/libutils/Looper.cpp)
+endif()
+
+if(PLATFORM_WINDOWS)
+    target_compile_definitions(libutils PRIVATE -DMB_CUR_MAX=1)
+endif()
 
 target_include_directories(libutils PRIVATE
     ${SRC}/core/include

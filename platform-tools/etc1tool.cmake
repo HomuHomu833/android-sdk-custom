@@ -22,4 +22,4 @@ target_include_directories(etc1tool PRIVATE
     ${SRC}/libpng
     ${SRC}/native/opengl/include
 )
-target_link_libraries(etc1tool png_static dl ${CMAKE_PREFIX_PATH}/lib/libz.a)
+target_link_libraries(etc1tool png_static ${CMAKE_DL_LIBS} ${CMAKE_PREFIX_PATH}/lib/libz.a)
