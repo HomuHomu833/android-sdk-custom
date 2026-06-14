@@ -18,7 +18,7 @@ on:
       ndk_revision:
         description: "Official NDK revision letter (optional)"
         required: false
-        default: "c"
+        default: "d"
 
 permissions:
   contents: write
