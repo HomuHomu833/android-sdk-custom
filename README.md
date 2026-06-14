@@ -1,6 +1,8 @@
 # Android SDK Custom
 
-**Android SDK Custom** is a custom-built Android SDK that replaces the default binaries with musl-based ones built using **[Zig](https://ziglang.org/)**.
+**Android SDK Custom** is a custom-built Android SDK that replaces the default binaries with rebuilt ones.
+
+It integrates alternative libc implementations like **musl** (via **[Zig](https://ziglang.org/)**), **Bionic** (from the official Android NDK), **[llvm-mingw](https://github.com/mstorsjo/llvm-mingw)** and the macOS SDK (via **[osxcross](https://github.com/tpoechtrager/osxcross)**) to provide a more flexible and portable build environment.
 
 This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lzhiyong/android-sdk-tools).
 
@@ -9,7 +11,7 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 ## 🚀 Features
 
 - Custom-built binaries, sourced from Google's Android SDK repositories.
-- Built using Zig to provide musl-based toolchains for improved portability and consistency.
+- Built using various toolchain's libc for improved portability and consistency.
 
 ---
 
