@@ -64,11 +64,11 @@ size_t strlcat(char *dst, const char *src, size_t dsize) {
 #endif /* glibc < 2.38 */
 
 /* qsort_r: GNU extension not universally available (absent on old glibc sysroots
- * regardless of arch). Provide a shim unconditionally under a private name and
- * redirect the public name via #define. <stdlib.h> is already included above so
- * any real extern declaration is locked in before the #define shadows it —
- * no static-follows-non-static conflict. Single-threaded callers (e.g. zstd
- * dictBuilder/cover.c) are unaffected by the lack of thread safety. */
+ * regardless of arch). Include <stdlib.h> first so any real extern declaration
+ * is locked in before the #define below shadows it — no static-follows-non-static
+ * conflict. Single-threaded callers (e.g. zstd dictBuilder/cover.c) are
+ * unaffected by the lack of thread safety. */
+#include <stdlib.h>
 static void *_qsort_r_ctx_;
 static int (*_qsort_r_fn_)(const void *, const void *, void *);
 static int _qsort_r_wrap_(const void *a, const void *b) {
