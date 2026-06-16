@@ -123,7 +123,7 @@ struct in_pktinfo {
 /* --- BSD mempcpy ------------------------------------------------------------
  * GNU extension (copy n bytes, return dst+n) adb uses unconditionally; BSD libcs
  * lack it, so provide an inline fallback. */
-#if (defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(mempcpy)
+#if defined(__OpenBSD__) && !defined(mempcpy)
 #include <string.h>
 static inline __attribute__((__unused__))
 void *mempcpy(void *dst, const void *src, size_t n) {
