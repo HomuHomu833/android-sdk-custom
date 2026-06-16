@@ -36,6 +36,8 @@ void InstructionSetAbort(InstructionSet isa) {
     case InstructionSet::kPowerPC:
     case InstructionSet::kS390X:
     case InstructionSet::kHexagon:
+    case InstructionSet::kMips:
+    case InstructionSet::kMips64:
     case InstructionSet::kNone:
       LOG(FATAL) << "Unsupported instruction set " << isa;
       UNREACHABLE();
@@ -65,6 +67,10 @@ const char* GetInstructionSetString(InstructionSet isa) {
       return "s390x";
     case InstructionSet::kHexagon:
       return "hexagon";
+    case InstructionSet::kMips:
+      return "mips";
+    case InstructionSet::kMips64:
+      return "mips64";
     case InstructionSet::kNone:
       return "none";
   }
@@ -93,6 +99,10 @@ InstructionSet GetInstructionSetFromString(const char* isa_str) {
     return InstructionSet::kS390X;
   } else if (strcmp("hexagon", isa_str) == 0) {
     return InstructionSet::kHexagon;
+  } else if (strcmp("mips", isa_str) == 0) {
+    return InstructionSet::kMips;
+  } else if (strcmp("mips64", isa_str) == 0) {
+    return InstructionSet::kMips64;
   }
 
   return InstructionSet::kNone;
@@ -140,6 +150,10 @@ std::vector<InstructionSet> GetSupportedInstructionSets(std::string* error_msg) 
       return {InstructionSet::kS390X};
     case InstructionSet::kHexagon:
       return {InstructionSet::kHexagon};
+    case InstructionSet::kMips:
+      return {InstructionSet::kMips};
+    case InstructionSet::kMips64:
+      return {InstructionSet::kMips64};
     default:
       *error_msg = android::base::StringPrintf("Unknown runtime ISA '%s'",
                                                GetInstructionSetString(kRuntimeISA));
@@ -170,6 +184,10 @@ static_assert(ART_FRAME_SIZE_LIMIT < kPowerPCStackOverflowReservedBytes,
 static_assert(ART_FRAME_SIZE_LIMIT < kS390XStackOverflowReservedBytes,
               "Frame size limit too large");
 static_assert(ART_FRAME_SIZE_LIMIT < kHexagonStackOverflowReservedBytes,
+              "Frame size limit too large");
+static_assert(ART_FRAME_SIZE_LIMIT < kMipsStackOverflowReservedBytes,
+              "Frame size limit too large");
+static_assert(ART_FRAME_SIZE_LIMIT < kMips64StackOverflowReservedBytes,
               "Frame size limit too large");
 
 NO_RETURN void GetStackOverflowReservedBytesFailure(const char* error_msg) {

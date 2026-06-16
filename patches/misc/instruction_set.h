@@ -38,7 +38,9 @@ enum class InstructionSet {
   kPowerPC,
   kS390X,
   kHexagon,
-  kLast = kHexagon
+  kMips,
+  kMips64,
+  kLast = kMips64
 };
 std::ostream& operator<<(std::ostream& os, InstructionSet rhs);
 
@@ -60,6 +62,10 @@ static constexpr InstructionSet kRuntimeISA = InstructionSet::kPowerPC;
 static constexpr InstructionSet kRuntimeISA = InstructionSet::kS390X;
 #elif defined(__hexagon__)
 static constexpr InstructionSet kRuntimeISA = InstructionSet::kHexagon;
+#elif defined(__mips__) && !defined(__mips64)
+static constexpr InstructionSet kRuntimeISA = InstructionSet::kMips;
+#elif defined(__mips64)
+static constexpr InstructionSet kRuntimeISA = InstructionSet::kMips64;
 #else
 static constexpr InstructionSet kRuntimeISA = InstructionSet::kNone;
 #endif
@@ -74,6 +80,8 @@ static constexpr PointerSize kLoongArch64PointerSize = PointerSize::k64;
 static constexpr PointerSize kPowerPCPointerSize = PointerSize::k64;
 static constexpr PointerSize kS390XPointerSize = PointerSize::k64;
 static constexpr PointerSize kHexagonPointerSize = PointerSize::k32;
+static constexpr PointerSize kMipsPointerSize = PointerSize::k32;
+static constexpr PointerSize kMips64PointerSize = PointerSize::k64;
 
 // ARM64 default SVE vector length.
 static constexpr size_t kArm64DefaultSVEVectorLength = 256;
@@ -89,6 +97,8 @@ static constexpr size_t kLoongArch64CodeAlignment = 16;
 static constexpr size_t kPowerPCCodeAlignment = 16;
 static constexpr size_t kS390XCodeAlignment = 16;
 static constexpr size_t kHexagonCodeAlignment = 16;
+static constexpr size_t kMipsCodeAlignment = 4;
+static constexpr size_t kMips64CodeAlignment = 4;
 
 // Instruction alignment (every instruction must be aligned at this boundary). This differs from
 // code alignment, which applies only to the first instruction of a subroutine.
@@ -104,6 +114,8 @@ static constexpr size_t kLoongArch64InstructionAlignment = 4;
 static constexpr size_t kPowerPCInstructionAlignment = 4;
 static constexpr size_t kS390XInstructionAlignment = 2;
 static constexpr size_t kHexagonInstructionAlignment = 4;
+static constexpr size_t kMipsInstructionAlignment = 4;
+static constexpr size_t kMips64InstructionAlignment = 4;
 
 const char* GetInstructionSetString(InstructionSet isa);
 
@@ -135,6 +147,10 @@ constexpr PointerSize GetInstructionSetPointerSize(InstructionSet isa) {
       return kS390XPointerSize;
     case InstructionSet::kHexagon:
       return kHexagonPointerSize;
+    case InstructionSet::kMips:
+      return kMipsPointerSize;
+    case InstructionSet::kMips64:
+      return kMips64PointerSize;
 
     case InstructionSet::kNone:
       break;
@@ -154,6 +170,8 @@ constexpr bool IsValidInstructionSet(InstructionSet isa) {
     case InstructionSet::kPowerPC:
     case InstructionSet::kS390X:
     case InstructionSet::kHexagon:
+    case InstructionSet::kMips:
+    case InstructionSet::kMips64:
       return true;
 
     case InstructionSet::kNone:
@@ -184,6 +202,10 @@ constexpr size_t GetInstructionSetInstructionAlignment(InstructionSet isa) {
       return kS390XInstructionAlignment;
     case InstructionSet::kHexagon:
       return kHexagonInstructionAlignment;
+    case InstructionSet::kMips:
+      return kMipsInstructionAlignment;
+    case InstructionSet::kMips64:
+      return kMips64InstructionAlignment;
 
     case InstructionSet::kNone:
       break;
@@ -213,6 +235,10 @@ constexpr size_t GetInstructionSetCodeAlignment(InstructionSet isa) {
       return kS390XCodeAlignment;
     case InstructionSet::kHexagon:
       return kHexagonCodeAlignment;
+    case InstructionSet::kMips:
+      return kMipsCodeAlignment;
+    case InstructionSet::kMips64:
+      return kMips64CodeAlignment;
 
     case InstructionSet::kNone:
       break;
@@ -233,6 +259,8 @@ constexpr size_t GetInstructionSetEntryPointAdjustment(InstructionSet isa) {
     case InstructionSet::kPowerPC:
     case InstructionSet::kS390X:
     case InstructionSet::kHexagon:
+    case InstructionSet::kMips:
+    case InstructionSet::kMips64:
       return 0;
     case InstructionSet::kThumb2: {
       // +1 to set the low-order bit so a BLX will switch to Thumb mode
@@ -251,6 +279,7 @@ constexpr bool Is64BitInstructionSet(InstructionSet isa) {
     case InstructionSet::kThumb2:
     case InstructionSet::kX86:
     case InstructionSet::kHexagon:
+    case InstructionSet::kMips:
       return false;
 
     case InstructionSet::kArm64:
@@ -259,6 +288,7 @@ constexpr bool Is64BitInstructionSet(InstructionSet isa) {
     case InstructionSet::kLoongArch64:
     case InstructionSet::kPowerPC:
     case InstructionSet::kS390X:
+    case InstructionSet::kMips64:
       return true;
 
     case InstructionSet::kNone:
@@ -293,6 +323,10 @@ constexpr size_t GetBytesPerGprSpillLocation(InstructionSet isa) {
       return 8;
     case InstructionSet::kS390X:
       return 8;
+    case InstructionSet::kMips:
+      return 4;
+    case InstructionSet::kMips64:
+      return 8;
 
     case InstructionSet::kNone:
       break;
@@ -321,6 +355,10 @@ constexpr size_t GetBytesPerFprSpillLocation(InstructionSet isa) {
     case InstructionSet::kPowerPC:
       return 8;
     case InstructionSet::kS390X:
+      return 8;
+    case InstructionSet::kMips:
+      return 8;
+    case InstructionSet::kMips64:
       return 8;
 
     case InstructionSet::kNone:
@@ -361,12 +399,19 @@ namespace instruction_set_details {
 #ifndef ART_STACK_OVERFLOW_GAP_hexagon
 #define ART_STACK_OVERFLOW_GAP_hexagon 16384
 #endif
+#ifndef ART_STACK_OVERFLOW_GAP_mips
+#define ART_STACK_OVERFLOW_GAP_mips 16384
+#endif
+#ifndef ART_STACK_OVERFLOW_GAP_mips64
+#define ART_STACK_OVERFLOW_GAP_mips64 16384
+#endif
 
 #if !defined(ART_STACK_OVERFLOW_GAP_arm) || !defined(ART_STACK_OVERFLOW_GAP_arm64) || \
     !defined(ART_STACK_OVERFLOW_GAP_riscv64) || !defined(ART_STACK_OVERFLOW_GAP_loongarch64) || \
     !defined(ART_STACK_OVERFLOW_GAP_x86) || !defined(ART_STACK_OVERFLOW_GAP_x86_64) || \
     !defined(ART_STACK_OVERFLOW_GAP_powerpc) || !defined(ART_STACK_OVERFLOW_GAP_s390x) || \
-    !defined(ART_STACK_OVERFLOW_GAP_hexagon)
+    !defined(ART_STACK_OVERFLOW_GAP_hexagon) || !defined(ART_STACK_OVERFLOW_GAP_mips) || \
+    !defined(ART_STACK_OVERFLOW_GAP_mips64)
 #error "Missing defines for stack overflow gap"
 #endif
 
@@ -379,6 +424,8 @@ static constexpr size_t kLoongArch64StackOverflowReservedBytes = ART_STACK_OVERF
 static constexpr size_t kPowerPCStackOverflowReservedBytes = ART_STACK_OVERFLOW_GAP_powerpc;
 static constexpr size_t kS390XStackOverflowReservedBytes = ART_STACK_OVERFLOW_GAP_s390x;
 static constexpr size_t kHexagonStackOverflowReservedBytes = ART_STACK_OVERFLOW_GAP_hexagon;
+static constexpr size_t kMipsStackOverflowReservedBytes    = ART_STACK_OVERFLOW_GAP_mips;
+static constexpr size_t kMips64StackOverflowReservedBytes  = ART_STACK_OVERFLOW_GAP_mips64;
 
 NO_RETURN void GetStackOverflowReservedBytesFailure(const char* error_msg);
 
@@ -413,6 +460,12 @@ constexpr size_t GetStackOverflowReservedBytes(InstructionSet isa) {
       return instruction_set_details::kS390XStackOverflowReservedBytes;
     case InstructionSet::kHexagon:
       return instruction_set_details::kHexagonStackOverflowReservedBytes;
+
+    case InstructionSet::kMips:
+      return instruction_set_details::kMipsStackOverflowReservedBytes;
+
+    case InstructionSet::kMips64:
+      return instruction_set_details::kMips64StackOverflowReservedBytes;
 
     case InstructionSet::kNone:
       instruction_set_details::GetStackOverflowReservedBytesFailure(
