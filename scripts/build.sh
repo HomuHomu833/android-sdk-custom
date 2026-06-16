@@ -60,7 +60,7 @@ case "$PLATFORM" in
         # strlcpy/strlcat: glibc declares them only from 2.38, so force-include a
         # shim rather than raise the runtime glibc floor. HAVE_STRLCPY/HAVE_STRLCAT
         # make deps with their own fallback (e.g. selinux) yield to it.
-        CROSS_CFLAGS="-Wno-error=date-time -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
+        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE=1 -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
     # libpng SIMD doesn't build on every target: 32-bit Thumb lacks the Neon asm
