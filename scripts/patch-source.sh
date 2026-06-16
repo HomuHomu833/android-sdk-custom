@@ -861,4 +861,7 @@ print('termux fastboot: find_usb_device_termux added + dispatch')
 PYEOF
 fi
 
+# mips brokey brokey
+protobuf/src/google/protobuf/port_def.inc
+
 log "Source fixups applied"
