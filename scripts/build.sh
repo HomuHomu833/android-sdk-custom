@@ -75,6 +75,13 @@ case "$PLATFORM" in
         CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
       powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
+    # mips64 LP64 (n64 ABI): pre-empt asm-generic/int-l64.h, which defines
+    # __s64/__u64 as 'long', to avoid redefinition conflicts with e2fsprogs and
+    # other code that expects 'long long'. See patches/misc/mips64-int-ll64.h.
+    case "$TARGET" in
+      mips64-*gnuabi64|mips64el-*gnuabi64)
+        CROSS_CFLAGS="$CROSS_CFLAGS -include $ROOTDIR/patches/misc/mips64-int-ll64.h" ;;
+    esac
     # x32: force local-exec TLS. lld can't relax R_X86_64_GOTTPOFF to clang's
     # 32-bit initial-exec sequence (link fails); these are static, so local-exec fits.
     case "$TARGET" in

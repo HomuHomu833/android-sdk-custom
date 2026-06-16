@@ -900,19 +900,6 @@ print('termux fastboot: find_usb_device_termux added + dispatch')
 PYEOF
 fi
 
-# e2fsprogs ext2_types.h: on MIPS64 LP64 (n64 ABI) the kernel's asm-generic/int-l64.h
-# defines __s64/__u64 as 'long', but ext2_types.h hardcodes 'long long' — same size,
-# different type token, causing a redefinition error. Align ext2_types.h with the
-# kernel definition (long == long long == 64-bit on LP64 MIPS).
-case "$TARGET" in
-  mips64-*gnuabi64|mips64el-*gnuabi64)
-    sed -i \
-      -e 's/typedef __signed__ long long[[:space:]]*__s64;/typedef __signed__ long\t__s64;/' \
-      -e 's/typedef unsigned long long[[:space:]]*__u64;/typedef unsigned long\t__u64;/' \
-      ${PWD_SRC}/src/e2fsprogs/lib/ext2fs/ext2_types.h
-    ;;
-esac
-
 # adb sysdeps/errno.cpp: the ERRNO_VALUE static_asserts verify that the host errno
 # numbers match the ADB wire-protocol values. MIPS Linux uses different errno values
 # (inherited from IRIX), so the asserts fail. Guard them out; the switch-based
