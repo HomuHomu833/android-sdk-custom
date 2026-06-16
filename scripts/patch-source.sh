@@ -125,7 +125,7 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 # riscv32/powerpc: drop the std::atomic is_always_lock_free static_assert (not
 # always lock-free there).
 case "$TARGET" in
-  riscv32-*|powerpc-*)
+  riscv32-*|powerpc-*|mips-*|mipsel-*)
     sed -i 's/^\([[:space:]]*\)static_assert(std::atomic<.*>::is_always_lock_free);/\1\/\/ &/' ${PWD_SRC}/src/art/libartbase/base/metrics/metrics.h
     ;;
 esac
@@ -241,6 +241,45 @@ sed -i 's@^\([[:space:]]*\)static_assert(sizeof(unsigned long) == 8, "Platform i
 # is struct sigcontext with a .pc field) by inserting a case before #else/#error.
 sed -i '/^#else$/{N;s/^#else\n#error "Undefined Architecture."/#elif defined(__hexagon__)\n    return reinterpret_cast<void*>(context->uc_mcontext.pc);\n#else\n#error "Undefined Architecture."/;}' \
   "${PWD_SRC}/src/abseil-cpp/absl/debugging/internal/examine_stack.cc"
+
+# abseil examine_stack.cc: add MIPS to GetProgramCounter() if not already present
+# (newer AOSP abseil has it; older snapshots may not). Field names differ by libc:
+#   glibc MIPS:   mcontext_t has a direct .pc field
+#   musl/OpenBSD: mcontext_t is struct sigcontext with .sc_pc
+#   NetBSD:       mcontext_t uses __gregs[_REG_EPC]
+python3 << 'PYEOF'
+import sys
+
+path = 'src/abseil-cpp/absl/debugging/internal/examine_stack.cc'
+with open(path) as f:
+    content = f.read()
+
+if 'defined(__mips__)' in content:
+    print('examine_stack.cc: MIPS already present, skipping')
+    sys.exit(0)
+
+mips_block = (
+    '#elif defined(__mips__)\n'
+    '#if defined(__GLIBC__)\n'
+    '    return reinterpret_cast<void*>(context->uc_mcontext.pc);\n'
+    '#elif defined(__NetBSD__)\n'
+    '    return reinterpret_cast<void*>(context->uc_mcontext.__gregs[_REG_EPC]);\n'
+    '#else  // musl, OpenBSD: mcontext_t is struct sigcontext\n'
+    '    return reinterpret_cast<void*>(context->uc_mcontext.sc_pc);\n'
+    '#endif\n'
+)
+
+# Insert before the trailing #else/#error (which follows the hexagon elif we just added).
+old = '#else\n#error "Undefined Architecture."'
+if old not in content:
+    print('examine_stack.cc: trailing #else/#error not found, skipping', file=sys.stderr)
+    sys.exit(0)
+
+content = content.replace(old, mips_block + old, 1)
+with open(path, 'w') as f:
+    f.write(content)
+print('examine_stack.cc: MIPS GetProgramCounter patch applied')
+PYEOF
 
 # abseil conditions.h: the Win32 guard wrongly excluded hexagon, leaving _exit
 # undeclared; drop hexagon from it (<unistd.h> then declares _exit on hexagon musl).
@@ -860,6 +899,27 @@ with open(path, 'w') as f: f.write(content)
 print('termux fastboot: find_usb_device_termux added + dispatch')
 PYEOF
 fi
+
+# e2fsprogs ext2_types.h: on MIPS64 LP64 (n64 ABI) the kernel's asm-generic/int-l64.h
+# defines __s64/__u64 as 'long', but ext2_types.h hardcodes 'long long' — same size,
+# different type token, causing a redefinition error. Align ext2_types.h with the
+# kernel definition (long == long long == 64-bit on LP64 MIPS).
+case "$TARGET" in
+  mips64-*gnuabi64|mips64el-*gnuabi64)
+    sed -i \
+      -e 's/typedef __signed__ long long[[:space:]]*__s64;/typedef __signed__ long\t__s64;/' \
+      -e 's/typedef unsigned long long[[:space:]]*__u64;/typedef unsigned long\t__u64;/' \
+      ${PWD_SRC}/src/e2fsprogs/lib/ext2fs/ext2_types.h
+    ;;
+esac
+
+# adb sysdeps/errno.cpp: the ERRNO_VALUE static_asserts verify that the host errno
+# numbers match the ADB wire-protocol values. MIPS Linux uses different errno values
+# (inherited from IRIX), so the asserts fail. Guard them out; the switch-based
+# translation function that follows uses the actual MIPS constants, so translation
+# still works correctly at runtime.
+sed -i 's@#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")@#if !defined(__mips__)\n#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")\n#else\n#define ERRNO_VALUE(error_name, wire_value) /* mips errno numbers differ from ADB wire values */\n#endif@' \
+    ${PWD_SRC}/src/adb/sysdeps/errno.cpp
 
 # mips brokey brokey
 sed -i 's/!defined(__i386__)$/!defined(__i386__) \&\& \\\n    !defined(__mips__)/' src/protobuf/src/google/protobuf/port_def.inc

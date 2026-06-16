@@ -237,10 +237,16 @@ esac
 mkdir -p "$EXTRA_PREFIX"
 if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
   log "Building zlib (static, $TARGET)"
+  # MIPS with -mabicalls (glibc default) requires PIC; without -fPIC clang emits a
+  # warning to stderr that makes zlib's configure think the compiler is "too harsh".
+  case "$TARGET" in
+    mips*|mipsel*) ZLIB_CFLAGS="-fPIC" ;;
+    *)             ZLIB_CFLAGS="" ;;
+  esac
   ( cd "$ROOTDIR"
     fetch --dir=/tmp -o zlib-1.3.1.tar.xz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz && xz -d < /tmp/zlib-1.3.1.tar.xz | tar -x && rm /tmp/zlib-1.3.1.tar.xz
     cd zlib-1.3.1
-    CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" ./configure --prefix="$EXTRA_PREFIX" --static
+    CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$ZLIB_CFLAGS" ./configure --prefix="$EXTRA_PREFIX" --static
     make -j"$JOBS" install )
 fi
 if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
