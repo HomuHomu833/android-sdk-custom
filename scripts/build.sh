@@ -70,7 +70,9 @@ case "$PLATFORM" in
     # libpng's own -D...=2 (-Wmacro-redefined). Thumb keeps the global -D (libpng's
     # arch regex ignores "thumb", so nothing collides).
     case "$TARGET" in
-      thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
+      thumb-*|thumbeb-*)
+        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
+        CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
       powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
     # x32: force local-exec TLS. lld can't relax R_X86_64_GOTTPOFF to clang's
@@ -149,7 +151,9 @@ case "$PLATFORM" in
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     # Per-arch SIMD/TLS, same as linux (see there for the PNG_POWERPC_VSX why).
     case "$TARGET" in
-      thumb-*|thumbeb-*)        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
+      thumb-*|thumbeb-*)
+        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
+        CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
       powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
     case "$TARGET" in
