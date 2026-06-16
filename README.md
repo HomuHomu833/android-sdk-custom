@@ -31,6 +31,8 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 - **ARM Family**: `armhf`, `armeb`, `aarch64`, `aarch64_be`
 - **RISC-V**: `riscv32`, `riscv64`
 - **PowerPC**: `powerpc`, `powerpc64`, `powerpc64le`
+- **MIPS**: `mips`, `mipsel`, `mips64`, `mips64el`
+- **Thumb**: `thumb`, `thumbeb`
 - **Other**: `loongarch64`, `s390x`, `hexagon`
 
 ---
