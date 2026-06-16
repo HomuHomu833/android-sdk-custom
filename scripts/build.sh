@@ -57,14 +57,13 @@ case "$PLATFORM" in
         CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
-        # _GNU_SOURCE: AOSP/host code (and deps like zstd cover.c's qsort_r) need
-        # GNU extensions glibc hides; musl exposes them anyway. Passed valueless
-        # (clang's bare -D makes `1`) to match upstream's bare #define and dodge
-        # -Wmacro-redefined.
+        # _GNU_SOURCE=1: AOSP/host code (and deps like zstd cover.c's qsort_r) need
+        # GNU extensions glibc hides; musl exposes them anyway. Use =1 to match
+        # zig's own built-in definition and avoid -Wmacro-redefined.
         # strlcpy/strlcat: glibc declares them only from 2.38, so force-include a
         # shim rather than raise the runtime glibc floor. HAVE_STRLCPY/HAVE_STRLCAT
         # make deps with their own fallback (e.g. selinux) yield to it.
-        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE= -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
+        CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE=1 -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
     # libpng SIMD doesn't build on every target: 32-bit Thumb lacks the Neon asm
