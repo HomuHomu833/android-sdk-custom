@@ -63,23 +63,23 @@ size_t strlcat(char *dst, const char *src, size_t dsize) {
 #endif /* !ANDROID_SDK_STRL_COMPAT_IMPLEMENTATION */
 #endif /* glibc < 2.38 */
 
-/* qsort_r: added to glibc in 2.8. zig's MIPS glibc sysroot minimum is older,
- * so the declaration may be absent even with _GNU_SOURCE=1. Supply a
- * thread-unsafe shim (single-threaded callers like zstd dictBuilder are fine).
- * Static per-TU so it doesn't conflict with any real symbol at link time. */
-#if defined(__GLIBC__) && (!defined(__GLIBC_PREREQ) || !__GLIBC_PREREQ(2, 8))
-#include <stdlib.h>
+/* qsort_r: GNU extension not universally available (absent on old glibc sysroots
+ * regardless of arch). Provide a shim unconditionally under a private name and
+ * redirect the public name via #define. <stdlib.h> is already included above so
+ * any real extern declaration is locked in before the #define shadows it —
+ * no static-follows-non-static conflict. Single-threaded callers (e.g. zstd
+ * dictBuilder/cover.c) are unaffected by the lack of thread safety. */
 static void *_qsort_r_ctx_;
 static int (*_qsort_r_fn_)(const void *, const void *, void *);
 static int _qsort_r_wrap_(const void *a, const void *b) {
     return _qsort_r_fn_(a, b, _qsort_r_ctx_);
 }
 static __attribute__((__unused__)) void
-qsort_r(void *base, size_t nmemb, size_t size,
-        int (*cmp)(const void *, const void *, void *), void *arg) {
+_sdk_qsort_r(void *base, size_t nmemb, size_t size,
+             int (*cmp)(const void *, const void *, void *), void *arg) {
     _qsort_r_ctx_ = arg; _qsort_r_fn_ = cmp;
     qsort(base, nmemb, size, _qsort_r_wrap_);
 }
-#endif /* glibc < 2.8 */
+#define qsort_r _sdk_qsort_r
 
 #endif /* ANDROID_SDK_STRL_COMPAT_H */
