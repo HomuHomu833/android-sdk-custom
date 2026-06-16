@@ -862,6 +862,6 @@ PYEOF
 fi
 
 # mips brokey brokey
-protobuf/src/google/protobuf/port_def.inc
+sed -i 's/!defined(__i386__)$/!defined(__i386__) \&\& \\\n    !defined(__mips__)/' src/protobuf/src/google/protobuf/port_def.inc
 
 log "Source fixups applied"
