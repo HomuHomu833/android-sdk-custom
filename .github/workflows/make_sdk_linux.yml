@@ -6,7 +6,7 @@ on:
       version:
         description: "Platform Tools Version"
         required: true
-        default: "36.0.2"
+        default: "37.0.0"
       tag:
         description: "Android Source Tag"
         required: true
