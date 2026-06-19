@@ -10,7 +10,7 @@ on:
       tag:
         description: "Android Source Tag"
         required: true
-        default: "android-16.0.0_r4"
+        default: "android-17.0.0_r1"
       ndk_version:
         description: "Official NDK version for the bionic clang"
         required: true

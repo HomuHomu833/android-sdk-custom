@@ -6,7 +6,7 @@
 # time, so editing scripts/ needs no rebuild.
 #
 #   docker run --rm -v "$PWD:/work" -w /work \
-#     -e PLATFORM=linux -e TARGET=x86_64-linux-musl -e TAG=android-16.0.0_r4 \
+#     -e PLATFORM=linux -e TARGET=x86_64-linux-musl -e TAG=android-17.0.0_r1 \
 #     ghcr.io/<owner>/sdk-builder \
 #     bash -c 'scripts/fetch-source.sh && scripts/build.sh'
 FROM ubuntu:24.04

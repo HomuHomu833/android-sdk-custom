@@ -22,7 +22,7 @@ on:
         description: "sdkmanager build-tools package"
         required: false
         type: string
-        default: "36.1.0"
+        default: "37.0.0"
       ndk_version:
         description: "Official NDK version for the bionic clang (bionic only)"
         required: false
