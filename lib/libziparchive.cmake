@@ -22,16 +22,11 @@ add_library(libziparchive STATIC
     ${SRC}/libziparchive/zip_error.cpp
     )
 
-if(NOT PLATFORM_WINDOWS)
-    target_sources(libziparchive PRIVATE
-        ${SRC}/libziparchive/incfs_support/signal_handling.cpp
-        )
-endif()
-
 target_compile_definitions(libziparchive PRIVATE
     -DZLIB_CONST
     -D_FILE_OFFSET_BITS=64
     -DZIPARCHIVE_DISABLE_CALLBACK_API=1
+    -DINCFS_SUPPORT_DISABLED=1
     )
 
 if(PLATFORM_WINDOWS)

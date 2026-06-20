@@ -14,7 +14,12 @@
 # limitations under the License.
 #
 
-add_executable(dmtracedump 
-    ${SRC}/art/tools/dmtracedump/tracedump.cc
+add_library(libcrypto_utils STATIC
+    ${SRC}/core/libcrypto_utils/android_pubkey.cpp
     )
-target_link_libraries(dmtracedump ${CMAKE_DL_LIBS} ${CMAKE_PREFIX_PATH}/lib/libz.a)
+
+target_include_directories(libcrypto_utils PRIVATE
+    ${SRC}/core/libcrypto_utils/include
+    ${SRC}/boringssl/include
+    ${SRC}/abseil-cpp
+    )

@@ -92,7 +92,6 @@ add_library(libdexfile STATIC
     ${SRC}/art/libdexfile/dex/descriptors_names.cc
     ${SRC}/art/libdexfile/dex/dex_file.cc
     ${SRC}/art/libdexfile/dex/dex_file_exception_helpers.cc
-    ${SRC}/art/libdexfile/dex/dex_file_layout.cc
     ${SRC}/art/libdexfile/dex/dex_file_loader.cc
     ${SRC}/art/libdexfile/dex/dex_file_tracking_registrar.cc
     ${SRC}/art/libdexfile/dex/dex_file_verifier.cc

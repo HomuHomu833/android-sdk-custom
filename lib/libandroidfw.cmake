@@ -35,6 +35,7 @@ add_library(libandroidfw STATIC
     ${SRC}/base/libs/androidfw/LocaleDataLookup.cpp
     ${SRC}/base/libs/androidfw/misc.cpp
     ${SRC}/base/libs/androidfw/NinePatch.cpp
+    ${SRC}/base/libs/androidfw/CursorWindow.cpp
     ${SRC}/base/libs/androidfw/ObbFile.cpp
     ${SRC}/base/libs/androidfw/PosixUtils.cpp
     ${SRC}/base/libs/androidfw/Png.cpp

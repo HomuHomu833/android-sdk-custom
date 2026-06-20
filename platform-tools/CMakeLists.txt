@@ -18,11 +18,6 @@ project(platform-tools)
 # executable files output path
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME})
 
-# this tool has removed by google after 33.0.4
-if(TOOLS_VERSION VERSION_LESS_EQUAL "33.0.4")
-  include(dmtracedump.cmake)
-endif()
-
 include(hprof-conv.cmake)
 include(sqlite3.cmake)
 include(etc1tool.cmake)

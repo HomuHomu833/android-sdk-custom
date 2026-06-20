@@ -272,15 +272,6 @@ target_include_directories(libfastdeploy PRIVATE
     ${SRC}/boringssl/include
     )
 
-add_library(libcrypto STATIC
-    ${SRC}/core/libcrypto_utils/android_pubkey.cpp
-    )
-target_include_directories(libcrypto PRIVATE
-    ${SRC}/core/libcrypto_utils/include 
-    ${SRC}/boringssl/include
-    ${SRC}/abseil-cpp
-    )
-
 add_executable(adb
     ${SRC}/adb/client/adb_client.cpp
     ${SRC}/adb/client/bugreport.cpp
@@ -323,7 +314,7 @@ target_link_libraries(adb
     libadb_tls_connection
     libadb_pairing_connection
     libadb_pairing_auth
-    libcrypto
+    libcrypto_utils
     libadb_sysdeps
     libfastdeploy
     ${SELINUX_LINK_LIBS}
