@@ -52,6 +52,10 @@ cp patches/misc/unscaledcycleclock.cc  src/abseil-cpp/absl/base/internal/unscale
 
 cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/CombinedIterator.h
 
+# libbase/file.cpp uses std::string::resize_and_overwrite (C++23). Provide a C++20
+# compatible fallback for toolchains whose libc++ doesn't expose it in C++20 mode.
+patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
+
 # aapt2 proto include-path rewrites
 sed -i 's#frameworks/base/tools/aapt2/Resources.proto#Resources.proto#g'         src/base/tools/aapt2/ApkInfo.proto
 sed -i 's#frameworks/base/tools/aapt2/Configuration.proto#Configuration.proto#g'  src/base/tools/aapt2/Resources.proto
