@@ -6,11 +6,11 @@ on:
       version:
         description: "Platform Tools Version (release tag)"
         required: true
-        default: "36.0.2"
+        default: "37.0.0"
       tag:
         description: "Android Source Tag"
         required: true
-        default: "android-16.0.0_r4"
+        default: "android-17.0.0_r1"
       ndk_version:
         description: "Official NDK version for the bionic clang"
         required: true

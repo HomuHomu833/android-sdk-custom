@@ -4,7 +4,7 @@
 #
 #   TARGET               target triple (names the artifact, locates the binaries)
 #   BUILT_BIN            dir of built host tools (default: $OUT/bin-$TARGET)
-#   BUILD_TOOLS_VERSION  sdkmanager build-tools package (default: 36.1.0)
+#   BUILD_TOOLS_VERSION  sdkmanager build-tools package (default: 37.0.0)
 #   CMDLINE_TOOLS_URL    commandline-tools zip (default: linux 13114758)
 #   ROOTDIR              work dir (default: cwd)
 #   DEST                 where the archive is written (default: $ROOTDIR)
@@ -16,7 +16,7 @@ ROOTDIR="${ROOTDIR:-$PWD}"
 PLATFORM="${PLATFORM:-linux}"
 OUT="${OUT:-$ROOTDIR/out}"
 BUILT_BIN="${BUILT_BIN:-$OUT/bin-$TARGET}"
-BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-36.1.0}"
+BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-37.0.0}"
 CMDLINE_TOOLS_URL="${CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip}"
 DEST="${DEST:-$ROOTDIR}"
 cd "$ROOTDIR"

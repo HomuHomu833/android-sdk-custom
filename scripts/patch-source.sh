@@ -52,6 +52,24 @@ cp patches/misc/unscaledcycleclock.cc  src/abseil-cpp/absl/base/internal/unscale
 
 cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/CombinedIterator.h
 
+# libbase/file.cpp uses std::string::resize_and_overwrite (C++23). Provide a C++20
+# compatible fallback for toolchains whose libc++ doesn't expose it in C++20 mode.
+patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
+
+# adb mDNS: make the Rust-backed adbmdns bridge optional so targets without a Rust
+# std (exotic BSD/PowerPC/-none triples) fall back to the openscreen backend. The
+# bridge is gated by ADB_NO_RUST_MDNS, set by adb.cmake when HAVE_RUST_MDNS is off.
+patch -p1 -d "$ROOTDIR" -i patches/misc/adb-mdns-openscreen-fallback.patch
+
+# adb mDNS: the bridge's netwatch only targets linux/macos/windows; route
+# target_os=android to the (netlink) linux backend so the bionic build compiles.
+patch -p1 -d "$ROOTDIR" -i patches/misc/adbmdns-netwatch-android.patch
+
+# protobuf/upb: disable the aarch64 inline-asm varint path on windows; LLVM can't
+# emit SEH unwind info for inline asm on aarch64-mingw (Failed to evaluate function
+# length). Falls back to the portable C path on aarch64-windows only.
+patch -p1 -d "$ROOTDIR" -i patches/misc/upb-aarch64-windows-no-asm.patch
+
 # aapt2 proto include-path rewrites
 sed -i 's#frameworks/base/tools/aapt2/Resources.proto#Resources.proto#g'         src/base/tools/aapt2/ApkInfo.proto
 sed -i 's#frameworks/base/tools/aapt2/Configuration.proto#Configuration.proto#g'  src/base/tools/aapt2/Resources.proto
@@ -156,7 +174,7 @@ s/.*/#if defined(__arm__) \&\& !defined(__aarch64__)\
 #endif/
 }' ${PWD_SRC}/src/art/libartbase/base/utils.cc
 sed -i '/FlushCpuCaches/,/}/ {
-  /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/i #if !defined(__s390x__) && !defined(__ppc__) && !defined(__hexagon__)
+  /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/i #if !defined(__s390x__) && !defined(__ppc__) && !defined(__hexagon__) && !defined(__riscv)
   /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/a #endif
 }' ${PWD_SRC}/src/art/libartbase/base/utils.cc
 
@@ -664,7 +682,11 @@ else:
 #if __has_include(<sys/auxv.h>)
 #include <sys/auxv.h>
 
-void OPENSSL_cpuid_setup(void) {
+// OPENSSL_armcap_P, ARMV*, and OPENSSL_cpuid_setup live in namespace bssl; the
+// original file's `using namespace bssl;` is inside the OpenBSD-only block.
+using namespace bssl;
+
+void bssl::OPENSSL_cpuid_setup(void) {
   unsigned long hwcap = 0;
   elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
   if (!(hwcap & (1UL << 1))) {  // ASIMD/NEON
@@ -680,7 +702,7 @@ void OPENSSL_cpuid_setup(void) {
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-void OPENSSL_cpuid_setup(void) {}
+void bssl::OPENSSL_cpuid_setup(void) {}
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/FreeBSD aarch64 cpuid
 """
@@ -736,7 +758,11 @@ else:
 # define HWCAP2_SHA2  (1UL << 3)
 #endif
 
-void OPENSSL_cpuid_setup(void) {
+// OPENSSL_armcap_P/ARMV* and OPENSSL_cpuid_setup are in namespace bssl; the
+// original file's `using namespace bssl;` is inside the FreeBSD-only block.
+using namespace bssl;
+
+void bssl::OPENSSL_cpuid_setup(void) {
   unsigned long hwcap = 0, hwcap2 = 0;
   elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
   elf_aux_info(AT_HWCAP2, &hwcap2, sizeof(hwcap2));
@@ -751,7 +777,7 @@ void OPENSSL_cpuid_setup(void) {
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD/OpenBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-void OPENSSL_cpuid_setup(void) {}
+void bssl::OPENSSL_cpuid_setup(void) {}
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/OpenBSD ARM 32-bit cpuid
 """

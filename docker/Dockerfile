@@ -6,7 +6,7 @@
 # time, so editing scripts/ needs no rebuild.
 #
 #   docker run --rm -v "$PWD:/work" -w /work \
-#     -e PLATFORM=linux -e TARGET=x86_64-linux-musl -e TAG=android-16.0.0_r4 \
+#     -e PLATFORM=linux -e TARGET=x86_64-linux-musl -e TAG=android-17.0.0_r1 \
 #     ghcr.io/<owner>/sdk-builder \
 #     bash -c 'scripts/fetch-source.sh && scripts/build.sh'
 FROM ubuntu:24.04
@@ -106,20 +106,43 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && cd / \
     && rm -rf /tmp/osxcross
 
-# Rust (termux-usb shim): builds libtermuxadb.a for the bionic adb/fastboot. As a
-# staticlib (libusb1-sys link feature off) it needs no C cross-compile/NDK linker,
-# just std for the android targets. Installed from the standalone dist tarballs via
-# the aria2c fetch helper (rustup-init needs curl/wget, absent here), read-only
-# under /opt/rust; build.sh uses a writable CARGO_HOME. Host x86_64 (the CI runner).
-ARG RUST_VERSION=1.84.0
+# Rust: builds two pure-Rust staticlibs at run time -- libtermuxadb.a (bionic
+# adb/fastboot USB shim) and libzeroconf.a (adb's adbmdns mDNS bridge, the upstream
+# default backend). Both are staticlibs (no C cross-compile/NDK linker), so a target
+# only needs its rust-std. 1.85+ is required: the adbmdns crate is edition 2024.
+# Installed from the standalone dist tarballs via the aria2c fetch helper (rustup-init
+# needs curl/wget, absent here), read-only under /opt/rust; build.sh uses a writable
+# CARGO_HOME. Host x86_64 (the CI runner).
+#
+# std targets cover every triple scripts/build.sh maps for adbmdns (android, linux,
+# macOS, windows). BSD is excluded -- it has a Rust std but the crate has no BSD
+# netwatch backend -- and the exotic arches without a Rust std (mips/hexagon/-none/
+# ...) use the openscreen fallback instead. std fetch is best-effort: a target whose
+# tarball is missing for this release is skipped, and build.sh's std-presence check
+# falls back to openscreen for it -- so the image build never fails on a 404.
+ARG RUST_VERSION=1.85.0
 RUN set -eu; \
     base="https://static.rust-lang.org/dist"; \
     fetch --dir=/tmp -o rust.tar.xz "$base/rust-${RUST_VERSION}-x86_64-unknown-linux-gnu.tar.xz"; \
     mkdir -p /tmp/rust && tar -xJf /tmp/rust.tar.xz -C /tmp/rust --strip-components=1; \
     /tmp/rust/install.sh --prefix=/opt/rust --disable-ldconfig --without=rust-docs; \
     rm -rf /tmp/rust /tmp/rust.tar.xz; \
-    for t in aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android; do \
-        fetch --dir=/tmp -o "std.tar.xz" "$base/rust-std-${RUST_VERSION}-$t.tar.xz"; \
+    for t in \
+        aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android \
+        x86_64-apple-darwin aarch64-apple-darwin \
+        x86_64-pc-windows-gnu i686-pc-windows-gnu aarch64-pc-windows-gnullvm \
+        x86_64-unknown-linux-gnu x86_64-unknown-linux-musl \
+        aarch64-unknown-linux-gnu aarch64-unknown-linux-musl \
+        i686-unknown-linux-gnu i686-unknown-linux-musl \
+        arm-unknown-linux-gnueabi arm-unknown-linux-gnueabihf \
+        arm-unknown-linux-musleabi arm-unknown-linux-musleabihf \
+        riscv64gc-unknown-linux-gnu riscv64gc-unknown-linux-musl \
+        s390x-unknown-linux-gnu powerpc64le-unknown-linux-musl \
+        loongarch64-unknown-linux-gnu loongarch64-unknown-linux-musl; do \
+        if ! fetch --dir=/tmp -o "std.tar.xz" "$base/rust-std-${RUST_VERSION}-$t.tar.xz"; then \
+            echo "WARNING: rust-std for $t unavailable at ${RUST_VERSION}; adb mDNS will use openscreen fallback for it"; \
+            continue; \
+        fi; \
         mkdir -p /tmp/std && tar -xJf /tmp/std.tar.xz -C /tmp/std --strip-components=1; \
         /tmp/std/install.sh --prefix=/opt/rust --disable-ldconfig; \
         rm -rf /tmp/std /tmp/std.tar.xz; \

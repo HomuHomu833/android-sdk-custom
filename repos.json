@@ -4,6 +4,10 @@
         "url": "https://android.googlesource.com/platform/system/core"
     },
     {
+        "path": "src/fs_mgr",
+        "url": "https://android.googlesource.com/platform/system/fs/fs_mgr"
+    },
+    {
         "path": "src/extras",
         "url": "https://android.googlesource.com/platform/system/extras"
     },

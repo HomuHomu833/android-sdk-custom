@@ -8,6 +8,10 @@ static inline bool android_content_res_resource_readwrite_flags() {
     return true;
 }
 
+static inline bool android_content_res_xml_file_size_limit() {
+    return true;
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -157,10 +157,18 @@ elseif(PLATFORM_BSD)
 else()
     target_sources(libadb PRIVATE
         ${SRC}/adb/client/usb_linux.cpp
+        ${SRC}/adb/client/usb_linux_netlink.cpp
         ${SRC}/adb/fdevent/fdevent_epoll.cpp
         )
 endif()
-target_compile_definitions(libadb PRIVATE 
+
+if(HAVE_RUST_MDNS)
+    target_sources(libadb PRIVATE ${SRC}/adb/client/adbmdns/adbmdns.cpp)
+else()
+    target_compile_definitions(libadb PRIVATE -DADB_NO_RUST_MDNS)
+endif()
+
+target_compile_definitions(libadb PRIVATE
     -D_GNU_SOURCE
     -DADB_HOST=1
     )
@@ -177,6 +185,7 @@ target_include_directories(libadb PRIVATE
     ${SRC}/libziparchive/include
     ${SRC}/native/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     ${SRC}/zstd/lib
     ${SRC}/libusb/include
@@ -208,6 +217,7 @@ target_include_directories(libadb_crypto PRIVATE
     ${SRC}/core/libcrypto_utils/include
     ${SRC}/libbase/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     )
 
@@ -233,6 +243,7 @@ target_include_directories(libadb_pairing_connection PRIVATE
     ${SRC}/libbase/include
     ${SRC}/boringssl/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     )
 
@@ -245,6 +256,7 @@ target_include_directories(libadb_pairing_auth PRIVATE
     ${SRC}/libbase/include
     ${SRC}/boringssl/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     )
 
@@ -268,17 +280,9 @@ target_include_directories(libfastdeploy PRIVATE
     ${SRC}/core/libcutils/include
     ${SRC}/libbase/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     ${SRC}/boringssl/include
-    )
-
-add_library(libcrypto STATIC
-    ${SRC}/core/libcrypto_utils/android_pubkey.cpp
-    )
-target_include_directories(libcrypto PRIVATE
-    ${SRC}/core/libcrypto_utils/include 
-    ${SRC}/boringssl/include
-    ${SRC}/abseil-cpp
     )
 
 add_executable(adb
@@ -323,7 +327,7 @@ target_link_libraries(adb
     libadb_tls_connection
     libadb_pairing_connection
     libadb_pairing_auth
-    libcrypto
+    libcrypto_utils
     libadb_sysdeps
     libfastdeploy
     ${SELINUX_LINK_LIBS}
@@ -354,6 +358,14 @@ target_link_libraries(adb
     ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(HAVE_RUST_MDNS)
+    target_link_libraries(adb ${ADBMDNS_LIB})
+    if(PLATFORM_WINDOWS)
+        # rust std + windows-sys (Win32 WiFi/crypto) extra import libs
+        target_link_libraries(adb bcrypt ntdll wlanapi)
+    endif()
+endif()
 
 if(PLATFORM_LINUX_KERNEL)
     target_link_libraries(adb libpackagelistparser)

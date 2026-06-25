@@ -27,30 +27,11 @@ target_include_directories(libext4 PRIVATE
     ${SRC}/libbase/include
     )
 
-add_library(libfsmgr STATIC
-    ${SRC}/core/fs_mgr/liblp/images.cpp
-    ${SRC}/core/fs_mgr/liblp/builder.cpp
-    ${SRC}/core/fs_mgr/liblp/super_layout_builder.cpp
-    ${SRC}/core/fs_mgr/liblp/property_fetcher.cpp
-    ${SRC}/core/fs_mgr/liblp/partition_opener.cpp
-    ${SRC}/core/fs_mgr/liblp/reader.cpp
-    ${SRC}/core/fs_mgr/liblp/utility.cpp
-    ${SRC}/core/fs_mgr/liblp/writer.cpp
-    )
-target_include_directories(libfsmgr PRIVATE
-    ${SRC}/core/fs_mgr/liblp/include 
-    ${SRC}/libbase/include
-    ${SRC}/extras/ext4_utils/include 
-    ${SRC}/core/libsparse/include
-    ${SRC}/boringssl/include
-    ${SRC}/core/libcutils/include
-    )
-target_link_libraries(libfsmgr PUBLIC fmt::fmt)
-
 add_executable(fastboot
     ${SRC}/core/fastboot/bootimg_utils.cpp
     ${SRC}/core/fastboot/fastboot.cpp
     ${SRC}/core/fastboot/fastboot_driver.cpp
+    ${SRC}/core/fastboot/h2h_workaround.cpp
     ${SRC}/core/fastboot/fs.cpp
     ${SRC}/core/fastboot/filesystem.cpp
     ${SRC}/core/fastboot/super_flash_helper.cpp
@@ -78,13 +59,14 @@ endif()
 
 target_include_directories(fastboot PRIVATE
     ${SRC}/avb
-    ${SRC}/libbase/include 
-    ${SRC}/soong/cc/libbuildversion/include 
+    ${SRC}/libbase/include
+    ${SRC}/fmtlib/include
+    ${SRC}/soong/cc/libbuildversion/include
     ${SRC}/core/include 
     ${SRC}/core/adb 
     ${SRC}/core/libsparse/include
-    ${SRC}/core/fs_mgr/liblp/include 
-    ${SRC}/core/fs_mgr/libstorage_literals 
+    ${SRC}/fs_mgr/liblp/include 
+    ${SRC}/fs_mgr/libstorage_literals 
     ${SRC}/libziparchive/include
     ${SRC}/extras/ext4_utils/include 
     ${SRC}/extras/f2fs_utils
@@ -104,10 +86,12 @@ target_link_libraries(fastboot
     libziparchive
     libbuildversion
     libcutils 
-    libfsmgr 
+    liblp 
+    libcrypto_utils
     libutils
     libbase
     libext4
+    fmt::fmt
     ${SELINUX_LINK_LIBS}
     liblog
     crypto
