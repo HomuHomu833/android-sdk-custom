@@ -231,8 +231,11 @@ case "$PLATFORM" in
     esac ;;
   macos)
     case "$TARGET" in
-      x86_64-*|x86_64h-*)          ADBMDNS_RUST_TARGET=x86_64-apple-darwin ;;
-      arm64-*|arm64e-*|aarch64-*)  ADBMDNS_RUST_TARGET=aarch64-apple-darwin ;;
+      x86_64-*|x86_64h-*)  ADBMDNS_RUST_TARGET=x86_64-apple-darwin ;;
+      arm64-*|aarch64-*)   ADBMDNS_RUST_TARGET=aarch64-apple-darwin ;;
+      # arm64e: Apple's PAC ABI is a distinct static-link slice with no rust-std;
+      # the aarch64 lib is rejected at link ("incompatible arm64e ABI"), so fall
+      # through to "" -> openscreen fallback.
     esac ;;
   windows)
     case "$TARGET" in
