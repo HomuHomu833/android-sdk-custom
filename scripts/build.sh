@@ -220,6 +220,71 @@ case "$PLATFORM" in
 esac
 export CROSS_CC CROSS_CXX CROSS_LD CROSS_AR CROSS_RANLIB CROSS_STRIP CROSS_OBJCOPY CROSS_LDFLAGS
 
+ADBMDNS_RUST_TARGET=""
+case "$PLATFORM" in
+  bionic)
+    case "$TARGET" in
+      aarch64-linux-android)    ADBMDNS_RUST_TARGET=aarch64-linux-android ;;
+      armv7a-linux-androideabi) ADBMDNS_RUST_TARGET=armv7-linux-androideabi ;;
+      i686-linux-android)       ADBMDNS_RUST_TARGET=i686-linux-android ;;
+      x86_64-linux-android)     ADBMDNS_RUST_TARGET=x86_64-linux-android ;;
+    esac ;;
+  macos)
+    case "$TARGET" in
+      x86_64-*|x86_64h-*)          ADBMDNS_RUST_TARGET=x86_64-apple-darwin ;;
+      arm64-*|arm64e-*|aarch64-*)  ADBMDNS_RUST_TARGET=aarch64-apple-darwin ;;
+    esac ;;
+  windows)
+    case "$TARGET" in
+      x86_64-w64-mingw32)  ADBMDNS_RUST_TARGET=x86_64-pc-windows-gnu ;;
+      i686-w64-mingw32)    ADBMDNS_RUST_TARGET=i686-pc-windows-gnu ;;
+      aarch64-w64-mingw32) ADBMDNS_RUST_TARGET=aarch64-pc-windows-gnullvm ;;
+    esac ;;
+  linux)
+    case "$TARGET" in
+      x86_64-linux-gnu)       ADBMDNS_RUST_TARGET=x86_64-unknown-linux-gnu ;;
+      x86_64-linux-musl)      ADBMDNS_RUST_TARGET=x86_64-unknown-linux-musl ;;
+      aarch64-linux-gnu)      ADBMDNS_RUST_TARGET=aarch64-unknown-linux-gnu ;;
+      aarch64-linux-musl)     ADBMDNS_RUST_TARGET=aarch64-unknown-linux-musl ;;
+      x86-linux-gnu)          ADBMDNS_RUST_TARGET=i686-unknown-linux-gnu ;;
+      x86-linux-musl)         ADBMDNS_RUST_TARGET=i686-unknown-linux-musl ;;
+      riscv64-linux-gnu)      ADBMDNS_RUST_TARGET=riscv64gc-unknown-linux-gnu ;;
+      riscv64-linux-musl)     ADBMDNS_RUST_TARGET=riscv64gc-unknown-linux-musl ;;
+      s390x-linux-gnu)        ADBMDNS_RUST_TARGET=s390x-unknown-linux-gnu ;;
+      powerpc64le-linux-musl) ADBMDNS_RUST_TARGET=powerpc64le-unknown-linux-musl ;;
+      loongarch64-linux-gnu)  ADBMDNS_RUST_TARGET=loongarch64-unknown-linux-gnu ;;
+      arm-linux-gnueabihf)    ADBMDNS_RUST_TARGET=armv7-unknown-linux-gnueabihf ;;
+      arm-linux-musleabihf)   ADBMDNS_RUST_TARGET=armv7-unknown-linux-musleabihf ;;
+    esac ;;
+  bsd)
+    case "$TARGET" in
+      x86_64-freebsd-none) ADBMDNS_RUST_TARGET=x86_64-unknown-freebsd ;;
+      x86_64-netbsd-none)  ADBMDNS_RUST_TARGET=x86_64-unknown-netbsd ;;
+    esac ;;
+esac
+
+if [ -n "$ADBMDNS_RUST_TARGET" ]; then
+  RUST_SYSROOT="$(rustc --print sysroot 2>/dev/null || echo /opt/rust)"
+  if [ ! -d "$RUST_SYSROOT/lib/rustlib/$ADBMDNS_RUST_TARGET" ]; then
+    log "adb mDNS: rust-std for $ADBMDNS_RUST_TARGET not installed -> openscreen fallback"
+    ADBMDNS_RUST_TARGET=""
+  fi
+fi
+
+if [ -n "$ADBMDNS_RUST_TARGET" ]; then
+  export CARGO_HOME="${CARGO_HOME:-$ROOTDIR/.cargo}"
+  export "CARGO_TARGET_$(echo "$ADBMDNS_RUST_TARGET" | tr 'a-z-' 'A-Z_')_LINKER=$CROSS_CC"
+  MDNS_CRATE="$ROOTDIR/src/adb/client/adbmdns"
+  log "Building adb mDNS bridge / libzeroconf ($ADBMDNS_RUST_TARGET)"
+  ( cd "$MDNS_CRATE" && cargo rustc --release --target "$ADBMDNS_RUST_TARGET" --crate-type staticlib )
+  ADBMDNS_A="$MDNS_CRATE/target/$ADBMDNS_RUST_TARGET/release/libzeroconf.a"
+  [ -f "$ADBMDNS_A" ] || { echo "adb mDNS bridge: $ADBMDNS_A not built" >&2; exit 1; }
+  CROSS_CMAKE_EXTRA+=(-DHAVE_RUST_MDNS=ON "-DADBMDNS_LIB=$ADBMDNS_A")
+else
+  log "adb mDNS: no Rust std for $TARGET -> openscreen fallback"
+  CROSS_CMAKE_EXTRA+=(-DHAVE_RUST_MDNS=OFF)
+fi
+
 # --- native protoc: built with the host compiler (not the cross toolchain),
 # since the cross build invokes it at codegen time ---------------------------
 PROTOC="$ROOTDIR/src/protobuf/build/protoc"

@@ -56,6 +56,11 @@ cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/Co
 # compatible fallback for toolchains whose libc++ doesn't expose it in C++20 mode.
 patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
 
+# adb mDNS: make the Rust-backed adbmdns bridge optional so targets without a Rust
+# std (exotic BSD/PowerPC/-none triples) fall back to the openscreen backend. The
+# bridge is gated by ADB_NO_RUST_MDNS, set by adb.cmake when HAVE_RUST_MDNS is off.
+patch -p1 -d "$ROOTDIR" -i patches/misc/adb-mdns-openscreen-fallback.patch
+
 # aapt2 proto include-path rewrites
 sed -i 's#frameworks/base/tools/aapt2/Resources.proto#Resources.proto#g'         src/base/tools/aapt2/ApkInfo.proto
 sed -i 's#frameworks/base/tools/aapt2/Configuration.proto#Configuration.proto#g'  src/base/tools/aapt2/Resources.proto

@@ -160,7 +160,14 @@ else()
         ${SRC}/adb/fdevent/fdevent_epoll.cpp
         )
 endif()
-target_compile_definitions(libadb PRIVATE 
+
+if(HAVE_RUST_MDNS)
+    target_sources(libadb PRIVATE ${SRC}/adb/client/adbmdns/adbmdns.cpp)
+else()
+    target_compile_definitions(libadb PRIVATE -DADB_NO_RUST_MDNS)
+endif()
+
+target_compile_definitions(libadb PRIVATE
     -D_GNU_SOURCE
     -DADB_HOST=1
     )
@@ -350,6 +357,14 @@ target_link_libraries(adb
     ${CMAKE_DL_LIBS}
     ${CMAKE_PREFIX_PATH}/lib/libz.a
     )
+
+if(HAVE_RUST_MDNS)
+    target_link_libraries(adb ${ADBMDNS_LIB})
+    if(PLATFORM_WINDOWS)
+        # rust std + windows-sys (Win32 WiFi/crypto) extra import libs
+        target_link_libraries(adb bcrypt ntdll wlanapi)
+    endif()
+endif()
 
 if(PLATFORM_LINUX_KERNEL)
     target_link_libraries(adb libpackagelistparser)

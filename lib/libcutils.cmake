@@ -44,6 +44,7 @@ if(NOT PLATFORM_WINDOWS)
         ${SRC}/core/libcutils/socket_local_server_unix.cpp
         ${SRC}/core/libcutils/socket_network_client_unix.cpp
         ${SRC}/core/libcutils/sockets_unix.cpp
+        ${SRC}/core/libcutils/sockets_utils.cpp
         )
 endif()
 

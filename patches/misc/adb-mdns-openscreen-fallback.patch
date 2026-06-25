@@ -1,0 +1,42 @@
+Make adb's Rust-backed mDNS bridge optional.
+
+Upstream made the Rust `adbmdns`/`libadbmdns_bridge` backend the default mDNS
+implementation (transport_mdns.cpp calls StartAdbMdnsDiscovery(), which lives in
+the Rust-dependent client/adbmdns/adbmdns.cpp). That bridge can only be built on
+targets that have a Rust std (bionic, linux, macOS, windows, tier-2 BSDs). On the
+exotic BSD/PowerPC/`-none` triples there is no Rust toolchain, so we compile adb
+with -DADB_NO_RUST_MDNS and fall back to the fully-functional openscreen backend.
+This is real configuration (openscreen mDNS works); it is not a stub.
+
+The build sets ADB_NO_RUST_MDNS on adb only when HAVE_RUST_MDNS is off; see
+platform-tools/adb.cmake and scripts/build.sh.
+--- a/src/adb/client/transport_mdns.cpp
++++ b/src/adb/client/transport_mdns.cpp
+@@ -37,8 +37,10 @@
+ #include "adb_trace.h"
+ #include "adb_utils.h"
+ #include "adb_wifi.h"
++#ifndef ADB_NO_RUST_MDNS
+ #include "client/adbmdns/adbmdns.h"
+ #include "client/adbmdns/adbmdns_bridge.h"
++#endif
+ #include "client/discovered_services.h"
+ #include "client/mdns_utils.h"
+ #include "client/openscreen/mdns_service.h"
+@@ -132,11 +134,16 @@
+ /////////////////////////////////////////////////////////////////////////////////
+
+ void init_mdns_transport_discovery() {
++#ifdef ADB_NO_RUST_MDNS
++    // No Rust mDNS bridge for this target; openscreen is the only backend.
++    StartOpenScreenDiscovery();
++#else
+     if (mdns::should_use_openscreen()) {
+         StartOpenScreenDiscovery();
+     } else {
+         StartAdbMdnsDiscovery();
+     }
++#endif
+ }
+
+ bool adb_secure_connect_by_service_name(const std::string& instance_name) {

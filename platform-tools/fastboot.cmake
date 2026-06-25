@@ -31,6 +31,7 @@ add_executable(fastboot
     ${SRC}/core/fastboot/bootimg_utils.cpp
     ${SRC}/core/fastboot/fastboot.cpp
     ${SRC}/core/fastboot/fastboot_driver.cpp
+    ${SRC}/core/fastboot/h2h_workaround.cpp
     ${SRC}/core/fastboot/fs.cpp
     ${SRC}/core/fastboot/filesystem.cpp
     ${SRC}/core/fastboot/super_flash_helper.cpp
@@ -90,6 +91,7 @@ target_link_libraries(fastboot
     libutils
     libbase
     libext4
+    fmt::fmt
     ${SELINUX_LINK_LIBS}
     liblog
     crypto
