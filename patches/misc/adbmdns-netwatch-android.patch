@@ -1,14 +1,18 @@
-Build the adbmdns crate's network-change monitor on Android.
+Build the adbmdns crate (and its netlink network-change monitor) on Android.
 
-Upstream's netwatch wires monitor_network_changes_native() only for
-target_os = linux/macos/windows (it's normally a host-only tool). The bionic SDK
-build targets target_os = "android", where none of the arms match and the symbol
-is missing (E0425). The Linux backend is netlink-based (nix/libc RTM_*), which
-works on bionic, so route android to it.
+Upstream's adbmdns is a host-only tool, so it's only wired for
+target_os = linux/macos/windows. The bionic SDK build targets target_os="android"
+and needs three fixes to compile:
 
-BSD (freebsd/netbsd) has no netwatch backend at all and is therefore not built
-with the Rust mDNS bridge — it uses the openscreen fallback (see scripts/build.sh
-and patches/misc/adb-mdns-openscreen-fallback.patch).
+  1. netwatch.rs: route android to the linux (netlink) backend.
+  2. netwatch_linux.rs: the libc crate doesn't export RTMGRP_LINK for android;
+     inline its UAPI value (1) — the netlink multicast-group bitmask.
+  3. Cargo.toml: nix::net::if_ (if_indextoname/InterfaceFlags) needs nix's "net"
+     feature, which the crate didn't enable.
+
+The netlink backend works on bionic. BSD (freebsd/netbsd) has no netwatch backend
+at all and is therefore not built with the Rust bridge — it uses the openscreen
+fallback (see scripts/build.sh + patches/misc/adb-mdns-openscreen-fallback.patch).
 --- a/src/adb/client/adbmdns/netwatch.rs
 +++ b/src/adb/client/adbmdns/netwatch.rs
 @@ -20,7 +20,7 @@
@@ -29,3 +33,24 @@ and patches/misc/adb-mdns-openscreen-fallback.patch).
  pub use netwatch_linux::monitor_network_changes_native;
 
  type NetworkMonitorCallback = Box<dyn Fn() + Send + Sync + 'static>;
+--- a/src/adb/client/adbmdns/netwatch/netwatch_linux.rs
++++ b/src/adb/client/adbmdns/netwatch/netwatch_linux.rs
+@@ -168,7 +168,7 @@
+     .context("Failed to open NetLink socket")?;
+
+     log::debug!("Creating NetlinkAddr");
+-    let sa = NetlinkAddr::new(0, libc::RTMGRP_LINK as u32);
++    let sa = NetlinkAddr::new(0, 1u32 /* RTMGRP_LINK: not exported by the libc crate for target_os=android */);
+     bind(fd.as_raw_fd(), &sa).context("Failed to bind NetLinkAddr")?;
+
+     let mut message_buf = MessageBuffer::default();
+--- a/src/adb/client/adbmdns/Cargo.toml
++++ b/src/adb/client/adbmdns/Cargo.toml
+@@ -14,7 +14,7 @@
+ zerocopy = { version = "0.8.26", features = ["derive"] }
+ libc = "0.2.174"
+ anyhow = "1.0.99"
+-nix = { version = "0.29.0", features = ["socket", "uio"] }
++nix = { version = "0.29.0", features = ["socket", "uio", "net"] }
+ if-addrs = "0.14.0"
+ mio = { version = "1.1.0", features = ["net", "os-poll"] }
