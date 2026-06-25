@@ -1,0 +1,24 @@
+Use upb's portable varint path on aarch64-windows.
+
+protobuf's upb/wire/encode.c has an AArch64 inline-asm fast path for varint
+encoding (encode_longvarint), gated by UPB_ARM64_ASM. On aarch64-w64-mingw32
+(llvm-mingw/clang) that macro is enabled, but LLVM cannot generate Windows SEH
+unwind info for a function containing inline asm:
+
+  fatal error: error in backend: Failed to evaluate function length in SEH unwind info
+
+Exclude _WIN32 from UPB_ARM64_ASM so aarch64-windows uses the portable C
+implementation. The asm fast path stays on aarch64 linux/android/macos/bsd.
+--- a/src/protobuf/upb/port/def.inc
++++ b/src/protobuf/upb/port/def.inc
+@@ -392,7 +392,9 @@
+ #define UPB_PRESERVE_NONE
+ #endif
+
+-#if defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__))
++// aarch64-mingw: LLVM cannot emit SEH unwind info for encode.c inline asm, so
++// use the portable C path on Windows (keeps the asm on linux/android/macos/bsd).
++#if defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(_WIN32)
+ #define UPB_ARM64_ASM 1
+ #else
+ #define UPB_ARM64_ASM 0

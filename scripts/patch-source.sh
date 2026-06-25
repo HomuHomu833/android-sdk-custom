@@ -65,6 +65,11 @@ patch -p1 -d "$ROOTDIR" -i patches/misc/adb-mdns-openscreen-fallback.patch
 # target_os=android to the (netlink) linux backend so the bionic build compiles.
 patch -p1 -d "$ROOTDIR" -i patches/misc/adbmdns-netwatch-android.patch
 
+# protobuf/upb: disable the aarch64 inline-asm varint path on windows; LLVM can't
+# emit SEH unwind info for inline asm on aarch64-mingw (Failed to evaluate function
+# length). Falls back to the portable C path on aarch64-windows only.
+patch -p1 -d "$ROOTDIR" -i patches/misc/upb-aarch64-windows-no-asm.patch
+
 # aapt2 proto include-path rewrites
 sed -i 's#frameworks/base/tools/aapt2/Resources.proto#Resources.proto#g'         src/base/tools/aapt2/ApkInfo.proto
 sed -i 's#frameworks/base/tools/aapt2/Configuration.proto#Configuration.proto#g'  src/base/tools/aapt2/Resources.proto
