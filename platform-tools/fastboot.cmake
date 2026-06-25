@@ -58,8 +58,9 @@ endif()
 
 target_include_directories(fastboot PRIVATE
     ${SRC}/avb
-    ${SRC}/libbase/include 
-    ${SRC}/soong/cc/libbuildversion/include 
+    ${SRC}/libbase/include
+    ${SRC}/fmtlib/include
+    ${SRC}/soong/cc/libbuildversion/include
     ${SRC}/core/include 
     ${SRC}/core/adb 
     ${SRC}/core/libsparse/include
