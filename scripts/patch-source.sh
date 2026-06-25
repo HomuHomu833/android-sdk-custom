@@ -682,7 +682,11 @@ else:
 #if __has_include(<sys/auxv.h>)
 #include <sys/auxv.h>
 
-void OPENSSL_cpuid_setup(void) {
+// OPENSSL_armcap_P, ARMV*, and OPENSSL_cpuid_setup live in namespace bssl; the
+// original file's `using namespace bssl;` is inside the OpenBSD-only block.
+using namespace bssl;
+
+void bssl::OPENSSL_cpuid_setup(void) {
   unsigned long hwcap = 0;
   elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
   if (!(hwcap & (1UL << 1))) {  // ASIMD/NEON
@@ -698,7 +702,7 @@ void OPENSSL_cpuid_setup(void) {
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-void OPENSSL_cpuid_setup(void) {}
+void bssl::OPENSSL_cpuid_setup(void) {}
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/FreeBSD aarch64 cpuid
 """
@@ -754,7 +758,11 @@ else:
 # define HWCAP2_SHA2  (1UL << 3)
 #endif
 
-void OPENSSL_cpuid_setup(void) {
+// OPENSSL_armcap_P/ARMV* and OPENSSL_cpuid_setup are in namespace bssl; the
+// original file's `using namespace bssl;` is inside the FreeBSD-only block.
+using namespace bssl;
+
+void bssl::OPENSSL_cpuid_setup(void) {
   unsigned long hwcap = 0, hwcap2 = 0;
   elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
   elf_aux_info(AT_HWCAP2, &hwcap2, sizeof(hwcap2));
@@ -769,7 +777,7 @@ void OPENSSL_cpuid_setup(void) {
 #else
 // <sys/auxv.h> is absent from this sysroot (older NetBSD/OpenBSD); no hardware
 // crypto features will be detected.  Safe: BoringSSL falls back to software.
-void OPENSSL_cpuid_setup(void) {}
+void bssl::OPENSSL_cpuid_setup(void) {}
 #endif  // __has_include(<sys/auxv.h>)
 #endif  // NetBSD/OpenBSD ARM 32-bit cpuid
 """

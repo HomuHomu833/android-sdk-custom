@@ -154,7 +154,9 @@ case "$PLATFORM" in
     esac
     # host_compat.h supplies glibc/bionic-isms BSDs omit (TEMP_FAILURE_RETRY,
     # reallocarray); Windows/Darwin sections stay inert. BSD links dynamically.
-    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat"
+    # XML_DEV_URANDOM: expat's entropy autodetect can't link-test arc4random_buf
+    # under the zig BSD sysroots, so point it at /dev/urandom (present on all BSD).
+    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat -DXML_DEV_URANDOM"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     # Per-arch SIMD/TLS, same as linux (see there for the PNG_POWERPC_VSX why).
     case "$TARGET" in
