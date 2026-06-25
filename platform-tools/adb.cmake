@@ -177,6 +177,7 @@ target_include_directories(libadb PRIVATE
     ${SRC}/libziparchive/include
     ${SRC}/native/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     ${SRC}/zstd/lib
     ${SRC}/libusb/include
@@ -208,6 +209,7 @@ target_include_directories(libadb_crypto PRIVATE
     ${SRC}/core/libcrypto_utils/include
     ${SRC}/libbase/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     )
 
@@ -233,6 +235,7 @@ target_include_directories(libadb_pairing_connection PRIVATE
     ${SRC}/libbase/include
     ${SRC}/boringssl/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     )
 
@@ -245,6 +248,7 @@ target_include_directories(libadb_pairing_auth PRIVATE
     ${SRC}/libbase/include
     ${SRC}/boringssl/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     )
 
@@ -268,6 +272,7 @@ target_include_directories(libfastdeploy PRIVATE
     ${SRC}/core/libcutils/include
     ${SRC}/libbase/include
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     ${SRC}/boringssl/include
     )

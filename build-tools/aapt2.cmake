@@ -56,6 +56,7 @@ endif()
 set(INCLUDES
     ${SRC}/base/tools/aapt2
     ${SRC}/protobuf/src
+    ${SRC}/protobuf/third_party/utf8_range
     ${SRC}/abseil-cpp
     ${SRC}/logging/liblog/include
     ${SRC}/expat/lib
