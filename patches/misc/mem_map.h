@@ -369,6 +369,11 @@ class MemMap {
 
   void DoReset();
   void Invalidate();
+
+  // Build a debug-friendly map name, prefixed with "dalvik-" and ellipsized in
+  // the interior if it would exceed the kernel's map-name length limit.
+  static std::string FormatDebugName(const char* name);
+
   void SwapMembers(MemMap& other);
 
   static void DumpMapsLocked(std::ostream& os, bool terse)
