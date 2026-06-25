@@ -129,15 +129,16 @@ RUN set -eu; \
     for t in \
         aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android \
         x86_64-apple-darwin aarch64-apple-darwin \
-        x86_64-pc-windows-gnu i686-pc-windows-gnu \
+        x86_64-pc-windows-gnu i686-pc-windows-gnu aarch64-pc-windows-gnullvm \
         x86_64-unknown-linux-gnu x86_64-unknown-linux-musl \
         aarch64-unknown-linux-gnu aarch64-unknown-linux-musl \
         i686-unknown-linux-gnu i686-unknown-linux-musl \
-        armv7-unknown-linux-gnueabihf armv7-unknown-linux-musleabihf \
+        arm-unknown-linux-gnueabi arm-unknown-linux-gnueabihf \
+        arm-unknown-linux-musleabi arm-unknown-linux-musleabihf \
         riscv64gc-unknown-linux-gnu riscv64gc-unknown-linux-musl \
         s390x-unknown-linux-gnu powerpc64le-unknown-linux-musl \
-        loongarch64-unknown-linux-gnu \
-        x86_64-unknown-freebsd x86_64-unknown-netbsd; do \
+        loongarch64-unknown-linux-gnu loongarch64-unknown-linux-musl \
+        x86_64-unknown-freebsd i686-unknown-freebsd x86_64-unknown-netbsd; do \
         if ! fetch --dir=/tmp -o "std.tar.xz" "$base/rust-std-${RUST_VERSION}-$t.tar.xz"; then \
             echo "WARNING: rust-std for $t unavailable at ${RUST_VERSION}; adb mDNS will use openscreen fallback for it"; \
             continue; \

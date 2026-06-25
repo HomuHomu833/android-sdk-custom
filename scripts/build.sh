@@ -253,13 +253,17 @@ case "$PLATFORM" in
       s390x-linux-gnu)        ADBMDNS_RUST_TARGET=s390x-unknown-linux-gnu ;;
       powerpc64le-linux-musl) ADBMDNS_RUST_TARGET=powerpc64le-unknown-linux-musl ;;
       loongarch64-linux-gnu)  ADBMDNS_RUST_TARGET=loongarch64-unknown-linux-gnu ;;
-      arm-linux-gnueabihf)    ADBMDNS_RUST_TARGET=armv7-unknown-linux-gnueabihf ;;
-      arm-linux-musleabihf)   ADBMDNS_RUST_TARGET=armv7-unknown-linux-musleabihf ;;
+      loongarch64-linux-musl) ADBMDNS_RUST_TARGET=loongarch64-unknown-linux-musl ;;
+      arm-linux-gnueabi)      ADBMDNS_RUST_TARGET=arm-unknown-linux-gnueabi ;;
+      arm-linux-gnueabihf)    ADBMDNS_RUST_TARGET=arm-unknown-linux-gnueabihf ;;
+      arm-linux-musleabi)     ADBMDNS_RUST_TARGET=arm-unknown-linux-musleabi ;;
+      arm-linux-musleabihf)   ADBMDNS_RUST_TARGET=arm-unknown-linux-musleabihf ;;
     esac ;;
   bsd)
     case "$TARGET" in
       x86_64-freebsd-none) ADBMDNS_RUST_TARGET=x86_64-unknown-freebsd ;;
       x86_64-netbsd-none)  ADBMDNS_RUST_TARGET=x86_64-unknown-netbsd ;;
+      x86-freebsd-none)    ADBMDNS_RUST_TARGET=i686-unknown-freebsd ;;
     esac ;;
 esac
 
