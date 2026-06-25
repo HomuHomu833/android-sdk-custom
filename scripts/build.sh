@@ -274,7 +274,10 @@ if [ -n "$ADBMDNS_RUST_TARGET" ]; then
   export "CARGO_TARGET_$(echo "$ADBMDNS_RUST_TARGET" | tr 'a-z-' 'A-Z_')_LINKER=$CROSS_CC"
   MDNS_CRATE="$ROOTDIR/src/adb/client/adbmdns"
   log "Building adb mDNS bridge / libzeroconf ($ADBMDNS_RUST_TARGET)"
-  ( cd "$MDNS_CRATE" && cargo rustc --release --target "$ADBMDNS_RUST_TARGET" --crate-type staticlib )
+  # Put the cross toolchain on PATH so cargo finds its <triple>-* tools -- the
+  # *-pc-windows-gnu target needs <triple>-dlltool (from llvm-mingw) to build
+  # windows-sys import libs. Harmless for the other platforms.
+  ( cd "$MDNS_CRATE" && PATH="$TC/bin:$PATH" cargo rustc --release --target "$ADBMDNS_RUST_TARGET" --crate-type staticlib )
   ADBMDNS_A="$MDNS_CRATE/target/$ADBMDNS_RUST_TARGET/release/libzeroconf.a"
   [ -f "$ADBMDNS_A" ] || { echo "adb mDNS bridge: $ADBMDNS_A not built" >&2; exit 1; }
   CROSS_CMAKE_EXTRA+=(-DHAVE_RUST_MDNS=ON "-DADBMDNS_LIB=$ADBMDNS_A")
