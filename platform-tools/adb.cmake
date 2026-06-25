@@ -157,6 +157,7 @@ elseif(PLATFORM_BSD)
 else()
     target_sources(libadb PRIVATE
         ${SRC}/adb/client/usb_linux.cpp
+        ${SRC}/adb/client/usb_linux_netlink.cpp
         ${SRC}/adb/fdevent/fdevent_epoll.cpp
         )
 endif()
