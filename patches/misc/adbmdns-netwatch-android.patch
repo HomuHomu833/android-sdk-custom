@@ -2,13 +2,16 @@ Build the adbmdns crate (and its netlink network-change monitor) on Android.
 
 Upstream's adbmdns is a host-only tool, so it's only wired for
 target_os = linux/macos/windows. The bionic SDK build targets target_os="android"
-and needs three fixes to compile:
+and needs these fixes to compile:
 
   1. netwatch.rs: route android to the linux (netlink) backend.
   2. netwatch_linux.rs: the libc crate doesn't export RTMGRP_LINK for android;
      inline its UAPI value (1) — the netlink multicast-group bitmask.
   3. Cargo.toml: nix::net::if_ (if_indextoname/InterfaceFlags) needs nix's "net"
      feature, which the crate didn't enable.
+  4. Cargo.toml: windows-sys was an unconditional dependency, so cargo tried to
+     build it (and failed: WSADATA/SERVENT) on non-windows targets. Gate it under
+     cfg(windows) — the crate's own windows code is already cfg-gated.
 
 The netlink backend works on bionic. BSD (freebsd/netbsd) has no netwatch backend
 at all and is therefore not built with the Rust bridge — it uses the openscreen
@@ -46,7 +49,7 @@ fallback (see scripts/build.sh + patches/misc/adb-mdns-openscreen-fallback.patch
      let mut message_buf = MessageBuffer::default();
 --- a/src/adb/client/adbmdns/Cargo.toml
 +++ b/src/adb/client/adbmdns/Cargo.toml
-@@ -14,7 +14,7 @@
+@@ -14,11 +14,11 @@
  zerocopy = { version = "0.8.26", features = ["derive"] }
  libc = "0.2.174"
  anyhow = "1.0.99"
@@ -54,3 +57,9 @@ fallback (see scripts/build.sh + patches/misc/adb-mdns-openscreen-fallback.patch
 +nix = { version = "0.29.0", features = ["socket", "uio", "net"] }
  if-addrs = "0.14.0"
  mio = { version = "1.1.0", features = ["net", "os-poll"] }
+
+-[dependencies.windows-sys]
++[target.'cfg(windows)'.dependencies.windows-sys]
+ version = "0.61.1"
+ features = [
+     "Win32_Foundation",
