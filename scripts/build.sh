@@ -259,12 +259,6 @@ case "$PLATFORM" in
       arm-linux-musleabi)     ADBMDNS_RUST_TARGET=arm-unknown-linux-musleabi ;;
       arm-linux-musleabihf)   ADBMDNS_RUST_TARGET=arm-unknown-linux-musleabihf ;;
     esac ;;
-  bsd)
-    case "$TARGET" in
-      x86_64-freebsd-none) ADBMDNS_RUST_TARGET=x86_64-unknown-freebsd ;;
-      x86_64-netbsd-none)  ADBMDNS_RUST_TARGET=x86_64-unknown-netbsd ;;
-      x86-freebsd-none)    ADBMDNS_RUST_TARGET=i686-unknown-freebsd ;;
-    esac ;;
 esac
 
 if [ -n "$ADBMDNS_RUST_TARGET" ]; then

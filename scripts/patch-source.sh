@@ -61,6 +61,10 @@ patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
 # bridge is gated by ADB_NO_RUST_MDNS, set by adb.cmake when HAVE_RUST_MDNS is off.
 patch -p1 -d "$ROOTDIR" -i patches/misc/adb-mdns-openscreen-fallback.patch
 
+# adb mDNS: the bridge's netwatch only targets linux/macos/windows; route
+# target_os=android to the (netlink) linux backend so the bionic build compiles.
+patch -p1 -d "$ROOTDIR" -i patches/misc/adbmdns-netwatch-android.patch
+
 # aapt2 proto include-path rewrites
 sed -i 's#frameworks/base/tools/aapt2/Resources.proto#Resources.proto#g'         src/base/tools/aapt2/ApkInfo.proto
 sed -i 's#frameworks/base/tools/aapt2/Configuration.proto#Configuration.proto#g'  src/base/tools/aapt2/Resources.proto

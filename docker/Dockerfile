@@ -114,9 +114,10 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
 # needs curl/wget, absent here), read-only under /opt/rust; build.sh uses a writable
 # CARGO_HOME. Host x86_64 (the CI runner).
 #
-# std targets cover every triple scripts/build.sh maps for adbmdns across all
-# platforms; the exotic arches without a Rust std (mips/hexagon/openbsd/-none/...)
-# use the openscreen fallback instead. std fetch is best-effort: a target whose
+# std targets cover every triple scripts/build.sh maps for adbmdns (android, linux,
+# macOS, windows). BSD is excluded -- it has a Rust std but the crate has no BSD
+# netwatch backend -- and the exotic arches without a Rust std (mips/hexagon/-none/
+# ...) use the openscreen fallback instead. std fetch is best-effort: a target whose
 # tarball is missing for this release is skipped, and build.sh's std-presence check
 # falls back to openscreen for it -- so the image build never fails on a 404.
 ARG RUST_VERSION=1.85.0
@@ -137,8 +138,7 @@ RUN set -eu; \
         arm-unknown-linux-musleabi arm-unknown-linux-musleabihf \
         riscv64gc-unknown-linux-gnu riscv64gc-unknown-linux-musl \
         s390x-unknown-linux-gnu powerpc64le-unknown-linux-musl \
-        loongarch64-unknown-linux-gnu loongarch64-unknown-linux-musl \
-        x86_64-unknown-freebsd i686-unknown-freebsd x86_64-unknown-netbsd; do \
+        loongarch64-unknown-linux-gnu loongarch64-unknown-linux-musl; do \
         if ! fetch --dir=/tmp -o "std.tar.xz" "$base/rust-std-${RUST_VERSION}-$t.tar.xz"; then \
             echo "WARNING: rust-std for $t unavailable at ${RUST_VERSION}; adb mDNS will use openscreen fallback for it"; \
             continue; \

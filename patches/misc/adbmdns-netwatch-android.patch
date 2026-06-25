@@ -1,0 +1,31 @@
+Build the adbmdns crate's network-change monitor on Android.
+
+Upstream's netwatch wires monitor_network_changes_native() only for
+target_os = linux/macos/windows (it's normally a host-only tool). The bionic SDK
+build targets target_os = "android", where none of the arms match and the symbol
+is missing (E0425). The Linux backend is netlink-based (nix/libc RTM_*), which
+works on bionic, so route android to it.
+
+BSD (freebsd/netbsd) has no netwatch backend at all and is therefore not built
+with the Rust mDNS bridge — it uses the openscreen fallback (see scripts/build.sh
+and patches/misc/adb-mdns-openscreen-fallback.patch).
+--- a/src/adb/client/adbmdns/netwatch.rs
++++ b/src/adb/client/adbmdns/netwatch.rs
+@@ -20,7 +20,7 @@
+ #[cfg(target_os = "macos")]
+ pub mod netwatch_darwin;
+
+-#[cfg(target_os = "linux")]
++#[cfg(any(target_os = "linux", target_os = "android"))]
+ pub mod netwatch_linux;
+
+ #[cfg(target_os = "windows")]
+@@ -29,7 +29,7 @@
+ #[cfg(target_os = "macos")]
+ pub use netwatch_darwin::monitor_network_changes_native;
+
+-#[cfg(target_os = "linux")]
++#[cfg(any(target_os = "linux", target_os = "android"))]
+ pub use netwatch_linux::monitor_network_changes_native;
+
+ type NetworkMonitorCallback = Box<dyn Fn() + Send + Sync + 'static>;
