@@ -2,8 +2,7 @@
 # and toolchains so CI only pulls. All five platforms: linux/bsd (zig), bionic
 # (NDK clang, pulled at run time), windows (llvm-mingw), macos (osxcross).
 #
-# Build scripts are NOT copied in — they're bind-mounted from the checkout at run
-# time, so editing scripts/ needs no rebuild.
+# Build scripts are bind-mounted from the checkout at run time, not copied in.
 #
 #   docker run --rm -v "$PWD:/work" -w /work \
 #     -e PLATFORM=linux -e TARGET=x86_64-linux-musl -e TAG=android-17.0.0_r1 \
@@ -89,8 +88,8 @@ RUN arch="$(uname -m)"; \
             && mv "/opt/llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-22.04-${arch}" /opt/llvm-mingw ;; \
         *) echo "WARNING: llvm-mingw does not support host arch '$arch'; Windows cross-builds will be unavailable" ;; \
     esac
-# Intentionally NOT on PATH — build.sh calls it by absolute path; keeping its
-# windows clang off PATH avoids shadowing the host clang used for native protoc.
+# Not on PATH: build.sh calls it by absolute path, so its windows clang doesn't
+# shadow the host clang used for native protoc.
 
 # osxcross: macOS cross toolchain (cctools-port + clang wrappers) with the macOS
 # SDK baked into /opt/osxcross/SDK; zig segfaults building Darwin binaries.
@@ -106,20 +105,15 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && cd / \
     && rm -rf /tmp/osxcross
 
-# Rust: builds two pure-Rust staticlibs at run time -- libtermuxadb.a (bionic
-# adb/fastboot USB shim) and libzeroconf.a (adb's adbmdns mDNS bridge, the upstream
-# default backend). Both are staticlibs (no C cross-compile/NDK linker), so a target
-# only needs its rust-std. 1.85+ is required: the adbmdns crate is edition 2024.
-# Installed from the standalone dist tarballs via the aria2c fetch helper (rustup-init
-# needs curl/wget, absent here), read-only under /opt/rust; build.sh uses a writable
-# CARGO_HOME. Host x86_64 (the CI runner).
+# Rust: builds libtermuxadb.a (bionic USB shim) and libzeroconf.a (adbmdns mDNS
+# bridge) at run time. Both are staticlibs, so a target only needs its rust-std.
+# 1.85+ required (adbmdns is edition 2024). Installed read-only under /opt/rust
+# from the dist tarballs; build.sh uses a writable CARGO_HOME.
 #
-# std targets cover every triple scripts/build.sh maps for adbmdns (android, linux,
-# macOS, windows). BSD is excluded -- it has a Rust std but the crate has no BSD
-# netwatch backend -- and the exotic arches without a Rust std (mips/hexagon/-none/
-# ...) use the openscreen fallback instead. std fetch is best-effort: a target whose
-# tarball is missing for this release is skipped, and build.sh's std-presence check
-# falls back to openscreen for it -- so the image build never fails on a 404.
+# std targets cover every adbmdns triple (android/linux/macOS/windows). BSD and
+# the no-std exotic arches use the openscreen fallback. std fetch is best-effort:
+# a missing tarball is skipped and build.sh falls back to openscreen, so a 404
+# never fails the image build.
 ARG RUST_VERSION=1.85.0
 RUN set -eu; \
     base="https://static.rust-lang.org/dist"; \

@@ -23,17 +23,14 @@ cp patches/misc/IncrementalProperties.sysprop.cpp src/incremental_delivery/syspr
 cp patches/misc/deployagent.inc        src/adb/fastdeploy/deployagent/
 cp patches/misc/deployagentscript.inc  src/adb/fastdeploy/deployagent/
 
-# libusb-based fastboot USB backend: builds fastboot on windows without AdbWinApi
-# (fastboot.cmake compiles this instead of usb_windows.cpp).
+# libusb fastboot USB backend for windows (no AdbWinApi).
 cp patches/misc/fastboot_usb_libusb.cpp src/core/fastboot/usb_libusb.cpp
 
-# adb libusb-only Windows glue: supplies the usb_init()/usb_cleanup() entry points
-# the dropped usb_windows.cpp (AdbWinApi, 32-bit) provided; LibUsbConnection does
-# the I/O. adb.cmake compiles this on windows.
+# adb libusb-only Windows glue: usb_init()/usb_cleanup() the dropped
+# usb_windows.cpp provided; LibUsbConnection does the I/O.
 cp patches/misc/adb_usb_windows_libusb.cpp src/adb/client/usb_windows_libusb.cpp
 
-# Windows <rpc.h> (via libbase <windows.h>) does `#define interface struct`, which
-# clobbers usb_ifc_info's `interface` field; #undef it just before the struct.
+# Windows <rpc.h> `#define interface struct` clobbers usb_ifc_info's field; #undef it.
 sed -i '/^struct usb_ifc_info {/i\
 #undef interface  /* Windows <rpc.h> defines this as `struct` */' src/core/fastboot/usb.h
 
@@ -44,30 +41,25 @@ cp patches/misc/instruction_set.cc       src/art/libartbase/arch/instruction_set
 cp patches/misc/mem_map.h                src/art/libartbase/base/mem_map.h
 
 cp patches/misc/target.h            src/boringssl/src/include/openssl/target.h
-# getrandom_fillin.h moved between boringssl releases, so overwrite it wherever
-# it lives.
+# getrandom_fillin.h moved between boringssl releases; overwrite it wherever it lives.
 find src/boringssl -name getrandom_fillin.h -exec cp patches/misc/getrandom_fillin.h {} \;
 
 cp patches/misc/unscaledcycleclock.cc  src/abseil-cpp/absl/base/internal/unscaledcycleclock.cc
 
 cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/CombinedIterator.h
 
-# libbase/file.cpp uses std::string::resize_and_overwrite (C++23). Provide a C++20
-# compatible fallback for toolchains whose libc++ doesn't expose it in C++20 mode.
+# libbase/file.cpp uses std::string::resize_and_overwrite (C++23); add a C++20 fallback.
 patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
 
-# adb mDNS: make the Rust-backed adbmdns bridge optional so targets without a Rust
-# std (exotic BSD/PowerPC/-none triples) fall back to the openscreen backend. The
-# bridge is gated by ADB_NO_RUST_MDNS, set by adb.cmake when HAVE_RUST_MDNS is off.
+# adb mDNS: make the Rust adbmdns bridge optional (ADB_NO_RUST_MDNS) so targets
+# without a Rust std fall back to openscreen.
 patch -p1 -d "$ROOTDIR" -i patches/misc/adb-mdns-openscreen-fallback.patch
 
-# adb mDNS: the bridge's netwatch only targets linux/macos/windows; route
-# target_os=android to the (netlink) linux backend so the bionic build compiles.
+# adb mDNS: route target_os=android to the linux netwatch backend so bionic compiles.
 patch -p1 -d "$ROOTDIR" -i patches/misc/adbmdns-netwatch-android.patch
 
-# protobuf/upb: disable the aarch64 inline-asm varint path on windows; LLVM can't
-# emit SEH unwind info for inline asm on aarch64-mingw (Failed to evaluate function
-# length). Falls back to the portable C path on aarch64-windows only.
+# protobuf/upb: disable the aarch64 inline-asm varint path on windows (LLVM can't
+# emit SEH unwind info for it); falls back to portable C.
 patch -p1 -d "$ROOTDIR" -i patches/misc/upb-aarch64-windows-no-asm.patch
 
 # aapt2 proto include-path rewrites
@@ -85,7 +77,6 @@ ln -sf "$ROOTDIR/src/googletest" "$ROOTDIR/src/boringssl/src/third_party/googlet
 log "Applying source fixups${TARGET:+ for $TARGET}"
 
 # PAGE_SIZE: all-platform #ifndef fallback (can't assume it in the 16K-page era).
-# (TEMP_FAILURE_RETRY comes from host_compat.h on the hosts that lack it.)
 sed -i '/};/ a\
 #ifndef PAGE_SIZE\
 #define PAGE_SIZE 4096\
@@ -121,8 +112,8 @@ find ${PWD_SRC}/src -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -e
 #endif\
 #endif' {} +
 
-# packagelistparser.h uses __BEGIN_DECLS/__END_DECLS from <sys/cdefs.h>; expand
-# them inline where that header is absent. BSD keeps its own, so skip there.
+# packagelistparser.h: expand __BEGIN_DECLS/__END_DECLS inline where <sys/cdefs.h>
+# is absent (BSD keeps its own).
 case "$TARGET" in
   *-freebsd-*|*-netbsd-*|*-openbsd-*) ;;
   *)
@@ -136,21 +127,19 @@ sed -i '/#include <sys\/limits.h>/d; /#include <log\/log.h>/a\
 
 sed -i 's/std::vector<const StringPiece>/std::vector<StringPiece>/g' ${PWD_SRC}/src/base/tools/aapt2/util/Files.cpp
 
-# fmtlib's allocator calls bare malloc()/free() via <cstdlib> leaking the C names
-# globally; zig 0.17's libc++ doesn't, so pull in <stdlib.h> after the guard.
+# fmtlib calls bare malloc()/free(); zig 0.17's libc++ doesn't leak the C names,
+# so pull in <stdlib.h>.
 sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/include/fmt/format.h
 
-# riscv32/powerpc: drop the std::atomic is_always_lock_free static_assert (not
-# always lock-free there).
+# riscv32/powerpc/mips: drop the std::atomic is_always_lock_free static_assert.
 case "$TARGET" in
   riscv32-*|powerpc-*|mips-*|mipsel-*)
     sed -i 's/^\([[:space:]]*\)static_assert(std::atomic<.*>::is_always_lock_free);/\1\/\/ &/' ${PWD_SRC}/src/art/libartbase/base/metrics/metrics.h
     ;;
 esac
 
-# cacheflush()/<sys/cachectl.h> is used only in utils.cc's __arm__ branch. zig's
-# generic-glibc header pulls <asm/cachectl.h> which zig doesn't ship, so on glibc
-# forward-declare cacheflush; musl's header is self-contained, so keep it there.
+# cacheflush(): zig's generic-glibc <sys/cachectl.h> pulls <asm/cachectl.h> which
+# zig doesn't ship, so forward-declare it on glibc; musl keeps its own header.
 sed -i '/#include "os.h"/a\
 #if defined(__arm__)\
 #if defined(__GLIBC__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\
@@ -220,10 +209,8 @@ sed -i '/utf8.resize_and_overwrite/{N;N;N; s/utf8.resize_and_overwrite(utf8_leng
 sed -i 's/libusb::usb_init();/usb_init();/g' ${PWD_SRC}/src/adb/client/main.cpp
 sed -i 's/path_data\.name\.contains('\''\.'\'')/path_data.name.find('\''.'\'') != std::string::npos/g' src/base/tools/aapt2/cmd/Compile.cpp
 
-# libbase posix_strerror_r.cpp: on gnu, strl_compat.h pulls <string.h> with
-# _GNU_SOURCE so strerror_r is the GNU char* variant; the file's #undef _GNU_SOURCE
-# would defeat the guard below, so drop it first. musl (no -D_GNU_SOURCE) keeps the
-# #else; bionic also has the char* variant under _GNU_SOURCE, joining that branch.
+# libbase posix_strerror_r.cpp: drop the file's #undef _GNU_SOURCE so the guard
+# below sees the GNU char* strerror_r on glibc/bionic; musl keeps the #else.
 sed -i '/\/\* Undefine _GNU_SOURCE/,/#undef _GNU_SOURCE/d' ${PWD_SRC}/src/libbase/posix_strerror_r.cpp
 sed -i '/return strerror_r(errnum, buf, buflen);/c\
 #if (defined(__GLIBC__) || defined(__BIONIC__)) \&\& defined(_GNU_SOURCE)\
@@ -237,9 +224,8 @@ sed -i '/return strerror_r(errnum, buf, buflen);/c\
   return strerror_r(errnum, buf, buflen);\
 #endif' ${PWD_SRC}/src/libbase/posix_strerror_r.cpp
 
-# abseil ppc32 stacktrace: glibc reads regs via uc_mcontext.uc_regs->gregs[]
-# (uc_regs is a pt_regs*), but musl exposes them directly as uc_mcontext.gregs[].
-# Rewrite for musl ppc32 only; glibc ppc32 keeps the uc_regs-> form.
+# abseil ppc32 stacktrace: musl exposes regs as uc_mcontext.gregs[] (glibc uses
+# uc_mcontext.uc_regs->gregs[]). Rewrite for musl ppc32 only.
 case "$TARGET" in
   powerpc-*musl*)
     for f in src/abseil-cpp/absl/debugging/internal/stacktrace_powerpc-inl.inc \
@@ -249,22 +235,18 @@ case "$TARGET" in
     ;;
 esac
 
-# abseil direct_mmap.h static_asserts "no __NR_mmap2 => 64-bit", wrong for the
-# generic-syscall 32-bit arches (riscv32, hexagon). Replace just the assert with a
-# libc mmap() fallback on non-LP64; the LP64 64-bit syscall path is left intact.
+# abseil direct_mmap.h asserts "no __NR_mmap2 => 64-bit", wrong for 32-bit
+# generic-syscall arches (riscv32, hexagon); use a libc mmap() fallback on non-LP64.
 sed -i 's@^\([[:space:]]*\)static_assert(sizeof(unsigned long) == 8, "Platform is not 64-bit");@#if !defined(__LP64__)\n\1return mmap(start, length, prot, flags, fd, offset);\n#endif@' \
   "${PWD_SRC}/src/abseil-cpp/absl/base/internal/direct_mmap.h"
 
-# abseil examine_stack.cc: add hexagon to GetProgramCounter() (musl's mcontext_t
-# is struct sigcontext with a .pc field) by inserting a case before #else/#error.
+# abseil examine_stack.cc: add hexagon to GetProgramCounter() (musl mcontext_t is
+# struct sigcontext with .pc).
 sed -i '/^#else$/{N;s/^#else\n#error "Undefined Architecture."/#elif defined(__hexagon__)\n    return reinterpret_cast<void*>(context->uc_mcontext.pc);\n#else\n#error "Undefined Architecture."/;}' \
   "${PWD_SRC}/src/abseil-cpp/absl/debugging/internal/examine_stack.cc"
 
-# abseil examine_stack.cc: add MIPS to GetProgramCounter() if not already present
-# (newer AOSP abseil has it; older snapshots may not). Field names differ by libc:
-#   glibc MIPS:   mcontext_t has a direct .pc field
-#   musl/OpenBSD: mcontext_t is struct sigcontext with .sc_pc
-#   NetBSD:       mcontext_t uses __gregs[_REG_EPC]
+# abseil examine_stack.cc: add MIPS to GetProgramCounter() if absent. Field
+# differs by libc: glibc .pc, musl/OpenBSD .sc_pc, NetBSD __gregs[_REG_EPC].
 python3 << 'PYEOF'
 import sys
 
@@ -299,26 +281,23 @@ with open(path, 'w') as f:
 print('examine_stack.cc: MIPS GetProgramCounter patch applied')
 PYEOF
 
-# abseil conditions.h: the Win32 guard wrongly excluded hexagon, leaving _exit
-# undeclared; drop hexagon from it (<unistd.h> then declares _exit on hexagon musl).
+# abseil conditions.h: drop hexagon from the Win32 guard so <unistd.h> declares _exit.
 sed -i 's/^#if defined(_WIN32) || defined(__hexagon__)$/#if defined(_WIN32)/' \
   "${PWD_SRC}/src/abseil-cpp/absl/log/internal/conditions.h"
 
-# liblog logger_name.cpp: hexagon Clang makes android_LogPriority's underlying type
-# unsigned char, tripping the uint32_t static_assert. Guard both asserts under
-# !__hexagon__ (they're only ABI-relevant on-device).
+# liblog logger_name.cpp: hexagon Clang makes android_LogPriority unsigned char,
+# tripping the uint32_t static_asserts; guard them under !__hexagon__.
 sed -i '/^static_assert(std::is_same<std::underlying_type<log_id_t>::type, uint32_t>::value,$/i #ifndef __hexagon__' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
 sed -i '/^static_assert(std::is_same<std::underlying_type<android_LogPriority>::type, uint32_t>::value,$/i #ifndef __hexagon__' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
 sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' ${PWD_SRC}/src/logging/liblog/logger_name.cpp
 
-# selinux libsepol cil_verify.c: struct field is uint32_t* but local is
-# enum cil_flavor — Clang (unlike GCC) rejects the implicit conversion in C.
+# selinux libsepol cil_verify.c: cast enum cil_flavor* local to the struct's
+# uint32_t* field (Clang rejects the implicit conversion in C).
 sed -i 's/extra_args\.flavor = \&flavor;/extra_args.flavor = (uint32_t *)\&flavor;/' \
   ${PWD_SRC}/src/selinux/libsepol/cil/src/cil_verify.c
 
-# selinux selinux_internal.h __selinux_once: the integer-pthread_once_t fallback
-# fails on macOS/mingw (struct there). pthread_once always exists on those hosts,
-# so call it directly.
+# selinux selinux_internal.h: the integer-pthread_once_t fallback fails on
+# macOS/mingw (struct there); call pthread_once directly.
 sed -i '/#define __selinux_once(ONCE_CONTROL, INIT_FUNCTION)/i\
 #if defined(__APPLE__) || defined(_WIN32)\
 #define __selinux_once(ONCE_CONTROL, INIT_FUNCTION) \\\
@@ -327,16 +306,14 @@ sed -i '/#define __selinux_once(ONCE_CONTROL, INIT_FUNCTION)/i\
 sed -i '0,/} while (0)/s/} while (0)/} while (0)\
 #endif/' ${PWD_SRC}/src/selinux/libselinux/src/selinux_internal.h
 
-# bionic: some symbols are API 29+, but we may target lower APIs. Guard their uses
-# behind an API check.
+# bionic: guard API 29+ symbol uses behind an API check (we may target lower).
 sed -i 's/#if defined(__BIONIC__)/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/g' ${PWD_SRC}/src/libbase/include/android-base/unique_fd.h ${PWD_SRC}/src/libziparchive/zip_archive.cc src/art/libartbase/base/unix_file/fd_file.cc
 sed -i 's/__INTRODUCED_IN([0-9]*)//g' ${PWD_SRC}/src/logging/liblog/include/android/log.h ${PWD_SRC}/src/adb/pairing_connection/include/adb/pairing/pairing_connection.h ${PWD_SRC}/src/adb/pairing_auth/include/adb/pairing/pairing_auth.h
 sed -i 's/^#if !defined(__BIONIC__)$/#if !defined(__BIONIC__) || __ANDROID_API__ < 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
 sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/' ${PWD_SRC}/src/core/libcutils/native_handle.cpp
 
-# PosixUtils.cpp ExecuteBinary() uses 'stdout'/'stderr' as locals, but on BSD
-# those are macros, so `int stdout[2]` is invalid. Rename to out_fd/err_fd
-# (result.stdout_str is a member access and unaffected).
+# PosixUtils.cpp: 'stdout'/'stderr' locals are macros on BSD; rename to
+# out_fd/err_fd.
 case "$TARGET" in
   *-freebsd-*|*-netbsd-*|*-openbsd-*)
     sed -i \
@@ -348,9 +325,8 @@ case "$TARGET" in
       -e 's/stderr\[/err_fd[/g' \
       src/base/libs/androidfw/PosixUtils.cpp
 
-    # utils.cc: GetTid() falls to Linux-only syscall(__NR_gettid); add a BSD branch
-    # (pthread_self -> uint32_t). SetThreadName()'s linux/win guard misses BSD:
-    # FreeBSD has Linux's 2-arg setname_np, NetBSD a 3-arg form, OpenBSD none.
+    # utils.cc: add BSD branches to GetTid() (pthread_self) and SetThreadName()
+    # (FreeBSD 2-arg, NetBSD 3-arg, OpenBSD none).
     python3 << 'PYEOF'
 import sys
 
@@ -422,24 +398,21 @@ esac
 # brotli: restore static-library support
 ( cd ${PWD_SRC}/src/brotli && git apply ../../patches/0001-add-static-support-back-to-brotli.patch )
 
-# selinux: guard host-inert Linux-isms in libselinux (selinuxfs/proc probe,
-# __fsetlocking, O_CLOEXEC, stpcpy, getxattr) so macOS/mingw compile. See patches/selinux/.
+# selinux: guard host-inert Linux-isms in libselinux so macOS/mingw compile.
 ( cd ${PWD_SRC}/src/selinux && git apply ../../patches/selinux/0001-host-portability-guards.patch )
 
-# setrans_client.c: POSIX socket headers don't exist on MinGW; with DISABLE_SETRANS
-# the bodies are stubs, so the network includes are dead code. Guard them out.
+# setrans_client.c: guard out the socket includes (dead code under DISABLE_SETRANS,
+# absent on MinGW).
 sed -i '/^#include <netdb.h>/i #ifndef _WIN32' ${PWD_SRC}/src/selinux/libselinux/src/setrans_client.c
 sed -i '/^#include <sys\/uio.h>/a #endif' ${PWD_SRC}/src/selinux/libselinux/src/setrans_client.c
 
-# e2fsprogs error-table sources: the 'link' var collides with POSIX link() on
-# bionic; rename to 'et_link' in the files defining static struct et_list link.
+# e2fsprogs error-table sources: rename the 'link' var (collides with POSIX
+# link() on bionic) to 'et_link'.
 for f in lib/support/prof_err.c lib/ext2fs/ext2_err.c lib/ss/ss_err.c; do
   sed -i 's/\blink\b/et_link/g' "${PWD_SRC}/src/e2fsprogs/$f"
 done
 
-# e2fsprogs config.h hard-codes HAVE_SYS_SYSMACROS_H, but llvm-mingw ships none;
-# exclude _WIN32 (and the BSDs) from the define (devname.c guards the include on
-# it). makedev() comes from host_compat.h on Windows.
+# e2fsprogs config.h: exclude _WIN32/BSD from HAVE_SYS_SYSMACROS_H (no such header).
 sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   ${PWD_SRC}/src/e2fsprogs/lib/config.h
 
@@ -447,43 +420,36 @@ sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32
 sed -i 's/#include\t<Ws2tcpip.h>/#include\t<ws2tcpip.h>/' \
   ${PWD_SRC}/src/mdnsresponder/mDNSShared/CommonServices.h
 
-# ADB Windows: default to the libusb backend (no native AdbWinApi backend). Only
-# is_libusb_enabled()'s body is touched, leaving the __APPLE__ overflow guard alone.
+# ADB Windows: default is_libusb_enabled() to the libusb backend (no AdbWinApi).
 sed -i '/^bool is_libusb_enabled() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(_WIN32) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
   ${PWD_SRC}/src/adb/client/transport_usb.cpp
 
-# ADB Windows+BSD: the legacy BlockingConnection USB path (UsbConnection, free
-# usb_read/write helpers, init_usb_transport) belongs to the native backends we
-# don't build here; it's dead and won't link. Exclude it, keeping only
-# is_adb_interface()/is_libusb_enabled().
+# ADB Windows+BSD: exclude the legacy native BlockingConnection USB path (dead,
+# won't link), keeping is_adb_interface()/is_libusb_enabled().
 sed -i '/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path' \
   ${PWD_SRC}/src/adb/client/transport_usb.cpp
 sed -i '/^bool is_adb_interface(int usb_class/i #endif  // native USB path\n' \
   ${PWD_SRC}/src/adb/client/transport_usb.cpp
-# ...and the matching native-transport registration helpers in transport.cpp
-# (register_usb_transport calls the now-absent init_usb_transport).
+# ...and the matching native-transport registration helpers in transport.cpp.
 sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
   ${PWD_SRC}/src/adb/transport.cpp
 sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^#endif/ { /^#endif/i #endif  // native USB path
 }' ${PWD_SRC}/src/adb/transport.cpp
 
-# ADB Windows: usb_libusb_hotplug.cpp's timeval init narrows time_t->long, which
-# clang rejects; make the cast explicit.
+# ADB Windows: make usb_libusb_hotplug.cpp's timeval time_t->long cast explicit.
 sed -i 's/struct timeval timeout{(time_t)libusb_inhouse_hotplug::kScan_rate_s.count(), 0};/struct timeval timeout{static_cast<long>(libusb_inhouse_hotplug::kScan_rate_s.count()), 0};/' \
   ${PWD_SRC}/src/adb/client/usb_libusb_hotplug.cpp
 
-# ADB Windows: sysdeps_win32.cpp casts between distinct structs OSVERSIONINFO and
-# RTL_OSVERSIONINFOW; use reinterpret_cast.
+# ADB Windows: reinterpret_cast OSVERSIONINFO* to PRTL_OSVERSIONINFOW in sysdeps_win32.cpp.
 sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVERSIONINFOW>(\&version)/' \
   ${PWD_SRC}/src/adb/sysdeps_win32.cpp
 
-# ADB Windows: stat.cpp passes struct adb_stat* where wstat (_wstat64) wants
-# struct _stat64*; reinterpret_cast it.
+# ADB Windows: reinterpret_cast adb_stat* to _stat64* for wstat() in stat.cpp.
 sed -i 's/wstat(path_wide\.c_str(), &st)/wstat(path_wide.c_str(), reinterpret_cast<struct _stat64*>(\&st))/' \
   ${PWD_SRC}/src/adb/sysdeps/win32/stat.cpp
 
 # gtest-port.cc: on FreeBSD AArch64 <machine/proc.h>'s struct ptrauth_key clashes
-# with clang's builtin ptrauth typedef; guard the include and stub GetThreadCount().
+# with clang's builtin; guard the include and stub GetThreadCount().
 sed -i '/^#include <sys\/user.h>$/i #if !defined(__FreeBSD__) || !defined(__aarch64__)' \
   "${PWD_SRC}/src/googletest/googletest/src/gtest-port.cc"
 sed -i '/^#include <sys\/user.h>$/a #endif' \
@@ -493,8 +459,8 @@ sed -i '/#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\$/{
   s/#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\\n    defined(GTEST_OS_GNU_KFREEBSD) || defined(GTEST_OS_NETBSD)/#elif defined(GTEST_OS_FREEBSD) \&\& defined(__aarch64__)\nsize_t GetThreadCount() { return 0; }\n#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\\n    defined(GTEST_OS_GNU_KFREEBSD) || defined(GTEST_OS_NETBSD)/
 }' "${PWD_SRC}/src/googletest/googletest/src/gtest-port.cc"
 
-# abseil stacktrace.cc: NetBSD/OpenBSD declare alloca() as a function (not a macro),
-# so the #if !defined(alloca) guard misses it and the static def conflicts. Guard it.
+# abseil stacktrace.cc: NetBSD/OpenBSD declare alloca() as a function, so the
+# #if !defined(alloca) guard misses it; guard the static def.
 sed -i '/static void\* alloca(size_t) noexcept { return nullptr; }/i #if !defined(__NetBSD__) \&\& !defined(__OpenBSD__)' \
   "${PWD_SRC}/src/abseil-cpp/absl/debugging/stacktrace.cc"
 sed -i '/static void\* alloca(size_t) noexcept { return nullptr; }/a #endif' \
@@ -508,8 +474,8 @@ sed -i 's/^#if defined(__APPLE__)$/#if defined(__APPLE__) || defined(__FreeBSD__
 sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#elif defined(__EMSCRIPTEN__)/' \
   "${PWD_SRC}/src/libbase/file.cpp"
 
-# libbase logging.cpp: the getprogname() fallback uses program_invocation_short_name
-# which is glibc-only. FreeBSD/NetBSD/OpenBSD have native getprogname().
+# libbase logging.cpp: the getprogname() fallback uses glibc-only
+# program_invocation_short_name; BSDs have native getprogname().
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   "${PWD_SRC}/src/libbase/logging.cpp"
 
@@ -521,9 +487,8 @@ sed -i 's|#include <sys/user.h>|#if !defined(__NetBSD__)\n#include <sys/user.h>\
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   "${PWD_SRC}/src/logging/liblog/logger_write.cpp"
 
-# android-base/endian.h: BSD falls into the macOS/Windows #else (no __BIONIC__/
-# __GLIBC__/ANDROID_HOST_MUSL), which includes <winsock2.h> and hard-codes
-# little-endian. Insert a BSD branch using the native <sys/endian.h>.
+# android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
+# doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
 import sys
 
@@ -562,9 +527,8 @@ else:
         sys.exit(1)
 PYEOF
 
-# e2fsprogs bitops.c: NetBSD declares popcount32() non-statically (<sys/bitops.h>),
-# so bitops.c's static re-declaration errors. Guard the inline fallback with
-# #if !defined(__NetBSD__).
+# e2fsprogs bitops.c: NetBSD declares popcount32() in <sys/bitops.h>, so guard
+# the static re-declaration under #if !defined(__NetBSD__).
 python3 << 'PYEOF'
 import sys
 
@@ -601,9 +565,8 @@ else:
     print('popcount32: marker not found, skipping', file=sys.stderr)
 PYEOF
 
-# adb/sysdeps.h: adb_thread_setname hits the 2-arg pthread_setname_np #else; BSD
-# APIs differ — OpenBSD pthread_set_name_np (void), NetBSD 3-arg printf-style,
-# FreeBSD GNU-compatible 2-arg. Add per-family branches.
+# adb/sysdeps.h: add per-family branches to adb_thread_setname (OpenBSD
+# pthread_set_name_np, NetBSD 3-arg, FreeBSD 2-arg).
 python3 << 'PYEOF'
 import sys
 
@@ -653,10 +616,8 @@ else:
         print('adb/sysdeps.h: pattern not found, skipping', file=sys.stderr)
 PYEOF
 
-# boringssl cpu_aarch64_openbsd.cc: only OpenBSD gets OPENSSL_cpuid_setup; append a
-# FreeBSD/NetBSD aarch64 impl via elf_aux_info when <sys/auxv.h> exists (else empty
-# body). The block #includes internal.h itself (OPENSSL_armcap_P/ARMV*) since the
-# file only includes it inside the OpenBSD block.
+# boringssl cpu_aarch64_openbsd.cc: append a FreeBSD/NetBSD aarch64
+# OPENSSL_cpuid_setup via elf_aux_info (empty body when <sys/auxv.h> is absent).
 python3 << 'PYEOF'
 import sys
 
@@ -712,9 +673,8 @@ void bssl::OPENSSL_cpuid_setup(void) {}
     print('cpu_aarch64_openbsd.cc BSD cpuid appended')
 PYEOF
 
-# boringssl cpu_arm_freebsd.cc: only FreeBSD ARM32 gets OPENSSL_cpuid_setup; append
-# a NetBSD/OpenBSD ARM32 impl via elf_aux_info when <sys/auxv.h> exists (else an
-# empty body so the build still succeeds).
+# boringssl cpu_arm_freebsd.cc: append a NetBSD/OpenBSD ARM32 OPENSSL_cpuid_setup
+# via elf_aux_info (empty body when <sys/auxv.h> is absent).
 python3 << 'PYEOF'
 import sys
 
@@ -741,7 +701,7 @@ else:
 #if __has_include(<sys/auxv.h>)
 #include <sys/auxv.h>
 
-// ARM 32-bit HWCAP bits — inline constants matching cpu_arm_freebsd.cc style.
+// ARM 32-bit HWCAP bits: inline constants matching cpu_arm_freebsd.cc style.
 #ifndef HWCAP_NEON
 # define HWCAP_NEON   (1UL << 12)
 #endif
@@ -788,9 +748,8 @@ void bssl::OPENSSL_cpuid_setup(void) {}
 PYEOF
 
 # --- termux-usb shims (android targets) -------------------------------------
-# Route adb/fastboot USB enumeration through libtermuxadb (FDs from termux-usb, not
-# /dev/bus/usb). Always applied; inert at runtime unless LIBUSB_TERMUX_IMPL=1. See
-# patches/termux/.
+# Route adb/fastboot USB enumeration through libtermuxadb. Inert unless
+# LIBUSB_TERMUX_IMPL=1 at runtime.
 case "$TARGET" in *-android|*-androideabi) TERMUX_OK=1 ;; *) TERMUX_OK=0 ;; esac
 if [ "$TERMUX_OK" = 1 ]; then
   log "Applying termux-usb shims"
@@ -825,9 +784,8 @@ if [ "$TERMUX_OK" = 1 ]; then
   sed -i '/#include "fastboot.h"/a #include "termux_adb.h"' "$ff"
   sed -i '/int FastBootTool::Main(int argc, char\* argv\[\]) {/a\    termuxadb::start();' "$ff"
 
-  # fastboot usb_linux.cpp: 36.x enumerates via sysfs (no good under Termux). Add a
-  # find_usb_device_termux (/dev/bus/usb walk via termuxadb::), dispatched only when
-  # enabled(); the stock sysfs find_usb_device stays for the off path.
+  # fastboot usb_linux.cpp: add find_usb_device_termux (/dev/bus/usb walk),
+  # dispatched only when enabled(); stock sysfs find_usb_device stays for the off path.
   sed -i '/#include "usb.h"/a #include "termux_adb.h"' "${PWD_SRC}/src/core/fastboot/usb_linux.cpp"
   TERMUX_FB="${PWD_SRC}/src/core/fastboot/usb_linux.cpp" python3 << 'PYEOF'
 import os, sys
@@ -926,11 +884,8 @@ print('termux fastboot: find_usb_device_termux added + dispatch')
 PYEOF
 fi
 
-# adb sysdeps/errno.cpp: the ERRNO_VALUE static_asserts verify that the host errno
-# numbers match the ADB wire-protocol values. MIPS Linux uses different errno values
-# (inherited from IRIX), so the asserts fail. Guard them out; the switch-based
-# translation function that follows uses the actual MIPS constants, so translation
-# still works correctly at runtime.
+# adb sysdeps/errno.cpp: guard out the ERRNO_VALUE static_asserts on MIPS (its
+# errno numbers differ from the ADB wire values); the runtime switch still works.
 sed -i 's@#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")@#if !defined(__mips__)\n#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")\n#else\n#define ERRNO_VALUE(error_name, wire_value) /* mips errno numbers differ from ADB wire values */\n#endif@' \
     ${PWD_SRC}/src/adb/sysdeps/errno.cpp
 

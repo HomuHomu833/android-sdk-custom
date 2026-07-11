@@ -36,10 +36,8 @@ fetch() {
 
 [ -d "$BUILT_BIN" ] || { echo "built binaries not found at $BUILT_BIN" >&2; exit 1; }
 
-# REPO_OS_OVERRIDE makes sdkmanager fetch a specific OS's packages regardless of
-# the Linux build host, so each platform gets the matching SDK to splice into
-# (windows .exe/.bat, macOS Mach-O). bionic and BSD reuse the Linux SDK (ELF +
-# Java launchers); no BSD SDK is published, and bionic runs on-device via Termux JRE.
+# REPO_OS_OVERRIDE makes sdkmanager fetch a specific OS's packages so each
+# platform gets the matching SDK to splice into. bionic/BSD reuse the Linux SDK.
 case "$PLATFORM" in
   windows) REPO_OS_OVERRIDE=windows ;;
   macos)   REPO_OS_OVERRIDE=macosx ;;
@@ -55,8 +53,8 @@ rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
   fetch --dir=. -o commandlinetools.zip "$CMDLINE_TOOLS_URL"
   unzip -q commandlinetools.zip
   rm commandlinetools.zip
-  # Feed a bounded "y" stream, not `yes`: under pipefail the infinite `yes` takes
-  # SIGPIPE (141) when sdkmanager closes stdin, aborting the script post-accept.
+  # Bounded "y" stream, not `yes`: under pipefail `yes` takes SIGPIPE (141) when
+  # sdkmanager closes stdin, aborting the script.
   printf 'y\n%.0s' {1..100} | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
   cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;$BUILD_TOOLS_VERSION" "platform-tools" )
 
@@ -81,16 +79,13 @@ rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
 rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscript*
 
 # --- drop now-useless DLLs (windows base) -----------------------------------
-# Ours don't need them: AdbWin*Api (ours use libusb), libwinpthread-1 (we link
-# static), and the RenderScript libs (libbcc/libbcinfo/libclang_android/
-# libLLVM_android) whose tools were pruned above.
+# AdbWin*Api (we use libusb), libwinpthread-1 (static), RenderScript libs (pruned above).
 rm -f "$HOST_SDK/platform-tools/AdbWinApi.dll" "$HOST_SDK/platform-tools/AdbWinUsbApi.dll"
 rm -f "$BT/libbcc.dll" "$BT/libbcinfo.dll" "$BT/libclang_android.dll" "$BT/libLLVM_android.dll"
 find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true
 
 # --- convert the bash launcher scripts to POSIX sh --------------------------
-# Unix-host SDKs (linux/macosx, and the linux base for bionic) ship bash
-# launchers; windows ships .bat, so skip there.
+# Unix-host SDKs ship bash launchers; windows ships .bat, so skip there.
 if [ "$PLATFORM" != windows ]; then
   sed -i -e '1s|^#!.*bash|#!/bin/sh|' \
          -e 's/^declare -a javaOpts=()/javaOpts=""/' \
