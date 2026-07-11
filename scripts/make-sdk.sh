@@ -45,6 +45,17 @@ case "$PLATFORM" in
 esac
 export REPO_OS_OVERRIDE
 
+# We drive sdkmanager (below) with the linux cmdline-tools since the build host
+# is linux, but the copy we *ship* must match $PLATFORM. Derive the matching zip
+# from CMDLINE_TOOLS_URL (linux -> win/mac); override SHIP_CMDLINE_TOOLS_URL to
+# pin a different build.
+case "$PLATFORM" in
+  windows) CMDLINE_TOOLS_OS=win ;;
+  macos)   CMDLINE_TOOLS_OS=mac ;;
+  *)       CMDLINE_TOOLS_OS=linux ;;
+esac
+SHIP_CMDLINE_TOOLS_URL="${SHIP_CMDLINE_TOOLS_URL:-${CMDLINE_TOOLS_URL/commandlinetools-linux-/commandlinetools-$CMDLINE_TOOLS_OS-}}"
+
 # --- fetch the official SDK (build-tools + platform-tools) -------------------
 log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"
 HOST_SDK="$ROOTDIR/android-sdk"
@@ -93,6 +104,20 @@ if [ "$PLATFORM" != windows ]; then
          -e 's/javaOpts+=("\${defaultMx}")/javaOpts="\$javaOpts \${defaultMx}"/' \
          -e 's|"\${javaOpts\[@\]}"|$javaOpts|' "$BT/d8"
   sed -i '1s|^#!.*bash|#!/bin/sh|' "$BT/apksigner"
+fi
+
+# --- swap linux build scaffolding for OS-matching cmdline-tools -------------
+# The cmdline-tools we drove sdkmanager with is linux; replace it with the copy
+# matching $PLATFORM so the archive isn't a linux/windows mix (sdkmanager fetched
+# under .temp is scaffolding too). For a linux build the URLs match, so keep the
+# one we already downloaded instead of re-fetching.
+rm -rf "$HOST_SDK/.temp"
+if [ "$SHIP_CMDLINE_TOOLS_URL" != "$CMDLINE_TOOLS_URL" ]; then
+  rm -rf "$HOST_SDK/cmdline-tools"
+  ( cd "$HOST_SDK"
+    fetch --dir=. -o cmdline-tools.zip "$SHIP_CMDLINE_TOOLS_URL"
+    unzip -q cmdline-tools.zip
+    rm cmdline-tools.zip )
 fi
 
 # --- archive ----------------------------------------------------------------
