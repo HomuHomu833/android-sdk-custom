@@ -142,6 +142,12 @@ case "$PLATFORM" in
     # can't link-test arc4random_buf under the zig BSD sysroots, so use /dev/urandom.
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat -DXML_DEV_URANDOM"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
+    # OpenBSD's zig sysroot has no <dev/usb/*> headers, so libusb's openbsd_usb.c
+    # can't compile. Supply the vendored OpenBSD usb.h, scoped to OpenBSD targets
+    # only (a shared -isystem would shadow FreeBSD's/NetBSD's real usb.h).
+    case "$TARGET" in
+      *-openbsd-*|*-openbsd) CROSS_CFLAGS="$CROSS_CFLAGS -isystem $ROOTDIR/patches/bsd-compat/openbsd" ;;
+    esac
     # Per-arch SIMD/TLS, same as linux.
     case "$TARGET" in
       thumb-*|thumbeb-*)
