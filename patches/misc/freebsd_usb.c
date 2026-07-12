@@ -567,8 +567,9 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 }
 
 /* Drain all pending USB-FS completions into the per-slot table. Caller holds
- * hpriv->lock. */
-static void
+ * hpriv->lock. Returns 0 normally, or -1 if the device went away (any
+ * USB_FS_COMPLETE error other than EBUSY, e.g. ENXIO on unplug). */
+static int
 _fs_drain(struct handle_priv *hpriv)
 {
 	struct usb_fs_complete comp;
@@ -576,7 +577,7 @@ _fs_drain(struct handle_priv *hpriv)
 	for (;;) {
 		memset(&comp, 0, sizeof(comp));
 		if (ioctl(hpriv->fd, USB_FS_COMPLETE, &comp) < 0)
-			break;			/* EBUSY: nothing more ready */
+			return (errno == EBUSY) ? 0 : -1;
 		if (comp.ep_index < FBSD_NFSEP) {
 			hpriv->done[comp.ep_index] = 1;
 			hpriv->cstatus[comp.ep_index] =
@@ -699,8 +700,16 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 		pfd.revents = 0;
 		(void)poll(&pfd, 1, 50);
 
+		/* Device unplugged / node revoked: poll reports hangup or the fd
+		 * becomes invalid. Bail so adb's read thread can tear down. */
+		if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL))
+			return LIBUSB_ERROR_NO_DEVICE;
+
 		pthread_mutex_lock(&hpriv->lock);
-		_fs_drain(hpriv);
+		if (_fs_drain(hpriv) < 0) {
+			pthread_mutex_unlock(&hpriv->lock);
+			return LIBUSB_ERROR_NO_DEVICE;
+		}
 		if (hpriv->done[slot]) {
 			status = hpriv->cstatus[slot];
 			actlen = hpriv->cactlen[slot];
