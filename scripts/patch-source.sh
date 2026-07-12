@@ -51,6 +51,14 @@ cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/Co
 # libbase/file.cpp uses std::string::resize_and_overwrite (C++23); add a C++20 fallback.
 patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
 
+# libbase/threads.cpp GetThreadId() has no BSD branch: on FreeBSD/NetBSD/OpenBSD it
+# falls off the end of a non-void function (UB -> clang emits a trap), which crashes
+# adb at startup (AdbOspTaskRunner ctor). Add the BSD thread-id calls + their headers.
+sed -i '/#include <unistd.h>/a\
+#if defined(__FreeBSD__)\n#include <pthread_np.h>\n#elif defined(__NetBSD__)\n#include <lwp.h>\n#endif' ${PWD_SRC}/src/libbase/threads.cpp
+sed -i '/return syscall(__NR_gettid);/a\
+#elif defined(__FreeBSD__)\n  return pthread_getthreadid_np();\n#elif defined(__NetBSD__)\n  return _lwp_self();\n#elif defined(__OpenBSD__)\n  return getthrid();' ${PWD_SRC}/src/libbase/threads.cpp
+
 # adb mDNS: make the Rust adbmdns bridge optional (ADB_NO_RUST_MDNS) so targets
 # without a Rust std fall back to openscreen.
 patch -p1 -d "$ROOTDIR" -i patches/misc/adb-mdns-openscreen-fallback.patch
