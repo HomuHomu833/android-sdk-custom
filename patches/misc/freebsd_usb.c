@@ -29,9 +29,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <dev/usb/usb.h>
@@ -55,6 +57,15 @@ struct device_priv {
 };
 
 struct handle_priv {
+	/*
+	 * adb drives this backend from two threads at once (a bulk-IN read
+	 * thread and a bulk-OUT write thread) via the synchronous
+	 * libusb_bulk_transfer API. The single ugen fd and its USB_FS_COMPLETE
+	 * queue are shared, so access is serialized by `lock`, and completions
+	 * are dispatched into per-slot done/status/actlen so each waiting thread
+	 * only consumes its own transfer's result.
+	 */
+	pthread_mutex_t	lock;
 	int		fd;		/* O_RDWR node fd; also USB_FS_* target */
 	int		fs_inited;	/* USB_FS_INIT has run */
 	struct usb_fs_endpoint fsep[FBSD_NFSEP];
@@ -62,6 +73,9 @@ struct handle_priv {
 	uint32_t	plen[FBSD_NFSEP];	/* single-frame length */
 	uint8_t		ep_no[FBSD_NFSEP];	/* bound bEndpointAddress, 0=free */
 	uint32_t	ep_bufsize[FBSD_NFSEP];	/* current opened max_bufsize */
+	int		done[FBSD_NFSEP];	/* completion seen for this slot */
+	int		cstatus[FBSD_NFSEP];	/* usb_fs_endpoint.status at completion */
+	uint32_t	cactlen[FBSD_NFSEP];	/* actual length at completion */
 };
 
 static int fbsd_get_device_list(struct libusb_context *,
@@ -226,10 +240,13 @@ fbsd_open(struct libusb_device_handle *handle)
 	int i;
 
 	memset(hpriv, 0, sizeof(*hpriv));
+	pthread_mutex_init(&hpriv->lock, NULL);
 
 	hpriv->fd = open(dpriv->devnode, O_RDWR);
-	if (hpriv->fd < 0)
+	if (hpriv->fd < 0) {
+		pthread_mutex_destroy(&hpriv->lock);
 		return _errno_to_libusb(errno);
+	}
 
 	for (i = 0; i < FBSD_NFSEP; i++)
 		hpriv->ep_no[i] = 0;
@@ -267,6 +284,7 @@ fbsd_close(struct libusb_device_handle *handle)
 	if (hpriv->fd >= 0)
 		close(hpriv->fd);
 	hpriv->fd = -1;
+	pthread_mutex_destroy(&hpriv->lock);
 }
 
 int
@@ -535,11 +553,38 @@ _sync_control_transfer(struct usbi_transfer *itransfer)
 	if ((transfer->flags & LIBUSB_TRANSFER_SHORT_NOT_OK) == 0)
 		req.ucr_flags = USB_SHORT_XFER_OK;
 
-	if (ioctl(hpriv->fd, USB_DO_REQUEST, &req) < 0)
-		return _errno_to_libusb(errno);
+	/* Serialize against the bulk path (shared fd). */
+	pthread_mutex_lock(&hpriv->lock);
+	if (ioctl(hpriv->fd, USB_DO_REQUEST, &req) < 0) {
+		int err = errno;
+		pthread_mutex_unlock(&hpriv->lock);
+		return _errno_to_libusb(err);
+	}
+	pthread_mutex_unlock(&hpriv->lock);
 
 	itransfer->transferred = req.ucr_actlen;
 	return 0;
+}
+
+/* Drain all pending USB-FS completions into the per-slot table. Caller holds
+ * hpriv->lock. */
+static void
+_fs_drain(struct handle_priv *hpriv)
+{
+	struct usb_fs_complete comp;
+
+	for (;;) {
+		memset(&comp, 0, sizeof(comp));
+		if (ioctl(hpriv->fd, USB_FS_COMPLETE, &comp) < 0)
+			break;			/* EBUSY: nothing more ready */
+		if (comp.ep_index < FBSD_NFSEP) {
+			hpriv->done[comp.ep_index] = 1;
+			hpriv->cstatus[comp.ep_index] =
+			    hpriv->fsep[comp.ep_index].status;
+			hpriv->cactlen[comp.ep_index] =
+			    hpriv->plen[comp.ep_index];
+		}
+	}
 }
 
 /* Find an open FS slot for ep, or allocate/(re)open one big enough. */
@@ -597,20 +642,30 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 	    usbi_get_device_handle_priv(transfer->dev_handle);
 	struct usb_fs_endpoint *fsep;
 	struct usb_fs_start fsstart;
-	struct usb_fs_complete fscomp;
 	struct pollfd pfd;
 	int slot;
+	struct timespec start;
+	int err, status;
+	uint32_t actlen;
 
 	if (!hpriv->fs_inited)
 		return LIBUSB_ERROR_NOT_SUPPORTED;
 
+	clock_gettime(CLOCK_MONOTONIC, &start);
+
+	/* --- set up and start the transfer under the lock --- */
+	pthread_mutex_lock(&hpriv->lock);
+
 	slot = _fs_slot(hpriv, (uint8_t)transfer->endpoint,
 	    (uint32_t)transfer->length);
-	if (slot < 0)
+	if (slot < 0) {
+		pthread_mutex_unlock(&hpriv->lock);
 		return slot;
+	}
 
 	hpriv->ppbuf[slot] = transfer->buffer;
 	hpriv->plen[slot] = (uint32_t)transfer->length;
+	hpriv->done[slot] = 0;
 
 	fsep = &hpriv->fsep[slot];
 	memset(fsep, 0, sizeof(*fsep));
@@ -624,32 +679,48 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 
 	memset(&fsstart, 0, sizeof(fsstart));
 	fsstart.ep_index = slot;
-	if (ioctl(hpriv->fd, USB_FS_START, &fsstart) < 0)
-		return _errno_to_libusb(errno);
+	if (ioctl(hpriv->fd, USB_FS_START, &fsstart) < 0) {
+		err = errno;
+		pthread_mutex_unlock(&hpriv->lock);
+		return _errno_to_libusb(err);
+	}
+	pthread_mutex_unlock(&hpriv->lock);
 
+	/*
+	 * Wait for *this* slot to complete. Multiple threads may poll the shared
+	 * fd concurrently; whoever wakes drains every ready completion into the
+	 * per-slot table (under the lock), so each thread finds its own. A short
+	 * poll slice bounds how long we hold nothing while another thread owns
+	 * the wakeup.
+	 */
 	for (;;) {
 		pfd.fd = hpriv->fd;
 		pfd.events = POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM;
 		pfd.revents = 0;
-		if (poll(&pfd, 1, transfer->timeout > 0 ? transfer->timeout : -1)
-		    == 0)
-			return LIBUSB_ERROR_TIMEOUT;
+		(void)poll(&pfd, 1, 50);
 
-		memset(&fscomp, 0, sizeof(fscomp));
-		if (ioctl(hpriv->fd, USB_FS_COMPLETE, &fscomp) < 0) {
-			if (errno == EBUSY)
-				continue;	/* not finished yet */
-			return _errno_to_libusb(errno);
+		pthread_mutex_lock(&hpriv->lock);
+		_fs_drain(hpriv);
+		if (hpriv->done[slot]) {
+			status = hpriv->cstatus[slot];
+			actlen = hpriv->cactlen[slot];
+			hpriv->done[slot] = 0;
+			pthread_mutex_unlock(&hpriv->lock);
+			if (status != 0)
+				return LIBUSB_ERROR_IO;
+			itransfer->transferred = (int)actlen;
+			return 0;
 		}
-		if (fscomp.ep_index == slot)
-			break;
-		/* completion for another endpoint; keep draining */
+		pthread_mutex_unlock(&hpriv->lock);
+
+		if (transfer->timeout > 0) {
+			struct timespec now;
+			long ms;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			ms = (now.tv_sec - start.tv_sec) * 1000 +
+			    (now.tv_nsec - start.tv_nsec) / 1000000;
+			if (ms >= transfer->timeout)
+				return LIBUSB_ERROR_TIMEOUT;
+		}
 	}
-
-	if (fsep->status != 0)
-		return LIBUSB_ERROR_IO;
-
-	/* pLength[0] was updated to the actual transferred length. */
-	itransfer->transferred = (int)hpriv->plen[slot];
-	return 0;
 }
