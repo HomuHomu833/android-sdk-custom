@@ -48,6 +48,11 @@ cp patches/misc/unscaledcycleclock.cc  src/abseil-cpp/absl/base/internal/unscale
 
 cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/CombinedIterator.h
 
+# Vendored FreeBSD libusb backend: upstream libusb has no *-freebsd* backend, so
+# the build would fall back to null_usb.c (fastboot sees no devices). Drop our
+# ugen(4)-based backend into the fetched tree; libusb.cmake selects it on FreeBSD.
+cp patches/misc/freebsd_usb.c  src/libusb/libusb/os/freebsd_usb.c
+
 # libbase/file.cpp uses std::string::resize_and_overwrite (C++23); add a C++20 fallback.
 patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
 
