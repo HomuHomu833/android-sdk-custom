@@ -375,7 +375,7 @@ endif()
 # termuxadb_* shims in libtermuxadb.a, which reference libusb_* — group them so the
 # mutual refs resolve regardless of link order. Inert unless LIBUSB_TERMUX_IMPL=1.
 if(TERMUX_USB_SHIM)
-    target_link_libraries(adb -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
+    target_link_libraries(adb -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group liblog)
 endif()
 
 if(PLATFORM_DARWIN)

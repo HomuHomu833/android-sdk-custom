@@ -113,5 +113,5 @@ endif()
 # link libusb, so pull it in). Group them for order-independent resolution. Inert
 # unless LIBUSB_TERMUX_IMPL=1.
 if(TERMUX_USB_SHIM)
-    target_link_libraries(fastboot -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group log)
+    target_link_libraries(fastboot -Wl,--start-group ${TERMUXADB_LIB} libusb -Wl,--end-group liblog)
 endif()
