@@ -82,6 +82,7 @@ extern "C" {
 #endif  // __BIONIC__
 
 extern "C" {
+    __attribute__((weak))
     int cacheflush(long start, long end, long flags) {
         (void)flags;
 
