@@ -105,7 +105,7 @@ case "$PLATFORM" in
     SYSTEM_NAME=Linux
     # reallocarray is API 29+ in bionic; host_compat.h shims it on lower APIs.
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h -static"
-    CROSS_LDFLAGS="-static"
+    CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384"
     # termux-usb shim: built into bionic adb/fastboot, inert until LIBUSB_TERMUX_IMPL=1.
     case "$TARGET" in
       aarch64-linux-android)    RUST_TARGET=aarch64-linux-android ;;
