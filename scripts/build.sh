@@ -38,6 +38,7 @@ fetch() {
 # --- toolchain selection (linux/bsd zig, bionic NDK clang, macos osxcross,
 # windows llvm-mingw) --------------------------------------------------------
 CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
+EXE_LDFLAGS_EXTRA=""   # appended to CMAKE_EXE_LINKER_FLAGS only (not shared libs)
 case "$PLATFORM" in
   linux)
     TC=/opt/zig-as-llvm
@@ -105,7 +106,15 @@ case "$PLATFORM" in
     SYSTEM_NAME=Linux
     # reallocarray is API 29+ in bionic; host_compat.h shims it on lower APIs.
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h -static"
-    CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384"
+    CROSS_LDFLAGS="-static"
+    # arm/arm64 executables need an 8-word-aligned PT_TLS to clear bionic's TCB
+    # slots, or the loader aborts with "executable's TLS segment is underaligned".
+    # crtbegin only supplies that from API 29, so link our own copy into every
+    # tool. Preprocessor-guarded, hence built unconditionally.
+    log "Building bionic TLS alignment stub"
+    mkdir -p "$BUILD_DIR"
+    "$CROSS_CC" -c "$ROOTDIR/patches/misc/bionic_tls_align.S" -o "$BUILD_DIR/bionic_tls_align.o"
+    EXE_LDFLAGS_EXTRA="$BUILD_DIR/bionic_tls_align.o"
     # termux-usb shim: built into bionic adb/fastboot, inert until LIBUSB_TERMUX_IMPL=1.
     case "$TARGET" in
       aarch64-linux-android)    RUST_TARGET=aarch64-linux-android ;;
@@ -350,13 +359,20 @@ cmake -GNinja \
   -DCMAKE_STRIP="$CROSS_STRIP" \
   -DCMAKE_C_FLAGS="$CROSS_CFLAGS" \
   -DCMAKE_CXX_FLAGS="$CROSS_CFLAGS" \
-  -DCMAKE_EXE_LINKER_FLAGS="$CROSS_LDFLAGS" \
+  -DCMAKE_EXE_LINKER_FLAGS="$CROSS_LDFLAGS $EXE_LDFLAGS_EXTRA" \
   -DCMAKE_SHARED_LINKER_FLAGS="$CROSS_LDFLAGS" \
   -Dprotobuf_BUILD_TESTS=OFF \
   -DABSL_PROPAGATE_CXX_STD=ON \
   -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DPROTOC_PATH="$PROTOC" \
   "${CROSS_CMAKE_EXTRA[@]}"
+
+# Vendored subprojects (protobuf/boringssl/...) define codegen commands with no
+# COMMENT, so their ninja edges render as blank "[n/m]" lines (empty $DESC).
+# Relabel the CUSTOM_COMMAND rule to fall back to the output path so the build
+# log has no empty descriptions.
+find "$BUILD_DIR" \( -name build.ninja -o -name rules.ninja \) -type f -print0 \
+  | xargs -0 -r sed -i 's/^  description = \$DESC$/  description = Generating $out/'
 
 log "Building"
 ninja -C "$BUILD_DIR" -j"$JOBS"
