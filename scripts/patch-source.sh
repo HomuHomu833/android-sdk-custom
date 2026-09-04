@@ -144,6 +144,12 @@ sed -i 's/std::vector<const StringPiece>/std::vector<StringPiece>/g' ${PWD_SRC}/
 # so pull in <stdlib.h>.
 sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/include/fmt/format.h
 
+# adb missing includes: fdevent.h names std::vector and adb_mdns.cpp std::atomic
+# without including either header. The other sysroots' libc++ happens to drag
+# them in transitively; llvm-mingw's does not, so spell them out.
+sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
+sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
+
 # riscv32/powerpc/mips: drop the std::atomic is_always_lock_free static_assert.
 case "$TARGET" in
   riscv32-*|powerpc-*|mips-*|mipsel-*)
@@ -153,9 +159,18 @@ esac
 
 # cacheflush(): zig's generic-glibc <sys/cachectl.h> pulls <asm/cachectl.h> which
 # zig doesn't ship, so forward-declare it on glibc; musl keeps its own header.
+# mingw has neither the header nor the function: map it onto Win32's
+# FlushInstructionCache. Declared by hand rather than via <windows.h>, which
+# utils.cc only includes further down (behind its ERROR-macro dance).
 sed -i '/#include "os.h"/a\
 #if defined(__arm__)\
-#if defined(__GLIBC__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\
+#if defined(_WIN32)\
+extern "C" __declspec(dllimport) void* __stdcall GetCurrentProcess(void);\
+extern "C" __declspec(dllimport) int __stdcall FlushInstructionCache(void*, const void*, unsigned long);\
+static inline int cacheflush(void* addr, int size, int) {\
+  return FlushInstructionCache(GetCurrentProcess(), addr, (unsigned long)size) ? 0 : -1;\
+}\
+#elif defined(__GLIBC__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\
 extern "C" int cacheflush(void*, int, int);\
 #else\
 #include <sys/cachectl.h>\

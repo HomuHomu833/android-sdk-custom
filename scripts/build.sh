@@ -73,11 +73,13 @@ case "$PLATFORM" in
         CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
       powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
-    # mips64 n64: force __s64/__u64 to 'long long' (asm-generic/int-l64.h uses
-    # 'long', conflicting with e2fsprogs). See patches/misc/mips64-int-ll64.h.
+    # mips64 n64 and powerpc64: force __s64/__u64 to 'long long' (both arches'
+    # asm/types.h picks asm-generic/int-l64.h, i.e. 'long', conflicting with
+    # e2fsprogs). glibc only — musl never includes asm/types.h from <sys/stat.h>.
+    # See patches/misc/force-int-ll64.h.
     case "$TARGET" in
-      mips64-*gnuabi64|mips64el-*gnuabi64)
-        CROSS_CFLAGS="$CROSS_CFLAGS -include $ROOTDIR/patches/misc/mips64-int-ll64.h" ;;
+      mips64-*gnuabi64|mips64el-*gnuabi64|powerpc64-*-gnu*|powerpc64le-*-gnu*)
+        CROSS_CFLAGS="$CROSS_CFLAGS -include $ROOTDIR/patches/misc/force-int-ll64.h" ;;
     esac
     # x32: force local-exec TLS (lld can't relax R_X86_64_GOTTPOFF here; static so it fits).
     case "$TARGET" in
@@ -218,7 +220,17 @@ case "$PLATFORM" in
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
     # Static libstdc++/libgcc + whole-archive libwinpthread (keeps its TLS/thread-exit
     # callbacks) so the .exe tools need no mingw DLLs.
-    CROSS_LDFLAGS="-static-libstdc++ -static-libgcc -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic"
+    CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
+    # aarch64/arm64ec are the exception: once llvm-mingw builds arm64ec, its
+    # winpthreads for aarch64 is compiled -marm64x, so aarch64-w64-mingw32/lib/
+    # libwinpthread.a holds ARM64X members. Demand-loading takes each member's
+    # native view and links fine, but --whole-archive force-loads them raw, so
+    # lld reports "machine type arm64ec conflicts with arm64" plus EC/native
+    # duplicate symbols. Fall back to the driver's default -lwinpthread there.
+    case "$TARGET" in
+      aarch64-*|arm64ec-*) ;;
+      *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic" ;;
+    esac
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
