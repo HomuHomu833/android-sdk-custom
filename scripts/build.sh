@@ -15,6 +15,13 @@ set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
 : "${PLATFORM:?set PLATFORM}" "${TARGET:?set TARGET}"
+
+# zig target for the compiler wrappers. powerpc64le-linux-gnu needs an explicit
+# glibc >= 2.32: clang gives it IEEE-128 long double, so zig's libc++ calls
+# glibc's __snprintfieee128 / __fprintfieee128 / __vfprintfieee128, added in
+# 2.32. Without a version zig picks an older glibc and the link fails.
+ZIG_TRIPLE="$TARGET"
+if [ "$TARGET" = powerpc64le-linux-gnu ]; then ZIG_TRIPLE="powerpc64le-linux-gnu.2.32"; fi
 ARCH="${ARCH:-${TARGET%%-*}}"
 OUT="${OUT:-$ROOTDIR/out}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
@@ -42,7 +49,7 @@ EXE_LDFLAGS_EXTRA=""   # appended to CMAKE_EXE_LINKER_FLAGS only (not shared lib
 case "$PLATFORM" in
   linux)
     TC=/opt/zig-as-llvm
-    export ZIG_TARGET="$TARGET"
+    export ZIG_TARGET="$ZIG_TRIPLE"
     # overlay the musl libc source fixes onto zig's bundled musl (lib is a+w)
     [ -d "$ROOTDIR/patches/musl/zig" ] && cp -R "$ROOTDIR/patches/musl/zig/." /opt/zig/ || true
     CROSS_CC="$TC/bin/cc"; CROSS_CXX="$TC/bin/c++"; CROSS_LD="$TC/bin/ld"
@@ -137,7 +144,7 @@ case "$PLATFORM" in
   bsd)
     # BSD host tools via zig-as-llvm (same wrappers as linux), all BSD targets.
     TC=/opt/zig-as-llvm
-    export ZIG_TARGET="$TARGET"
+    export ZIG_TARGET="$ZIG_TRIPLE"
     [ -d "$ROOTDIR/patches/musl/zig" ] && cp -R "$ROOTDIR/patches/musl/zig/." /opt/zig/ || true
     CROSS_CC="$TC/bin/cc"; CROSS_CXX="$TC/bin/c++"; CROSS_LD="$TC/bin/ld"
     CROSS_AR="$TC/bin/ar"; CROSS_RANLIB="$TC/bin/ranlib"
