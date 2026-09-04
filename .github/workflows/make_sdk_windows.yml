@@ -24,5 +24,6 @@ jobs:
       platform: windows
       version: ${{ inputs.version }}
       tag: ${{ inputs.tag }}
-      # armv7-w64-mingw32, arm64ec-w64-mingw32
-      targets: '["x86_64-w64-mingw32", "aarch64-w64-mingw32", "i686-w64-mingw32"]'
+      targets: >-
+        ["x86_64-w64-mingw32", "aarch64-w64-mingw32", "i686-w64-mingw32",
+         "armv7-w64-mingw32", "arm64ec-w64-mingw32"]
