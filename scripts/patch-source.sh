@@ -147,6 +147,11 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
+# abseil's crc cpu_detect.cc gates __cpuid on __x86_64__, but on arm64ec clang has
+# no x86 builtin and the asm fallback is !_WIN32, so nothing declares it. Exclude EC
+# and GetCpuType() returns its kUnknown fallback.
+sed -i 's@defined(__x86_64__) || defined(_M_X64)@(defined(__x86_64__) || defined(_M_X64)) \&\& !defined(__arm64ec__)@g' ${PWD_SRC}/src/abseil-cpp/absl/crc/internal/cpu_detect.cc
+
 # arm64ec defines __x86_64__/_M_X64 so datatype layouts match x64, but every use of
 # them in zstd is instruction-level -- cpuid asm, cmova in ZSTD_selectAddr, .p2align
 # hints (which also break SEH unwind info), BMI2 -- so require a non-EC target for
