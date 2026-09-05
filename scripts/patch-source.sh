@@ -147,6 +147,12 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
+# abseil's random platform.h picks ABSL_ARCH_* by macro, so arm64ec lands on
+# X86_64 and randen_detect.cc reaches for __cpuid that mingw's <intrin.h> has no
+# ARM declaration for. Leave the arch undefined instead: the #else is empty, so
+# AES acceleration and dispatch stay off and randen takes its portable path.
+sed -i 's@^#define ABSL_ARCH_X86_64$@#if !defined(__arm64ec__)\n#define ABSL_ARCH_X86_64\n#endif@' ${PWD_SRC}/src/abseil-cpp/absl/random/internal/platform.h
+
 # abseil's crc cpu_detect.cc gates __cpuid on __x86_64__, but on arm64ec clang has
 # no x86 builtin and the asm fallback is !_WIN32, so nothing declares it. Exclude EC
 # and GetCpuType() returns its kUnknown fallback.
