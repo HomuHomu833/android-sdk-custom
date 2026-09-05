@@ -147,12 +147,13 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
-# "__x86_64__ && __GNUC__" is protobuf's idiom for a GNU-style x86 asm block --
-# parse_context.h's ror/movb rotate, port_def.inc's prefetcht0. arm64ec assembles
-# none of it, and each site has a portable (or empty) #else, so exclude EC in all
-# of them rather than one CI round per file.
-grep -rl '^#if defined(__x86_64__) && defined(__GNUC__)$' ${PWD_SRC}/src/protobuf/src 2>/dev/null | while read -r _f; do
-  sed -i 's@^#if defined(__x86_64__) \&\& defined(__GNUC__)$@#if defined(__x86_64__) \&\& defined(__GNUC__) \&\& !defined(__arm64ec__)@' "$_f"
+# protobuf guards its x86 asm on __x86_64__ in several spellings -- plain
+# "&& __GNUC__" (parse_context.h's ror/movb, port_def.inc's prefetcht0) and
+# "__GCC_ASM_FLAG_OUTPUTS__ &&" (varint_shuffle.h's btc), which clang also defines
+# on AArch64. arm64ec assembles none of it and every site has a portable #else, so
+# require a non-EC target for the macro itself rather than per guard spelling.
+grep -rl 'defined(__x86_64__)' ${PWD_SRC}/src/protobuf/src 2>/dev/null | while read -r _f; do
+  sed -i 's@defined(__x86_64__)@(defined(__x86_64__) \&\& !defined(__arm64ec__))@g' "$_f"
 done
 
 # abseil's prefetch.h emits x86 prefetchw for __x86_64__; arm64ec has no such
