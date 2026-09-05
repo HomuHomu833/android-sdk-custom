@@ -219,7 +219,7 @@ case "$PLATFORM" in
     # arm64ec carries x86_64's macros, so bundled libraries reach for x86 intrinsics
     # and asm the ARM backend cannot build; take each one's own opt-out.
     case "$TARGET" in
-      arm64ec-*) CROSS_CFLAGS="$CROSS_CFLAGS -DOPENSSL_NO_SSE2_FOR_TESTING -DZSTD_NO_INTRINSICS -DABSL_USE_UNSCALED_CYCLECLOCK=0" ;;
+      arm64ec-*) CROSS_CFLAGS="$CROSS_CFLAGS -DOPENSSL_NO_SSE2_FOR_TESTING -DZSTD_NO_INTRINSICS" ;;
     esac
     # Static libstdc++/libgcc + whole-archive libwinpthread (keeps its TLS/thread-exit
     # callbacks) so the .exe tools need no mingw DLLs.

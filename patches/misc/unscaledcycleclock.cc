@@ -56,7 +56,7 @@ double UnscaledCycleClock::Frequency() {
   return base_internal::NominalCPUFrequency();
 }
 
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) && !defined(__arm64ec__)
 
 double UnscaledCycleClock::Frequency() {
   return base_internal::NominalCPUFrequency();
@@ -143,7 +143,7 @@ double UnscaledCycleClock::Frequency() {
 #endif
 }
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm64ec__)
 
 double UnscaledCycleClock::Frequency() {
   uint64_t aarch64_timer_frequency;
