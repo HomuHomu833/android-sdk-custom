@@ -28,7 +28,7 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 
 **Architectures**
 - **X86 Family**: `x86`, `x86_64`, `x32`
-- **ARM Family**: `armhf`, `armeb`, `aarch64`, `aarch64_be`
+- **ARM Family**: `arm`, `armeb`, `aarch64`, `aarch64_be`
 - **RISC-V**: `riscv32`, `riscv64`
 - **PowerPC**: `powerpc`, `powerpc64`, `powerpc64le`
 - **MIPS**: `mips`, `mipsel`, `mips64`, `mips64el`
@@ -46,7 +46,7 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 
 **Architectures**
 - `x86`, `x86_64`
-- `aarch64`
+- `aarch64`, `arm64ec` *(Windows-only)*
 - `armv7a` *(Android-only)*
 - `arm64e`, `x86_64h` *(macOS-only)*
 
