@@ -147,9 +147,14 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
-# zstd cpu.h takes its cpuid asm branch off __x86_64__, which arm64ec also defines;
-# exclude it and ZSTD_cpuid() keeps its zeroed (no x86 features) result.
-sed -i 's/^#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__)$/#elif (defined(__x86_64__) || defined(_M_X64) || defined(__i386__)) \&\& !defined(__arm64ec__) \&\& !defined(_M_ARM64EC)/' ${PWD_SRC}/src/zstd/lib/common/cpu.h
+# arm64ec defines __x86_64__/_M_X64 so datatype layouts match x64, but every use of
+# them in zstd is instruction-level -- cpuid asm, cmova in ZSTD_selectAddr, .p2align
+# hints (which also break SEH unwind info), BMI2 -- so require a non-EC target for
+# all of them. Each site has a portable #else.
+grep -rl 'defined(__x86_64__)\|defined(_M_X64)' ${PWD_SRC}/src/zstd/lib 2>/dev/null | while read -r _f; do
+  sed -i -e 's@defined(__x86_64__)@(defined(__x86_64__) \&\& !defined(__arm64ec__))@g' \
+         -e 's@defined(_M_X64)@(defined(_M_X64) \&\& !defined(_M_ARM64EC))@g' "$_f"
+done
 
 # riscv32/powerpc/mips: drop the std::atomic is_always_lock_free static_assert.
 case "$TARGET" in
