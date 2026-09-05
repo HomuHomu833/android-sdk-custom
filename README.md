@@ -20,33 +20,35 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 ### 🔹 Zig-based Environment
 
 **Platforms**
-- Linux *(glibc and musl)*
+- Linux
+- Android
 - NetBSD
 - FreeBSD
 - OpenBSD
 
 **Architectures**
-- **X86 Family**: `x86`, `x86_64` *(plus the `x32` ABI on Linux)*
-- **ARM Family**: `arm` *(soft- and hard-float)*, `armeb`, `aarch64`, `aarch64_be`
+- **X86 Family**: `x86`, `x86_64`, `x32`
+- **ARM Family**: `armhf`, `armeb`, `aarch64`, `aarch64_be`
 - **RISC-V**: `riscv32`, `riscv64`
 - **PowerPC**: `powerpc`, `powerpc64`, `powerpc64le`
 - **MIPS**: `mips`, `mipsel`, `mips64`, `mips64el`
-- **Thumb**: `thumb`, `thumbeb` *(Linux-only)*
-- **Other**: `loongarch64`, `s390x`, `hexagon` *(Linux-only)*
+- **Thumb**: `thumb`, `thumbeb`
+- **Other**: `loongarch64`, `s390x`, `hexagon`
 
 ---
 
 ### 🔹 Native Environment
 
 **Platforms**
-- Windows *(via llvm-mingw)*
-- macOS *(via osxcross)*
-- Android *(via the official NDK)*
+- Windows
+- macOS
+- Android
 
 **Architectures**
-- **Windows**: `x86`, `x86_64`, `aarch64`, `armv7`, `arm64ec`
-- **macOS**: `x86_64`, `x86_64h`, `arm64`, `arm64e`
-- **Android**: `x86`, `x86_64`, `aarch64`, `armv7a`
+- `x86`, `x86_64`
+- `aarch64`
+- `armv7a` *(Android-only)*
+- `arm64e`, `x86_64h` *(macOS-only)*
 
 ---
 
