@@ -48,17 +48,15 @@ cp patches/misc/unscaledcycleclock.cc  src/abseil-cpp/absl/base/internal/unscale
 
 cp patches/misc/CombinedIterator.h  src/base/libs/androidfw/include/androidfw/CombinedIterator.h
 
-# Vendored FreeBSD libusb backend: upstream libusb has no *-freebsd* backend, so
-# the build would fall back to null_usb.c (fastboot sees no devices). Drop our
-# ugen(4)-based backend into the fetched tree; libusb.cmake selects it on FreeBSD.
+# Vendored FreeBSD libusb backend: upstream has none, so the build would fall back
+# to null_usb.c and fastboot would see no devices. libusb.cmake selects it.
 cp patches/misc/freebsd_usb.c  src/libusb/libusb/os/freebsd_usb.c
 
 # libbase/file.cpp uses std::string::resize_and_overwrite (C++23); add a C++20 fallback.
 patch -p1 -d "$ROOTDIR" -i patches/misc/libbase-file-resize_and_overwrite.patch
 
-# libbase/threads.cpp GetThreadId() has no BSD branch: on FreeBSD/NetBSD/OpenBSD it
-# falls off the end of a non-void function (UB -> clang emits a trap), which crashes
-# adb at startup (AdbOspTaskRunner ctor). Add the BSD thread-id calls + their headers.
+# libbase/threads.cpp GetThreadId() has no BSD branch, so it falls off a non-void
+# function and clang's trap crashes adb at startup. Add the BSD calls + headers.
 sed -i '/#include <unistd.h>/a\
 #if defined(__FreeBSD__)\n#include <pthread_np.h>\n#elif defined(__NetBSD__)\n#include <lwp.h>\n#endif' ${PWD_SRC}/src/libbase/threads.cpp
 sed -i '/return syscall(__NR_gettid);/a\
@@ -144,9 +142,8 @@ sed -i 's/std::vector<const StringPiece>/std::vector<StringPiece>/g' ${PWD_SRC}/
 # so pull in <stdlib.h>.
 sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/include/fmt/format.h
 
-# adb missing includes: fdevent.h names std::vector and adb_mdns.cpp std::atomic
-# without including either header. The other sysroots' libc++ happens to drag
-# them in transitively; llvm-mingw's does not, so spell them out.
+# fdevent.h names std::vector and adb_mdns.cpp std::atomic without including
+# either. Only llvm-mingw's libc++ declines to drag them in, so spell them out.
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
@@ -157,11 +154,10 @@ case "$TARGET" in
     ;;
 esac
 
-# cacheflush(): zig's generic-glibc <sys/cachectl.h> pulls <asm/cachectl.h> which
-# zig doesn't ship, so forward-declare it on glibc; musl keeps its own header.
-# mingw has neither the header nor the function: map it onto Win32's
-# FlushInstructionCache. Declared by hand rather than via <windows.h>, which
-# utils.cc only includes further down (behind its ERROR-macro dance).
+# cacheflush(): zig's generic-glibc <sys/cachectl.h> pulls an <asm/cachectl.h> it
+# doesn't ship, so declare it instead; musl keeps its own header. mingw has neither
+# header nor function -- map it onto Win32 FlushInstructionCache, declared by hand
+# so <windows.h> stays behind utils.cc's own ERROR-macro dance.
 sed -i '/#include "os.h"/a\
 #if defined(__arm__)\
 #if defined(_WIN32)\

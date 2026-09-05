@@ -73,10 +73,9 @@ case "$PLATFORM" in
         CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
       powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
     esac
-    # mips64 n64 and powerpc64: force __s64/__u64 to 'long long' (both arches'
-    # asm/types.h picks asm-generic/int-l64.h, i.e. 'long', conflicting with
-    # e2fsprogs). glibc only — musl never includes asm/types.h from <sys/stat.h>.
-    # See patches/misc/force-int-ll64.h.
+    # mips64 n64 and powerpc64 pick asm-generic/int-l64.h, typing __s64/__u64 as
+    # 'long' and clashing with e2fsprogs; glibc only. See
+    # patches/misc/force-int-ll64.h.
     case "$TARGET" in
       mips64-*gnuabi64|mips64el-*gnuabi64|powerpc64-*-gnu*|powerpc64le-*-gnu*)
         CROSS_CFLAGS="$CROSS_CFLAGS -include $ROOTDIR/patches/misc/force-int-ll64.h" ;;
@@ -159,9 +158,8 @@ case "$PLATFORM" in
     # can't link-test arc4random_buf under the zig BSD sysroots, so use /dev/urandom.
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat -DXML_DEV_URANDOM"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
-    # OpenBSD's zig sysroot has no <dev/usb/*> headers, so libusb's openbsd_usb.c
-    # can't compile. Supply the vendored OpenBSD usb.h, scoped to OpenBSD targets
-    # only (a shared -isystem would shadow FreeBSD's/NetBSD's real usb.h).
+    # OpenBSD's zig sysroot lacks <dev/usb/*>, so libusb's openbsd_usb.c needs the
+    # vendored usb.h -- scoped, or it would shadow FreeBSD's/NetBSD's real one.
     case "$TARGET" in
       *-openbsd-*|*-openbsd) CROSS_CFLAGS="$CROSS_CFLAGS -isystem $ROOTDIR/patches/bsd-compat/openbsd" ;;
     esac
@@ -221,12 +219,10 @@ case "$PLATFORM" in
     # Static libstdc++/libgcc + whole-archive libwinpthread (keeps its TLS/thread-exit
     # callbacks) so the .exe tools need no mingw DLLs.
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
-    # aarch64/arm64ec are the exception: once llvm-mingw builds arm64ec, its
-    # winpthreads for aarch64 is compiled -marm64x, so aarch64-w64-mingw32/lib/
-    # libwinpthread.a holds ARM64X members. Demand-loading takes each member's
-    # native view and links fine, but --whole-archive force-loads them raw, so
-    # lld reports "machine type arm64ec conflicts with arm64" plus EC/native
-    # duplicate symbols. Fall back to the driver's default -lwinpthread there.
+    # Not on aarch64/arm64ec: once llvm-mingw builds arm64ec it compiles the
+    # aarch64 winpthreads -marm64x, so libwinpthread.a holds ARM64X members.
+    # Demand-loading takes each member's native view, but --whole-archive loads
+    # them raw and lld rejects the EC ones. Use the driver's -lwinpthread there.
     case "$TARGET" in
       aarch64-*|arm64ec-*) ;;
       *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic" ;;

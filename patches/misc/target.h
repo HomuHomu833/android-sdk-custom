@@ -22,13 +22,6 @@
 // <openssl/base.h> and <openssl/asm_base.h>. Prefer to include those headers
 // instead.
 
-// ARM64EC must be tested before the x86_64 arm. So that datatype layouts match
-// x86_64, clang defines __amd64__/__x86_64/__x86_64__ there (GNU mode, i.e.
-// llvm-mingw) and _M_AMD64/_M_X64 (MSVC mode), and does not define __aarch64__
-// at all. Either way target.h would classify it as x86_64 and pull <emmintrin.h>
-// in via OPENSSL_SSE2 — x86 intrinsics the ARM64EC backend has no builtins for.
-// It is an AArch64 target with an x64-compatible ABI; both are LLP64, so the
-// 64-bit layout is unchanged by picking the AArch64 arm.
 #if defined(__arm64ec__) || defined(_M_ARM64EC)
 #define OPENSSL_64_BIT
 #define OPENSSL_AARCH64

@@ -11,13 +11,11 @@ Exclude _WIN32 from UPB_ARM64_ASM so aarch64-windows uses the portable C
 implementation. The asm fast path stays on aarch64 linux/android/macos/bsd.
 --- a/src/protobuf/upb/port/def.inc
 +++ b/src/protobuf/upb/port/def.inc
-@@ -392,7 +392,9 @@
+@@ -392,7 +392,7 @@
  #define UPB_PRESERVE_NONE
  #endif
 
 -#if defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__))
-+// aarch64-mingw: LLVM cannot emit SEH unwind info for encode.c inline asm, so
-+// use the portable C path on Windows (keeps the asm on linux/android/macos/bsd).
 +#if defined(__aarch64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(_WIN32)
  #define UPB_ARM64_ASM 1
  #else

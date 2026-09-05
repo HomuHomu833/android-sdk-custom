@@ -22,14 +22,11 @@
 
 #include <sys/syscall.h>
 
-// Every target we build provides __NR_getrandom via <sys/syscall.h> (the kernel
-// uapi headers bundled with the toolchain). Trust it directly instead of
-// hardcoding and validating a per-architecture syscall number: the original
-// upstream EXPECTED_NR_getrandom table only exists to supply a fallback when the
-// headers lack the number, but it constantly drifts from reality on the less
-// common ABIs (x32, hexagon, the mips o32/n32/n64 variants, ...) and trips its
-// own #error. If a target genuinely lacks __NR_getrandom, USE_NR_getrandom stays
-// undefined and BoringSSL falls back to /dev/urandom.
+// Trust <sys/syscall.h> instead of upstream's EXPECTED_NR_getrandom table: that
+// table only backstops headers lacking the number, and it drifts on the less
+// common ABIs (x32, hexagon, mips o32/n32/n64) and trips its own #error. Without
+// __NR_getrandom, USE_NR_getrandom stays undefined and BoringSSL uses
+// /dev/urandom.
 #if defined(__NR_getrandom)
 #define USE_NR_getrandom
 #endif

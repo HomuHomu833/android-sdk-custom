@@ -45,10 +45,9 @@ case "$PLATFORM" in
 esac
 export REPO_OS_OVERRIDE
 
-# We drive sdkmanager (below) with the linux cmdline-tools since the build host
-# is linux, but the copy we *ship* must match $PLATFORM. Derive the matching zip
-# from CMDLINE_TOOLS_URL (linux -> win/mac); override SHIP_CMDLINE_TOOLS_URL to
-# pin a different build.
+# sdkmanager runs on the linux cmdline-tools, but the copy we *ship* must match
+# $PLATFORM. Derive that zip from CMDLINE_TOOLS_URL; SHIP_CMDLINE_TOOLS_URL pins
+# a different build.
 case "$PLATFORM" in
   windows) CMDLINE_TOOLS_OS=win ;;
   macos)   CMDLINE_TOOLS_OS=mac ;;
@@ -107,10 +106,9 @@ if [ "$PLATFORM" != windows ]; then
 fi
 
 # --- swap linux build scaffolding for OS-matching cmdline-tools -------------
-# The cmdline-tools we drove sdkmanager with is linux; replace it with the copy
-# matching $PLATFORM so the archive isn't a linux/windows mix (sdkmanager fetched
-# under .temp is scaffolding too). For a linux build the URLs match, so keep the
-# one we already downloaded instead of re-fetching.
+# Replace the linux cmdline-tools we drove sdkmanager with by the $PLATFORM copy,
+# so the archive isn't a mix (.temp is scaffolding too). On linux the URLs match,
+# so keep what we downloaded.
 rm -rf "$HOST_SDK/.temp"
 if [ "$SHIP_CMDLINE_TOOLS_URL" != "$CMDLINE_TOOLS_URL" ]; then
   rm -rf "$HOST_SDK/cmdline-tools"
