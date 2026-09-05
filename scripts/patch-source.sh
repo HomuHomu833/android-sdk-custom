@@ -147,6 +147,10 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
+# zstd cpu.h takes its cpuid asm branch off __x86_64__, which arm64ec also defines;
+# exclude it and ZSTD_cpuid() keeps its zeroed (no x86 features) result.
+sed -i 's/^#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__)$/#elif (defined(__x86_64__) || defined(_M_X64) || defined(__i386__)) \&\& !defined(__arm64ec__) \&\& !defined(_M_ARM64EC)/' ${PWD_SRC}/src/zstd/lib/common/cpu.h
+
 # riscv32/powerpc/mips: drop the std::atomic is_always_lock_free static_assert.
 case "$TARGET" in
   riscv32-*|powerpc-*|mips-*|mipsel-*)
