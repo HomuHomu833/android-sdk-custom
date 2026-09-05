@@ -147,6 +147,10 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
+# abseil's prefetch.h emits x86 prefetchw for __x86_64__; arm64ec has no such
+# mnemonic. Exclude EC and it falls to the portable __builtin_prefetch #else.
+sed -i 's@^#if defined(__x86_64__) \&\& !defined(__PRFCHW__)$@#if defined(__x86_64__) \&\& !defined(__PRFCHW__) \&\& !defined(__arm64ec__)@' ${PWD_SRC}/src/abseil-cpp/absl/base/prefetch.h
+
 # abseil's unscaledcycleclock.h picks Now() by arch: arm64ec defines __x86_64__ but
 # not __aarch64__, so it took the rdtsc branch. Send it to the ARM one, which
 # aarch64-w64-mingw32 already uses.
