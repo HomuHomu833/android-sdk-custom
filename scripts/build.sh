@@ -224,10 +224,11 @@ case "$PLATFORM" in
     # Static libstdc++/libgcc + whole-archive libwinpthread (keeps its TLS/thread-exit
     # callbacks) so the .exe tools need no mingw DLLs.
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
-    # Not on aarch64/arm64ec: llvm-mingw builds that winpthreads -marm64x, and lld
-    # rejects the ARM64X members --whole-archive force-loads. Demand-load instead.
+    # aarch64/arm64ec drop only --whole-archive: llvm-mingw builds that winpthreads
+    # -marm64x and lld rejects the ARM64X members it force-loads. -Bstatic stays, or
+    # -lwinpthread would pick libwinpthread.dll.a and make-sdk.sh deletes that DLL.
     case "$TARGET" in
-      aarch64-*|arm64ec-*) ;;
+      aarch64-*|arm64ec-*) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic" ;;
       *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic" ;;
     esac
     ;;
