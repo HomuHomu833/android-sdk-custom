@@ -216,10 +216,10 @@ case "$PLATFORM" in
     CROSS_OBJCOPY="$TC/bin/${TARGET}-objcopy"
     SYSTEM_NAME=Windows
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
-    # arm64ec carries x86_64's macros, so bundled libraries reach for <emmintrin.h>
-    # the ARM backend has no builtins for; take each one's own opt-out.
+    # arm64ec carries x86_64's macros, so bundled libraries reach for x86 intrinsics
+    # and asm the ARM backend cannot build; take each one's own opt-out.
     case "$TARGET" in
-      arm64ec-*) CROSS_CFLAGS="$CROSS_CFLAGS -DOPENSSL_NO_SSE2_FOR_TESTING -DZSTD_NO_INTRINSICS" ;;
+      arm64ec-*) CROSS_CFLAGS="$CROSS_CFLAGS -DOPENSSL_NO_SSE2_FOR_TESTING -DZSTD_NO_INTRINSICS -DABSL_USE_UNSCALED_CYCLECLOCK=0" ;;
     esac
     # Static libstdc++/libgcc + whole-archive libwinpthread (keeps its TLS/thread-exit
     # callbacks) so the .exe tools need no mingw DLLs.
