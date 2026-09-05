@@ -147,9 +147,13 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' ${PWD_SRC}/src/fmtlib/incl
 sed -i '/^#include <variant>$/a #include <vector>' ${PWD_SRC}/src/adb/fdevent/fdevent.h
 sed -i '/^#include <algorithm>$/i #include <atomic>' ${PWD_SRC}/src/adb/adb_mdns.cpp
 
-# protobuf's parse_context.h hand-rolls a ror/movb sequence for __x86_64__;
-# arm64ec has neither mnemonic. Exclude EC for its portable RotateLeft #else.
-sed -i 's@^#if defined(__x86_64__) \&\& defined(__GNUC__)$@#if defined(__x86_64__) \&\& defined(__GNUC__) \&\& !defined(__arm64ec__)@' ${PWD_SRC}/src/protobuf/src/google/protobuf/parse_context.h
+# "__x86_64__ && __GNUC__" is protobuf's idiom for a GNU-style x86 asm block --
+# parse_context.h's ror/movb rotate, port_def.inc's prefetcht0. arm64ec assembles
+# none of it, and each site has a portable (or empty) #else, so exclude EC in all
+# of them rather than one CI round per file.
+grep -rl '^#if defined(__x86_64__) && defined(__GNUC__)$' ${PWD_SRC}/src/protobuf/src 2>/dev/null | while read -r _f; do
+  sed -i 's@^#if defined(__x86_64__) \&\& defined(__GNUC__)$@#if defined(__x86_64__) \&\& defined(__GNUC__) \&\& !defined(__arm64ec__)@' "$_f"
+done
 
 # abseil's prefetch.h emits x86 prefetchw for __x86_64__; arm64ec has no such
 # mnemonic. Exclude EC and it falls to the portable __builtin_prefetch #else.
