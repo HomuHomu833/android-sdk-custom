@@ -216,13 +216,16 @@ case "$PLATFORM" in
     CROSS_OBJCOPY="$TC/bin/${TARGET}-objcopy"
     SYSTEM_NAME=Windows
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h"
+    # arm64ec carries x86_64's macros, so boringssl's internal.h sets OPENSSL_SSE2
+    # and pulls <emmintrin.h>; take its own opt-out rather than chase the macro.
+    case "$TARGET" in
+      arm64ec-*) CROSS_CFLAGS="$CROSS_CFLAGS -DOPENSSL_NO_SSE2_FOR_TESTING" ;;
+    esac
     # Static libstdc++/libgcc + whole-archive libwinpthread (keeps its TLS/thread-exit
     # callbacks) so the .exe tools need no mingw DLLs.
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
-    # Not on aarch64/arm64ec: once llvm-mingw builds arm64ec it compiles the
-    # aarch64 winpthreads -marm64x, so libwinpthread.a holds ARM64X members.
-    # Demand-loading takes each member's native view, but --whole-archive loads
-    # them raw and lld rejects the EC ones. Use the driver's -lwinpthread there.
+    # Not on aarch64/arm64ec: llvm-mingw builds that winpthreads -marm64x, and lld
+    # rejects the ARM64X members --whole-archive force-loads. Demand-load instead.
     case "$TARGET" in
       aarch64-*|arm64ec-*) ;;
       *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic" ;;
