@@ -29,9 +29,50 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 fetch() {
   local i=0
   until aria2c --console-log-level=error --check-certificate=false \
-               --max-tries=5 --retry-wait=2 --connect-timeout=15 "$@"; do
+               --max-tries=5 --retry-wait=2 --connect-timeout=15 \
+               --allow-overwrite=true --auto-file-renaming=false "$@"; do
     i=$((i + 1)); [ "$i" -ge 5 ] && { echo "fetch: giving up after $i attempts" >&2; return 1; }
     echo "fetch: aria2c failed, retry $i/5 in 2s..." >&2; sleep 2
+  done
+}
+
+# Unpack ARCHIVE into DEST, picking the tool from the extension.
+unpack() {
+  case "$1" in
+    *.tar.gz|*.tgz) tar -xzf "$1" -C "$2" ;;
+    *.tar.xz)       tar -xJf "$1" -C "$2" ;;
+    *.tar.bz2)      tar -xjf "$1" -C "$2" ;;
+    *.zip)          unzip -qq -o "$1" -d "$2" ;;
+    *) echo "unpack: don't know how to unpack $1" >&2; return 1 ;;
+  esac
+}
+
+# Download URL to ARCHIVE and unpack it into DEST (default: the current
+# directory), re-downloading when the unpack fails. ARCHIVE is removed on the
+# way out. Usage: fetch_unpack URL ARCHIVE [DEST]
+#
+# aria2c's own retries cannot see a truncated download. Endpoints that generate
+# archives on the fly -- gitiles' +archive, codeload -- stream them chunked with
+# no Content-Length (aria2 logs the size as "0B/0B"), so when the far end cuts
+# the stream short there is no expected size to compare against: aria2 prints
+# "(OK):download completed" and exits 0 on a 600KiB truncation of a 200MiB
+# archive, and the damage only surfaces further down as "gzip: stdin:
+# unexpected end of file". Unpacking is the only integrity check available, so
+# the retry has to wrap the download and the unpack together.
+fetch_unpack() {
+  local url="$1" archive="$2" dest="${3:-.}" i=0
+  mkdir -p "$dest"
+  while :; do
+    rm -f "$archive" "$archive.aria2"
+    if fetch --dir="$(dirname "$archive")" -o "$(basename "$archive")" "$url" \
+       && unpack "$archive" "$dest"; then
+      rm -f "$archive"
+      return 0
+    fi
+    i=$((i + 1))
+    [ "$i" -ge 5 ] && { echo "fetch_unpack: $url still incomplete after $i attempts" >&2; return 1; }
+    echo "fetch_unpack: $(basename "$archive") came down incomplete, retry $i/5 in $((5 * i))s..." >&2
+    sleep $((5 * i))
   done
 }
 
@@ -99,9 +140,7 @@ case "$PLATFORM" in
     NDK_DIR="$ROOTDIR/$NDK_NAME"
     if [ ! -d "$NDK_DIR" ]; then
       log "Downloading official NDK ($NDK_NAME)"
-      fetch --dir="$ROOTDIR" -o ndk.zip "https://dl.google.com/android/repository/${NDK_NAME}-linux.zip"
-      unzip -qq "$ROOTDIR/ndk.zip" -d "$ROOTDIR"
-      rm -f "$ROOTDIR/ndk.zip"
+      fetch_unpack "https://dl.google.com/android/repository/${NDK_NAME}-linux.zip" "$ROOTDIR/ndk.zip" "$ROOTDIR"
     fi
     TC="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64"
     CROSS_CC="$TC/bin/${TARGET}${API}-clang"; CROSS_CXX="${CROSS_CC}++"
@@ -334,7 +373,7 @@ if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
     *)             ZLIB_CFLAGS="-fno-sanitize=undefined" ;;
   esac
   ( cd "$ROOTDIR"
-    fetch --dir=/tmp -o zlib-1.3.1.tar.xz https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz && xz -d < /tmp/zlib-1.3.1.tar.xz | tar -x && rm /tmp/zlib-1.3.1.tar.xz
+    fetch_unpack https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz /tmp/zlib-1.3.1.tar.xz
     cd zlib-1.3.1
     CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$ZLIB_CFLAGS" ./configure --prefix="$EXTRA_PREFIX" --static
     make -j"$JOBS" install )
@@ -342,7 +381,7 @@ fi
 if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
   log "Building bzip2 (static, $TARGET)"
   ( cd "$ROOTDIR"
-    fetch --dir=/tmp -o bzip2-1.0.8.tar.gz https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz && gzip -d < /tmp/bzip2-1.0.8.tar.gz | tar -x && rm /tmp/bzip2-1.0.8.tar.gz
+    fetch_unpack https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz /tmp/bzip2-1.0.8.tar.gz
     cd bzip2-1.0.8
     make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" libbz2.a
     cp -f libbz2.a "$EXTRA_PREFIX/lib/"
