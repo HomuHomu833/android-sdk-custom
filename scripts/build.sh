@@ -10,7 +10,7 @@
 #   OUT        stripped host tools land here (default: $ROOTDIR/out)
 #   JOBS       parallelism (default: nproc)
 #   NDK_VERSION/NDK_REVISION  official NDK for the bionic clang (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 25, riscv64 forced 35; bionic only)
+#   ANDROID_PLATFORM  bionic API level (default 24, riscv64 forced 35; bionic only)
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -131,9 +131,9 @@ case "$PLATFORM" in
     # SYSTEM_NAME stays Linux so CMake uses our clang, not its NDK machinery.
     : "${NDK_VERSION:?set NDK_VERSION for the bionic build}"
     NDK_REVISION="${NDK_REVISION:-}"
-    API="${ANDROID_PLATFORM:-25}"; [ "$TARGET" = riscv64-linux-android ] && API=35
-    if [ "$API" -lt 25 ]; then
-      echo "bionic build requires ANDROID_PLATFORM >= 25 (got $API)." >&2
+    API="${ANDROID_PLATFORM:-24}"; [ "$TARGET" = riscv64-linux-android ] && API=35
+    if [ "$API" -lt 24 ]; then
+      echo "bionic build requires ANDROID_PLATFORM >= 24 (got $API)." >&2
       exit 1
     fi
     NDK_NAME="android-ndk-r${NDK_VERSION}${NDK_REVISION}"
