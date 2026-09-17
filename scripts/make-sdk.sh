@@ -51,7 +51,7 @@ unpack() {
 # way out. Usage: fetch_unpack URL ARCHIVE [DEST]
 #
 # aria2c's own retries cannot see a truncated download. Endpoints that generate
-# archives on the fly -- gitiles' +archive, codeload -- stream them chunked with
+# archives on the fly, such as codeload, stream them chunked with
 # no Content-Length (aria2 logs the size as "0B/0B"), so when the far end cuts
 # the stream short there is no expected size to compare against: aria2 prints
 # "(OK):download completed" and exits 0 on a 600KiB truncation of a 200MiB
