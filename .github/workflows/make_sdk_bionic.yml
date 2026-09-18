@@ -14,11 +14,11 @@ on:
       ndk_version:
         description: "Official NDK version for the bionic clang"
         required: true
-        default: "27"
+        default: "30"
       ndk_revision:
         description: "Official NDK revision letter (optional)"
         required: false
-        default: "d"
+        default: ""
 
 permissions:
   contents: write
