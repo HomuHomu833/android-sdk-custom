@@ -149,7 +149,10 @@ case "$PLATFORM" in
     SYSTEM_NAME=Linux
     # reallocarray is API 29+ in bionic; host_compat.h shims it on lower APIs.
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h -static"
-    CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384"
+    # r30's libc.a carries Rust's libstd, so rust_eh_personality arrives both
+    # from there and from our own Rust shim in libtermuxadb.a. Both are the same
+    # routine out of two toolchains; let the linker keep the first.
+    CROSS_LDFLAGS="-static -Wl,-z,max-page-size=16384 -Wl,--allow-multiple-definition"
     # arm/arm64 executables need an 8-word-aligned PT_TLS to clear bionic's TCB
     # slots, or the loader aborts with "executable's TLS segment is underaligned".
     # crtbegin only supplies that from API 29, so link our own copy into every
