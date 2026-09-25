@@ -170,6 +170,13 @@ class Emitter:
         self._compiled(t, "add_executable(%s" % t.name)
         if t.output_name and t.output_name != t.name:
             self.w("set_target_properties(%s PROPERTIES OUTPUT_NAME %s)" % (t.name, q(t.output_name)))
+        # A library whole-linked somewhere below this binary is usually also
+        # a plain dependency of another library, and CMake refuses one link
+        # item with two features. Soong lets whole-archive win; so does this.
+        whole = self._whole_below(t)
+        if whole:
+            self.w("set_property(TARGET %s PROPERTY LINK_LIBRARY_OVERRIDE %s)"
+                   % (t.name, q(",".join(["WHOLE_ARCHIVE"] + whole))))
         ldlibs = list(dict.fromkeys(t.ldlibs + self.globals.get("ldlibs", [])))
         self.block("target_link_libraries(%s PRIVATE" % t.name, [q(l) for l in ldlibs])
         self.block("target_link_options(%s PRIVATE" % t.name, [q(f) for f in t.ldflags])
@@ -193,6 +200,29 @@ class Emitter:
         for o in t.objs:
             self.w("target_link_libraries(%s PRIVATE %s)" % (t.name, o.name))
         self._links(t, "PUBLIC" if t.kind != "binary" else "PRIVATE", "PRIVATE")
+
+    @staticmethod
+    def _whole_below(t):
+        """Libraries linked WHOLE_ARCHIVE anywhere in t's link graph.
+
+        Every non-header link reaches the final link line (a static
+        library's private deps too, as $<LINK_ONLY:>), so walk them all.
+        """
+        whole, seen, stack = [], {id(t)}, [t]
+        while stack:
+            x = stack.pop()
+            deps = [(d, mode) for d, _, mode in x.link] + [(o, "link") for o in x.objs]
+            for d, mode in deps:
+                if d is x or d.kind == "filegroup":
+                    continue
+                if mode == "headers" and d.kind in ("static", "object", "binary"):
+                    continue  # $<COMPILE_ONLY:>, see _links()
+                if mode == "whole" and d.kind in ("static", "prebuilt") and d.name not in whole:
+                    whole.append(d.name)
+                if id(d) not in seen:
+                    seen.add(id(d))
+                    stack.append(d)
+        return sorted(whole)
 
     def _links(self, t, pub_kw, priv_kw):
         pub, priv = [], []
