@@ -42,11 +42,18 @@ def gx(s):
         .replace(";", "$<SEMICOLON>")
 
 
+def opt(f):
+    """One Android.bp flag as one CMake option. Soong pastes flags into a shell
+    command, so "-include stdio.h" is two words; SHELL: splits it the same way
+    and keeps the pair whole through CMake's option de-duplication."""
+    return "SHELL:" + f if any(c.isspace() for c in f) else f
+
+
 def lang_flags(lang, flags):
     if not flags:
         return None
     return '"$<$<COMPILE_LANGUAGE:%s>:%s>"' % (
-        lang, ";".join(gx(f).replace("\\", "\\\\").replace('"', '\\"') for f in flags))
+        lang, ";".join(gx(opt(f)).replace("\\", "\\\\").replace('"', '\\"') for f in flags))
 
 
 class Emitter:
@@ -87,7 +94,7 @@ class Emitter:
             lang_flags("CXX", g.get("cppflags", [])),
             lang_flags("ASM", g.get("asflags", [])),
         ])
-        self.block("add_link_options(", [q(f) for f in g.get("ldflags", [])])
+        self.block("add_link_options(", [q(opt(f)) for f in g.get("ldflags", [])])
         self.w()
         for t in sorted(c.order, key=lambda t: t.name):
             if t.kind == "filegroup":
@@ -179,7 +186,7 @@ class Emitter:
                    % (t.name, q(",".join(["WHOLE_ARCHIVE"] + whole))))
         ldlibs = list(dict.fromkeys(t.ldlibs + self.globals.get("ldlibs", [])))
         self.block("target_link_libraries(%s PRIVATE" % t.name, [q(l) for l in ldlibs])
-        self.block("target_link_options(%s PRIVATE" % t.name, [q(f) for f in t.ldflags])
+        self.block("target_link_options(%s PRIVATE" % t.name, [q(opt(f)) for f in t.ldflags])
 
     def _compiled(self, t, head):
         for g in t.gens:
