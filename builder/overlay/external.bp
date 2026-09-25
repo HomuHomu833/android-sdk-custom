@@ -1,0 +1,72 @@
+// Modules the fetched source set does not contain, or that must come from
+// somewhere else than their upstream definition.
+
+// zlib is not fetched from AOSP. For the tools, build.sh cross-builds it into
+// $EXTRA_PREFIX and passes that as CMAKE_PREFIX_PATH; the host protoc build
+// instead names the build machine's own archive with --var sdk:zlib=<libz.a>.
+cc_prebuilt_library_static {
+    name: "libz",
+    srcs: select(soong_config_variable("sdk", "zlib"), {
+        any @ lib: [lib],
+        default: ["${CMAKE_PREFIX_PATH}/lib/libz.a"],
+    }),
+    export_include_dirs: select(soong_config_variable("sdk", "zlib"), {
+        any: [],
+        default: ["${CMAKE_PREFIX_PATH}/include"],
+    }),
+}
+
+// libnativehelper's JNI headers; include/ carries jni.h and friends.
+cc_library_headers {
+    name: "jni_headers",
+    export_include_dirs: ["include"],
+}
+
+// Defaults defined in projects outside the fetched set; they only carry
+// device/APEX policy.
+cc_defaults {
+    name: "no_bti",
+}
+
+cc_defaults {
+    name: "apex-lowest-min-sdk-version",
+}
+
+// bionic's arm32 relocation-packing workaround; device only.
+cc_defaults {
+    name: "bug_24465209_workaround",
+}
+
+// libartbase links libcap only for ScopedCap, which just the tests and
+// art_exec use; external/libcap is not fetched.
+cc_library_headers {
+    name: "libcap",
+}
+
+// bionic's async-signal-safe logging; the NDK does not ship it, and nothing
+// libcutils compiles for linux_bionic calls it.
+cc_library_headers {
+    name: "libasync_safe",
+}
+
+// bzip2, like zlib, comes from build.sh's $EXTRA_PREFIX.
+cc_prebuilt_library_static {
+    name: "libbz",
+    srcs: ["${CMAKE_PREFIX_PATH}/lib/libbz2.a"],
+    export_include_dirs: ["${CMAKE_PREFIX_PATH}/include"],
+}
+
+// bionic's own header modules. Older releases list them for their bionic
+// variants; the NDK sysroot the bionic build uses already provides libc's
+// public headers, and nothing built here includes the platform-private ones.
+cc_library_headers {
+    name: "libc_headers",
+}
+
+cc_library_headers {
+    name: "bionic_libc_platform_headers",
+}
+
+cc_library_headers {
+    name: "bionic_libc_private_headers",
+}

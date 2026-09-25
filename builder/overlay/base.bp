@@ -1,0 +1,8 @@
+// frameworks/base
+
+// aconfig-generated flag accessors. aconfig itself (a Rust host tool) is not
+// built here; include/android_content_res.h holds the read-only values.
+cc_library_headers {
+    name: "android.content.res.flags-aconfig-cc-host-ro",
+    export_include_dirs: ["include"],
+}

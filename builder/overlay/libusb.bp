@@ -1,0 +1,32 @@
+// external/libusb
+
+// The BSDs have no Soong target. Their libusb backends share the POSIX event
+// and thread code, and darwin/config.h describes them well enough. Upstream
+// libusb has no FreeBSD backend; patches/sources/libusb_freebsd_usb.c is one.
+amend {
+    name: "libusb",
+    target: {
+        bsd: {
+            srcs: [
+                "libusb/os/events_posix.c",
+                "libusb/os/threads_posix.c",
+            ],
+            local_include_dirs: ["darwin"],
+            cflags: ["-UHAVE_PTHREAD_THREADID_NP"],
+        },
+        freebsd: {
+            srcs: [":sdk_libusb_freebsd_usb"],
+        },
+        netbsd: {
+            srcs: ["libusb/os/netbsd_usb.c"],
+        },
+        openbsd: {
+            srcs: ["libusb/os/openbsd_usb.c"],
+        },
+    },
+}
+
+filegroup {
+    name: "sdk_libusb_freebsd_usb",
+    srcs: ["patches/sources/libusb_freebsd_usb.c"],
+}

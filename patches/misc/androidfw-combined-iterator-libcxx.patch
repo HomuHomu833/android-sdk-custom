@@ -1,0 +1,45 @@
+androidfw CombinedIterator: make RefPair usable by newer libc++ algorithms.
+
+RefPair is the proxy reference of CombinedIterator. Newer libc++ (the one
+zig, NDK r30 and llvm-mingw ship) compares it through C++20 rewritten
+operator== candidates, which need the comparisons to be const, and swaps
+the prvalues operator* returns, which needs rvalue swap overloads.
+
+--- a/src/base/libs/androidfw/include/androidfw/CombinedIterator.h
++++ b/src/base/libs/androidfw/include/androidfw/CombinedIterator.h
+@@ -47,10 +47,10 @@
+   operator Value() const {
+     return Value(this->first, this->second);
+   }
+-  bool operator==(const RefPair& other) {
++  bool operator==(const RefPair& other) const {
+     return this->first == other.first;
+   }
+-  bool operator==(const Value& other) {
++  bool operator==(const Value& other) const {
+     return this->first == other.first;
+   }
+   std::strong_ordering operator<=>(const RefPair& other) const {
+@@ -59,10 +59,21 @@
+   std::strong_ordering operator<=>(const Value& other) const {
+     return this->first <=> other.first;
+   }
+-  friend void swap(RefPair& l, RefPair& r) {
++  friend void swap(RefPair& l, RefPair& r) noexcept {
+     using std::swap;
+     swap(l.first, r.first);
+     swap(l.second, r.second);
++  }
++  // Dereferencing a CombinedIterator yields a prvalue RefPair, so libc++'s
++  // std::sort/ranges::iter_swap swap temporaries; route them to the lvalue swap.
++  friend void swap(RefPair&& l, RefPair&& r) noexcept {
++    swap(static_cast<RefPair&>(l), static_cast<RefPair&>(r));
++  }
++  friend void swap(RefPair& l, RefPair&& r) noexcept {
++    swap(l, static_cast<RefPair&>(r));
++  }
++  friend void swap(RefPair&& l, RefPair& r) noexcept {
++    swap(static_cast<RefPair&>(l), r);
+   }
+ };
+ 

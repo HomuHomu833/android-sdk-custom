@@ -75,9 +75,9 @@
 #include <stdint.h>
 
 /* --- BSD sys/socket.h + netinet/in.h ----------------------------------------
- * BSD zig sysroots' <netinet/in.h> doesn't pull in <sys/socket.h> (unlike glibc),
- * but AOSP (libsepol kernel_to_cil/conf.c) uses AF_INET* after only including it.
- * FreeBSD also needs netinet/in.h for `struct in6_addr` (cil_internal.h). */
+ * BSD zig sysroots' <netinet/in.h> doesn't pull in <sys/socket.h> as glibc's
+ * does, and AOSP code written against glibc leans on that for AF_INET* and
+ * struct in6_addr. The in_pktinfo/ip_mreqn fallbacks below need it too. */
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 # include <sys/socket.h>
 # include <sys/time.h>
@@ -155,7 +155,7 @@ int rand_s(unsigned int *_Value);
 #endif
 
 /* --- Windows POSIX types ----------------------------------------------------
- * MinGW omits uid_t/gid_t; provide them for libpackagelistparser, libprocessgroup. */
+ * MinGW omits uid_t/gid_t; the identity stubs below return them. */
 #if defined(_WIN32)
 #ifndef uid_t_defined
 typedef unsigned int uid_t;
@@ -254,26 +254,6 @@ const char *getprogname(void) {
 #endif
 #endif
 
-/* --- macOS POSIX scheduling -------------------------------------------------
- * macOS lacks SCHED_BATCH/SCHED_IDLE and sched_setscheduler(); stub them for
- * libprocessgroup task_profiles.cpp (the calls are inert on macOS). */
-#if defined(__APPLE__)
-#include <sched.h>
-
-#ifndef SCHED_BATCH
-#define SCHED_BATCH 3
-#endif
-#ifndef SCHED_IDLE
-#define SCHED_IDLE 5
-#endif
-
-static inline __attribute__((__unused__))
-int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
-  (void)pid; (void)policy; (void)param;
-  return 0;
-}
-#endif
-
 /* --- Windows socket constants -----------------------------------------------
  * SHUT_RD/WR/RDWR don't exist in MinGW's <sys/socket.h>; adb and others use them. */
 #if defined(_WIN32)
@@ -362,9 +342,9 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 #endif
 
 /* --- reallocarray() ---------------------------------------------------------
- * libsepol builds -DHAVE_REALLOCARRAY (skips its own decl), but macOS/MinGW may
- * lack a libc one; provide a fallback there (bionic gates on API 29). glibc, musl
- * and all BSDs declare it themselves, so they're excluded to avoid a clash. */
+ * libselinux (selinux_internal.c) calls reallocarray(), which macOS/MinGW lack
+ * and bionic only has from API 29. glibc, musl and all BSDs declare it
+ * themselves, so they're excluded to avoid a clash. */
 #if (!defined(__ANDROID_API__) || __ANDROID_API__ < 29) \
     && !defined(__GLIBC__) \
     && !(defined(__linux__) && !defined(__ANDROID__)) \
@@ -447,25 +427,6 @@ static inline gid_t getegid(void) { return 0; }
 #ifndef minor
 #define minor(dev) ((int)((dev) & 0xff))
 #endif
-#endif
-
-/* --- Windows malloc_usable_size ---------------------------------------------
- * sqlite3 builds -DHAVE_MALLOC_USABLE_SIZE everywhere; the Windows CRT's
- * equivalent is _msize(). Wrap it (a forward decl would leave an unresolved
- * symbol); _msize(NULL) is UB, so return 0 like glibc. */
-#if defined(_WIN32) && !defined(malloc_usable_size)
-#include <malloc.h>
-static inline __attribute__((__unused__))
-size_t malloc_usable_size(void *ptr) { return ptr ? _msize(ptr) : 0; }
-#endif
-
-/* --- OpenBSD malloc_usable_size stub ----------------------------------------
- * OpenBSD's malloc has no malloc_usable_size(); sqlite3 calls it for accounting,
- * so return 0 (just disables an oversized-block optimization). */
-#if defined(__OpenBSD__) && !defined(malloc_usable_size)
-#include <stddef.h>
-static inline __attribute__((__unused__))
-size_t malloc_usable_size(void *ptr) { (void)ptr; return 0; }
 #endif
 
 #endif /* HOST_COMPAT_H */

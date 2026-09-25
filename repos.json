@@ -1,162 +1,42 @@
 [
-    {
-        "path": "src/core",
-        "url": "https://android.googlesource.com/platform/system/core"
-    },
-    {
-        "path": "src/fs_mgr",
-        "url": "https://android.googlesource.com/platform/system/fs/fs_mgr"
-    },
-    {
-        "path": "src/extras",
-        "url": "https://android.googlesource.com/platform/system/extras"
-    },
-    {
-        "path": "src/selinux",
-        "url": "https://android.googlesource.com/platform/external/selinux"
-    },
-    {
-        "path": "src/f2fs-tools",
-        "url": "https://android.googlesource.com/platform/external/f2fs-tools"
-    },
-    {
-        "path": "src/e2fsprogs",
-        "url": "https://android.googlesource.com/platform/external/e2fsprogs"
-    },
-    {
-        "path": "src/boringssl",
-        "url": "https://android.googlesource.com/platform/external/boringssl"
-    },
-    {
-        "path": "src/mkbootimg",
-        "url": "https://android.googlesource.com/platform/system/tools/mkbootimg"
-    },
-    {
-        "path": "src/avb",
-        "url": "https://android.googlesource.com/platform/external/avb"
-    },
-    {
-        "path": "src/libbase",
-        "url": "https://android.googlesource.com/platform/system/libbase"
-    },
-    {
-        "path": "src/base",
-        "url": "https://android.googlesource.com/platform/frameworks/base"
-    },
-    {
-        "path": "src/native",
-        "url": "https://android.googlesource.com/platform/frameworks/native"
-    },
-    {
-        "path": "src/adb",
-        "url": "https://android.googlesource.com/platform/packages/modules/adb"
-    },
-    {
-        "path": "src/logging",
-        "url": "https://android.googlesource.com/platform/system/logging"
-    },
-    {
-        "path": "src/incremental_delivery",
-        "url": "https://android.googlesource.com/platform/system/incremental_delivery"
-    },
-    {
-        "path": "src/fmtlib",
-        "url": "https://android.googlesource.com/platform/external/fmtlib"
-    },
-    {
-        "path": "src/pcre",
-        "url": "https://android.googlesource.com/platform/external/pcre"
-    },
-    {
-        "path": "src/libpng",
-        "url": "https://android.googlesource.com/platform/external/libpng"
-    },
-    {
-        "path": "src/expat",
-        "url": "https://android.googlesource.com/platform/external/expat"
-    },
-    {
-        "path": "src/protobuf",
-        "url": "https://android.googlesource.com/platform/external/protobuf"
-    },
-    {
-        "path": "src/aidl",
-        "url": "https://android.googlesource.com/platform/system/tools/aidl"
-    },
-    {
-        "path": "src/unwinding",
-        "url": "https://android.googlesource.com/platform/system/unwinding"
-    },
-    {
-        "path": "src/zopfli",
-        "url": "https://android.googlesource.com/platform/external/zopfli"
-    },
-    {
-        "path": "src/jsoncpp",
-        "url": "https://android.googlesource.com/platform/external/jsoncpp"
-    },
-    {
-        "path": "src/art",
-        "url": "https://android.googlesource.com/platform/art"
-    },
-    {
-        "path": "src/dalvik",
-        "url": "https://android.googlesource.com/platform/dalvik"
-    },
-    {
-        "path": "src/sqlite",
-        "url": "https://android.googlesource.com/platform/external/sqlite"
-    },
-    {
-        "path": "src/lz4",
-        "url": "https://android.googlesource.com/platform/external/lz4"
-    },
-    {
-        "path": "src/zstd",
-        "url": "https://android.googlesource.com/platform/external/zstd"
-    },
-    {
-        "path": "src/libusb",
-        "url": "https://android.googlesource.com/platform/external/libusb"
-    },
-    {
-        "path": "src/brotli",
-        "url": "https://android.googlesource.com/platform/external/brotli"
-    },
-    {
-        "path": "src/mdnsresponder",
-        "url": "https://android.googlesource.com/platform/external/mdnsresponder"
-    },
-    {
-        "path": "src/abseil-cpp",
-        "url": "https://android.googlesource.com/platform/external/abseil-cpp"
-    },
-    {
-        "path": "src/openscreen",
-        "url": "https://android.googlesource.com/platform/external/openscreen"
-    },
-    {
-        "path": "src/googletest",
-        "url": "https://android.googlesource.com/platform/external/googletest"
-    },
-    {
-        "path": "src/tinyxml2",
-        "url": "https://android.googlesource.com/platform/external/tinyxml2"
-    },
-    {
-        "path": "src/libziparchive",
-        "url": "https://android.googlesource.com/platform/system/libziparchive"
-    },
-    {
-        "path": "src/build",
-        "url": "https://android.googlesource.com/platform/build"
-    },
-    {
-        "path": "src/development",
-        "url": "https://android.googlesource.com/platform/development"
-    },
-    {
-        "path": "src/soong",
-        "url": "https://android.googlesource.com/platform/build/soong"
-    }
+    {"path": "src/core", "aosp": "system/core"},
+    {"path": "src/fs_mgr", "aosp": "system/fs/fs_mgr"},
+    {"path": "src/extras", "aosp": "system/extras"},
+    {"path": "src/selinux", "aosp": "external/selinux"},
+    {"path": "src/f2fs-tools", "aosp": "external/f2fs-tools"},
+    {"path": "src/e2fsprogs", "aosp": "external/e2fsprogs"},
+    {"path": "src/boringssl", "aosp": "external/boringssl"},
+    {"path": "src/mkbootimg", "aosp": "system/tools/mkbootimg"},
+    {"path": "src/avb", "aosp": "external/avb"},
+    {"path": "src/libbase", "aosp": "system/libbase"},
+    {"path": "src/base", "aosp": "frameworks/base"},
+    {"path": "src/native", "aosp": "frameworks/native"},
+    {"path": "src/adb", "aosp": "packages/modules/adb"},
+    {"path": "src/logging", "aosp": "system/logging"},
+    {"path": "src/incremental_delivery", "aosp": "system/incremental_delivery"},
+    {"path": "src/fmtlib", "aosp": "external/fmtlib"},
+    {"path": "src/pcre", "aosp": "external/pcre"},
+    {"path": "src/libpng", "aosp": "external/libpng"},
+    {"path": "src/expat", "aosp": "external/expat"},
+    {"path": "src/protobuf", "aosp": "external/protobuf"},
+    {"path": "src/aidl", "aosp": "system/tools/aidl"},
+    {"path": "src/unwinding", "aosp": "system/unwinding"},
+    {"path": "src/zopfli", "aosp": "external/zopfli"},
+    {"path": "src/art", "aosp": "art"},
+    {"path": "src/dalvik", "aosp": "dalvik"},
+    {"path": "src/sqlite", "aosp": "external/sqlite"},
+    {"path": "src/lz4", "aosp": "external/lz4"},
+    {"path": "src/zstd", "aosp": "external/zstd"},
+    {"path": "src/lzma", "aosp": "external/lzma"},
+    {"path": "src/libusb", "aosp": "external/libusb"},
+    {"path": "src/brotli", "aosp": "external/brotli"},
+    {"path": "src/mdnsresponder", "aosp": "external/mdnsresponder"},
+    {"path": "src/abseil-cpp", "aosp": "external/abseil-cpp"},
+    {"path": "src/openscreen", "aosp": "external/openscreen"},
+    {"path": "src/googletest", "aosp": "external/googletest"},
+    {"path": "src/tinyxml2", "aosp": "external/tinyxml2"},
+    {"path": "src/libziparchive", "aosp": "system/libziparchive"},
+    {"path": "src/build", "aosp": "build/make"},
+    {"path": "src/development", "aosp": "development"},
+    {"path": "src/soong", "aosp": "build/soong"}
 ]

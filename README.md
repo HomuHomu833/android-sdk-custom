@@ -60,6 +60,24 @@ Simply extract the archive and use it in your build setup just as you would with
 
 ---
 
+## 🏗️ How It's Built
+
+There are no hand-written build files. Each build converts AOSP's own `Android.bp` files to CMake, so any release can be built, whether an `android-*` tag or any `platform-tools-*` tag:
+
+1. **`scripts/fetch-source.sh`** reads the AOSP manifest of `$TAG` and clones the projects from [`repos.json`](repos.json) that the release has. Projects move between releases, for example adb moved from `system/core` to `packages/modules/adb`.
+2. **`scripts/patch-source.sh`** applies the source fixups the non-Soong toolchains need (musl, llvm-mingw, osxcross, the BSDs, the NDK below API 29). It is best-effort: a fixup a release doesn't need is reported and skipped.
+3. **`builder`** evaluates every `Android.bp` the way Soong does for one OS/arch (defaults, `target`/`arch` properties, `select()`, Soong config variables, genrules, protos, yacc/lex). It then writes a CMake project for the SDK tools and everything they depend on. [`builder/overlay/*.bp`](builder/overlay) holds, in Blueprint syntax, everything this repo does differently from Soong: the tool list, the global flags, the libusb USB backends for Windows/BSD, the BSD sources, and stand-ins for modules outside the fetched set.
+4. **`scripts/build.sh`** builds a host `protoc` from the same protobuf sources, then configures and builds the generated project with the target's cross toolchain.
+5. **`scripts/make-sdk.sh`** takes Google's official platform-tools of the revision the sources declare (`development/sdk/plat_tools_source.prop_template`) and the newest official build-tools of that major version, swaps in the rebuilt binaries by name, drops any official binary it has no rebuild of, and archives the result.
+
+To see what gets built for a target without compiling anything:
+
+```bash
+python3 -m builder --platform linux --triple x86_64-linux-musl --out build/generated
+```
+
+---
+
 ## ⚖️ License
 
 This project is licensed under the **MIT License**.<br>

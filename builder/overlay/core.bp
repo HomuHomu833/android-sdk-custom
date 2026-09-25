@@ -1,0 +1,45 @@
+// system/core
+
+// fastboot reaches USB through libusb on Windows (no AdbWinApi) and on the
+// BSDs (which upstream does not build for), with the backend in
+// patches/sources/fastboot_usb_libusb.cpp. It includes <libusb.h> directly.
+amend {
+    name: "libfastboot",
+    target: {
+        windows: {
+            exclude_srcs: ["usb_windows.cpp"],
+            srcs: [":sdk_fastboot_usb_libusb"],
+            static_libs: ["libusb"],
+            include_dirs: ["external/libusb/include/libusb"],
+            host_ldlibs: [
+                "-lsetupapi",
+                "-lole32",
+                "-lcfgmgr32",
+                "-lwinusb",
+            ],
+        },
+        bsd: {
+            srcs: [":sdk_fastboot_usb_libusb"],
+            static_libs: ["libusb"],
+            include_dirs: ["external/libusb/include/libusb"],
+        },
+    },
+}
+
+// fastboot is a static_libs user of libfastboot; libusb must reach its link.
+amend {
+    name: "fastboot",
+    target: {
+        windows: {
+            static_libs: ["libusb"],
+        },
+        bsd: {
+            static_libs: ["libusb"],
+        },
+    },
+}
+
+filegroup {
+    name: "sdk_fastboot_usb_libusb",
+    srcs: ["patches/sources/fastboot_usb_libusb.cpp"],
+}

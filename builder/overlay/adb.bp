@@ -1,0 +1,98 @@
+// packages/modules/adb
+
+// The Rust mDNS bridge. build.sh builds the crate with cargo as a staticlib
+// when the target has a Rust std and passes --var sdk:rust_mdns=true plus
+// -DADBMDNS_LIB; otherwise this module selects to nothing and adb falls back
+// to openscreen (patches/misc/adb-mdns-openscreen-fallback.patch).
+cc_prebuilt_library_static {
+    name: "libadbmdns_bridge",
+    srcs: select(soong_config_variable("sdk", "rust_mdns"), {
+        true: ["${ADBMDNS_LIB}"],
+        default: [],
+    }),
+    target: {
+        windows: {
+            // Rust std and windows-sys (WiFi, crypto) import libraries
+            host_ldlibs: [
+                "-lbcrypt",
+                "-lntdll",
+                "-lwlanapi",
+            ],
+        },
+    },
+}
+
+amend {
+    name: "libadb_host",
+    cflags: select(soong_config_variable("sdk", "rust_mdns"), {
+        true: [],
+        default: ["-DADB_NO_RUST_MDNS"],
+    }),
+    exclude_srcs: select(soong_config_variable("sdk", "rust_mdns"), {
+        true: [],
+        default: ["client/adbmdns/adbmdns.cpp"],
+    }),
+}
+
+// adb embeds the fastdeploy agent, a Java jar, as a C array. Building it
+// needs the Java toolchain, so the repo carries the generated array.
+genrule {
+    name: "bin2c_fastdeployagent",
+    srcs: ["patches/misc/deployagent.inc"],
+    out: ["deployagent.inc"],
+    cmd: "cp $(in) $(out)",
+}
+
+// Upstream converts the script with xxd, which the build image lacks.
+genrule {
+    name: "bin2c_fastdeployagentscript",
+    srcs: ["patches/misc/deployagentscript.inc"],
+    out: ["deployagentscript.inc"],
+    cmd: "cp $(in) $(out)",
+}
+
+// Windows: adb talks to devices through libusb instead of Google's AdbWinApi
+// driver DLLs (the SDK ships without them). patches/sources/
+// adb_usb_windows_libusb.cpp has the usb_init()/usb_cleanup() glue the dropped
+// usb_windows.cpp used to provide.
+cc_library_headers {
+    name: "AdbWinApi",
+}
+
+amend {
+    name: "libadb_host",
+    target: {
+        windows: {
+            exclude_srcs: ["client/usb_windows.cpp"],
+            srcs: [":sdk_adb_usb_windows_libusb"],
+            host_ldlibs: [
+                "-lsetupapi",
+                "-lole32",
+                "-lcfgmgr32",
+                "-lwinusb",
+                "-lgdi32",
+                "-luserenv",
+                "-lws2_32",
+                "-liphlpapi",
+            ],
+        },
+        // The BSDs have no Soong target: poll()-based fdevent plus libusb
+        // hotplug via patches/sources/adb_usb_bsd.cpp.
+        bsd: {
+            srcs: [
+                "fdevent/fdevent_poll.cpp",
+                ":sdk_adb_usb_bsd",
+            ],
+        },
+    },
+}
+
+filegroup {
+    name: "sdk_adb_usb_bsd",
+    srcs: ["patches/sources/adb_usb_bsd.cpp"],
+}
+
+filegroup {
+    name: "sdk_adb_usb_windows_libusb",
+    srcs: ["patches/sources/adb_usb_windows_libusb.cpp"],
+}

@@ -1,0 +1,37 @@
+// external/sqlite
+
+// The host sqlite3 shell links ICU, which is not fetched. Drop the ICU
+// extension (and the Android functions built on it; the host shell sets
+// NO_ANDROID_FUNCS anyway), leaving the plain sqlite3.c + shell.c build.
+// Newer trees also carry sqlite3_noicu for this, older ones do not.
+amend {
+    name: "libsqlite",
+    target: {
+        host: {
+            cflags: ["-USQLITE_ENABLE_ICU"],
+            exclude_shared_libs: [
+                "libandroidicu",
+                "libicui18n",
+                "libicuuc",
+            ],
+            exclude_whole_static_libs: ["libsqlite3_android"],
+        },
+    },
+}
+
+amend {
+    name: "sqlite3",
+    target: {
+        host: {
+            exclude_static_libs: [
+                "libicui18n",
+                "libicuuc",
+                "libicuuc_stubdata",
+            ],
+            exclude_shared_libs: [
+                "libicui18n",
+                "libicuuc",
+            ],
+        },
+    },
+}

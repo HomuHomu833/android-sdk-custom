@@ -1,0 +1,37 @@
+boringssl: take getrandom's syscall number from <sys/syscall.h>.
+
+getrandom_fillin.h cross-checks __NR_getrandom against a table of expected
+numbers and #errors on a mismatch, which x32 hits (its numbers carry
+__X32_SYSCALL_BIT). Trust the libc header when it has the number and use the
+table only as the fallback it was meant to be; CPUs outside the table then use
+the syscall too instead of falling back to /dev/urandom.
+
+--- a/src/boringssl/src/crypto/rand/getrandom_fillin.h
++++ b/src/boringssl/src/crypto/rand/getrandom_fillin.h
+@@ -34,22 +34,12 @@
+ #define EXPECTED_NR_getrandom 278
+ #endif
+ 
+-#if defined(EXPECTED_NR_getrandom)
++#if defined(__NR_getrandom)
+ #define USE_NR_getrandom
+-
+-#if defined(__NR_getrandom)
+-
+-#if __NR_getrandom != EXPECTED_NR_getrandom
+-#error "system call number for getrandom is not the expected value"
++#elif defined(EXPECTED_NR_getrandom)
++#define USE_NR_getrandom
++#define __NR_getrandom EXPECTED_NR_getrandom
+ #endif
+-
+-#else  // __NR_getrandom
+-
+-#define __NR_getrandom EXPECTED_NR_getrandom
+-
+-#endif  // __NR_getrandom
+-
+-#endif  // EXPECTED_NR_getrandom
+ 
+ #if !defined(GRND_NONBLOCK)
+ #define GRND_NONBLOCK 1

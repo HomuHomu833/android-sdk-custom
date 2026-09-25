@@ -11,6 +11,11 @@
 #   JOBS       parallelism (default: nproc)
 #   NDK_VERSION/NDK_REVISION  official NDK for the bionic clang (bionic only)
 #   ANDROID_PLATFORM  bionic API level (default 24, riscv64 forced 35; bionic only)
+#   PLATFORM_TOOLS_VERSION  overrides the version adb/fastboot report (default:
+#              the release's own, from development/sdk/plat_tools_source.prop_template)
+#
+# The CMake project is generated from the sources' own Android.bp files by
+# builder (see builder/__main__.py); nothing here lists sources.
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -79,6 +84,7 @@ fetch_unpack() {
 # --- toolchain selection (linux/bsd zig, bionic NDK clang, macos osxcross,
 # windows llvm-mingw) --------------------------------------------------------
 CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
+SOONG_VARS=()          # --var flags for the builder's select()s
 EXE_LDFLAGS_EXTRA=""   # appended to CMAKE_EXE_LINKER_FLAGS only (not shared libs)
 case "$PLATFORM" in
   linux)
@@ -97,8 +103,9 @@ case "$PLATFORM" in
     # native, dynamic.
     case "$TARGET" in
       *musl*)
-        # host_compat.h supplies GNU/bionic-isms musl omits (e.g. TEMP_FAILURE_RETRY).
-        CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
+        # host_compat.h supplies GNU/bionic-isms musl omits (e.g. TEMP_FAILURE_RETRY);
+        # patches/compat/musl has the <sys/cdefs.h> musl doesn't ship.
+        CROSS_CFLAGS="-Wno-error=date-time -isystem $ROOTDIR/patches/compat/musl -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
         # strlcpy/strlcat: glibc declares them only from 2.38; force-include a shim
@@ -106,13 +113,10 @@ case "$PLATFORM" in
         CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE=1 -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
-    # libpng SIMD: Thumb lacks Neon asm, 32-bit/BE PowerPC lacks VSX; fall back to
-    # C. PowerPC uses PNG_POWERPC_VSX=off (a global -D would clash with libpng's own).
+    # Thumb is converted as Soong's arm but has no Neon and takes no assembly.
+    # (The CPUs Soong lacks altogether are handled in builder/overlay/global.bp.)
     case "$TARGET" in
-      thumb-*|thumbeb-*)
-        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
-        CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
-      powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
+      thumb-*|thumbeb-*) CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
     esac
     # mips64 n64 and powerpc64 pick asm-generic/int-l64.h, typing __s64/__u64 as
     # 'long' and clashing with e2fsprogs; glibc only. See
@@ -177,7 +181,8 @@ case "$PLATFORM" in
       ( cd "$ROOTDIR/patches/termux/libtermuxadb" && cargo build --release --target "$RUST_TARGET" )
       TERMUXADB_A="$ROOTDIR/patches/termux/libtermuxadb/target/$RUST_TARGET/release/libtermuxadb.a"
       [ -f "$TERMUXADB_A" ] || { echo "termux shim: $TERMUXADB_A not built" >&2; exit 1; }
-      CROSS_CMAKE_EXTRA+=(-DTERMUX_USB_SHIM=ON "-DTERMUXADB_LIB=$TERMUXADB_A")
+      SOONG_VARS+=(--var sdk:termux_usb=true)
+      CROSS_CMAKE_EXTRA+=("-DTERMUXADB_LIB=$TERMUXADB_A")
     fi
     ;;
   bsd)
@@ -207,10 +212,7 @@ case "$PLATFORM" in
     esac
     # Per-arch SIMD/TLS, same as linux.
     case "$TARGET" in
-      thumb-*|thumbeb-*)
-        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
-        CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
-      powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
+      thumb-*|thumbeb-*) CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
     esac
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
@@ -320,6 +322,13 @@ case "$PLATFORM" in
     esac ;;
 esac
 
+# Older adb releases predate the Rust bridge.
+MDNS_CRATE="$ROOTDIR/src/adb/client/adbmdns"
+if [ -n "$ADBMDNS_RUST_TARGET" ] && [ ! -f "$MDNS_CRATE/Cargo.toml" ]; then
+  log "adb mDNS: no Rust bridge in these sources -> openscreen"
+  ADBMDNS_RUST_TARGET=""
+fi
+
 if [ -n "$ADBMDNS_RUST_TARGET" ]; then
   RUST_SYSROOT="$(rustc --print sysroot 2>/dev/null || echo /opt/rust)"
   if [ ! -d "$RUST_SYSROOT/lib/rustlib/$ADBMDNS_RUST_TARGET" ]; then
@@ -331,7 +340,6 @@ fi
 if [ -n "$ADBMDNS_RUST_TARGET" ]; then
   export CARGO_HOME="${CARGO_HOME:-$ROOTDIR/.cargo}"
   export "CARGO_TARGET_$(echo "$ADBMDNS_RUST_TARGET" | tr 'a-z-' 'A-Z_')_LINKER=$CROSS_CC"
-  MDNS_CRATE="$ROOTDIR/src/adb/client/adbmdns"
   log "Building adb mDNS bridge / libzeroconf ($ADBMDNS_RUST_TARGET)"
   # *-pc-windows-gnu needs <triple>-dlltool on PATH. Only prepend for windows:
   # zig-as-llvm's bare cc/c++ would otherwise shadow the host compiler cargo uses
@@ -340,23 +348,32 @@ if [ -n "$ADBMDNS_RUST_TARGET" ]; then
   ( cd "$MDNS_CRATE" && PATH="$MDNS_PATH" cargo rustc --release --target "$ADBMDNS_RUST_TARGET" --crate-type staticlib )
   ADBMDNS_A="$MDNS_CRATE/target/$ADBMDNS_RUST_TARGET/release/libzeroconf.a"
   [ -f "$ADBMDNS_A" ] || { echo "adb mDNS bridge: $ADBMDNS_A not built" >&2; exit 1; }
-  CROSS_CMAKE_EXTRA+=(-DHAVE_RUST_MDNS=ON "-DADBMDNS_LIB=$ADBMDNS_A")
+  SOONG_VARS+=(--var sdk:rust_mdns=true)
+  CROSS_CMAKE_EXTRA+=("-DADBMDNS_LIB=$ADBMDNS_A")
 else
   log "adb mDNS: no Rust std for $TARGET -> openscreen fallback"
-  CROSS_CMAKE_EXTRA+=(-DHAVE_RUST_MDNS=OFF)
 fi
 
-# --- native protoc: host-compiler build (invoked at codegen time) -----------
-PROTOC="$ROOTDIR/src/protobuf/build/protoc"
-if [ ! -f "$PROTOC" ]; then
-  log "Building native protoc"
-  ( cd "$ROOTDIR/src/protobuf/third_party"
-    [ -d abseil-cpp ] || git clone https://android.googlesource.com/platform/external/abseil-cpp.git -b "${TAG:-master}" --recursive
-    [ -d jsoncpp ]    || git clone https://android.googlesource.com/platform/external/jsoncpp.git    -b "${TAG:-master}" --recursive )
-  patch -up1 -d "$ROOTDIR" < "$ROOTDIR/patches/protobuf_CMakeLists.txt.patch" || true
-  rm -rf "$ROOTDIR/src/protobuf/build"
-  cmake -S "$ROOTDIR/src/protobuf" -B "$ROOTDIR/src/protobuf/build" -GNinja -Dprotobuf_BUILD_TESTS=OFF
-  ninja -C "$ROOTDIR/src/protobuf/build" -j"$JOBS"
+# --- host protoc: AOSP's own aprotoc from the same protobuf tree -------------
+# Generated code must match the libprotobuf it links against, so build the
+# protoc of these very sources, with the build machine's clang.
+HOST_BUILD="$BUILD_DIR/host"
+PROTOC="$HOST_BUILD/cmake/bin/aprotoc"
+if [ ! -x "$PROTOC" ]; then
+  log "Building host protoc (aprotoc)"
+  case "$(uname -m)" in
+    x86_64)        HOST_ARCH=x86_64 ;;
+    aarch64|arm64) HOST_ARCH=arm64 ;;
+    *)             HOST_ARCH="$(uname -m)" ;;
+  esac
+  HOST_ZLIB="$(find /usr/lib /usr/lib64 -name libz.a 2>/dev/null | head -n1)"
+  [ -n "$HOST_ZLIB" ] || { echo "host protoc: no libz.a on the build machine (zlib1g-dev)" >&2; exit 1; }
+  python3 -m builder --root "$ROOTDIR" --os linux_glibc --arch "$HOST_ARCH" \
+    --tools aprotoc --var "sdk:zlib=$HOST_ZLIB" --out "$HOST_BUILD/generated"
+  cmake -GNinja -S "$HOST_BUILD/generated" -B "$HOST_BUILD/cmake" \
+    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_ASM_COMPILER=clang
+  ninja -C "$HOST_BUILD/cmake" -j"$JOBS" aprotoc
 fi
 
 # --- extra deps: zlib + bzip2 static archives, cross-compiled. -static (musl
@@ -392,21 +409,19 @@ if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
 fi
 
 # --- the SDK host tools -----------------------------------------------------
-# TARGET_OS maps PLATFORM to the AOSP Android.bp os axis (the only way CMake
-# tells android from a Linux host, since bionic sets CMAKE_SYSTEM_NAME=Linux).
-case "$PLATFORM" in
-  bionic)  TARGET_OS=android ;;
-  macos)   TARGET_OS=darwin ;;
-  windows) TARGET_OS=windows ;;
-  bsd)     TARGET_OS=bsd ;;
-  *)       TARGET_OS=linux ;;
-esac
+[ -n "${PLATFORM_TOOLS_VERSION:-}" ] && SOONG_VARS+=(--var "sdk:platform_tools_version=$PLATFORM_TOOLS_VERSION")
+
+log "Generating CMake from Android.bp ($PLATFORM / $TARGET)"
+python3 -m builder --root "$ROOTDIR" --platform "$PLATFORM" --triple "$TARGET" \
+  "${SOONG_VARS[@]}" --out "$BUILD_DIR/generated"
 
 log "Configuring SDK ($PLATFORM / $TARGET)"
+# No CMAKE_BUILD_TYPE: the generated project carries Soong's -O2 and
+# hardening flags (builder/overlay/global.bp).
 cmake -GNinja \
-  -B "$BUILD_DIR" \
+  -S "$BUILD_DIR/generated" \
+  -B "$BUILD_DIR/cmake" \
   -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
-  -DTARGET_OS="$TARGET_OS" \
   -DCMAKE_CROSSCOMPILING=True \
   -DCMAKE_SYSTEM_PROCESSOR="$ARCH" \
   -DCMAKE_PREFIX_PATH="$EXTRA_PREFIX" \
@@ -416,41 +431,27 @@ cmake -GNinja \
   -DCMAKE_LINKER="$CROSS_LD" \
   -DCMAKE_OBJCOPY="$CROSS_OBJCOPY" \
   -DCMAKE_AR="$CROSS_AR" \
+  -DCMAKE_RANLIB="$CROSS_RANLIB" \
   -DCMAKE_STRIP="$CROSS_STRIP" \
   -DCMAKE_C_FLAGS="$CROSS_CFLAGS" \
   -DCMAKE_CXX_FLAGS="$CROSS_CFLAGS" \
   -DCMAKE_EXE_LINKER_FLAGS="$CROSS_LDFLAGS $EXE_LDFLAGS_EXTRA" \
   -DCMAKE_SHARED_LINKER_FLAGS="$CROSS_LDFLAGS" \
-  -Dprotobuf_BUILD_TESTS=OFF \
-  -DABSL_PROPAGATE_CXX_STD=ON \
-  -DCMAKE_BUILD_TYPE=MinSizeRel \
-  -DPROTOC_PATH="$PROTOC" \
+  -DPROTOC="$PROTOC" \
   "${CROSS_CMAKE_EXTRA[@]}"
 
-# Vendored subprojects (protobuf/boringssl/...) define codegen commands with no
-# COMMENT, so their ninja edges render as blank "[n/m]" lines (empty $DESC).
-# Relabel the CUSTOM_COMMAND rule to fall back to the output path so the build
-# log has no empty descriptions.
-find "$BUILD_DIR" \( -name build.ninja -o -name rules.ninja \) -type f -print0 \
-  | xargs -0 -r sed -i 's/^  description = \$DESC$/  description = Generating $out/'
-
 log "Building"
-ninja -C "$BUILD_DIR" -j"$JOBS"
+ninja -C "$BUILD_DIR/cmake" -j"$JOBS"
 
 # --- strip + stage ----------------------------------------------------------
+# Every executable lands flat in bin/ (aapt2, adb, adb.exe, ...), which is
+# where make-sdk.sh looks for them.
 log "Stripping host tools"
-tools="aapt aapt2 aidl zipalign dexdump split-select \
-       adb fastboot sqlite3 etc1tool hprof-conv e2fsdroid sload_f2fs mke2fs \
-       make_f2fs make_f2fs_casefold dmtracedump \
-       veridex"
-for t in $tools; do
-  # windows tools are $t.exe; everything else is bare $t
-  for f in "$BUILD_DIR/bin/$t" "$BUILD_DIR/bin/$t.exe"; do
-    [ -f "$f" ] && "$CROSS_STRIP" "$f" || true
-  done
+for f in "$BUILD_DIR/cmake/bin"/*; do
+  [ -f "$f" ] && "$CROSS_STRIP" "$f" || true
 done
 
 mkdir -p "$OUT"
 rm -rf "$OUT/bin-$TARGET"
-cp -R "$BUILD_DIR/bin" "$OUT/bin-$TARGET"
+cp -R "$BUILD_DIR/cmake/bin" "$OUT/bin-$TARGET"
 log "Done -> $OUT/bin-$TARGET"

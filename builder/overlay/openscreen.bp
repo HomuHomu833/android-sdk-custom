@@ -1,0 +1,17 @@
+// external/openscreen
+
+// Interface enumeration for the BSDs (getifaddrs based); upstream only has
+// the Linux, macOS and Windows variants.
+amend {
+    name: "libopenscreen-platform-impl",
+    target: {
+        bsd: {
+            srcs: [":sdk_openscreen_network_interface_bsd"],
+        },
+    },
+}
+
+filegroup {
+    name: "sdk_openscreen_network_interface_bsd",
+    srcs: ["patches/sources/openscreen_network_interface_bsd.cc"],
+}

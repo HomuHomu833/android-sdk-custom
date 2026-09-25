@@ -4,7 +4,12 @@
 #
 #   TARGET               target triple (names the artifact, locates the binaries)
 #   BUILT_BIN            dir of built host tools (default: $OUT/bin-$TARGET)
-#   BUILD_TOOLS_VERSION  sdkmanager build-tools package (default: 37.0.0)
+#   PLATFORM_TOOLS_VERSION  official platform-tools revision to splice into
+#                        (default: the one the sources declare, in
+#                        src/development/sdk/plat_tools_source.prop_template;
+#                        the latest when Google has no zip of it)
+#   BUILD_TOOLS_VERSION  official build-tools revision (default: the newest
+#                        stable one of the same major as platform-tools)
 #   CMDLINE_TOOLS_URL    commandline-tools zip (default: linux 13114758)
 #   ROOTDIR              work dir (default: cwd)
 #   DEST                 where the archive is written (default: $ROOTDIR)
@@ -16,7 +21,8 @@ ROOTDIR="${ROOTDIR:-$PWD}"
 PLATFORM="${PLATFORM:-linux}"
 OUT="${OUT:-$ROOTDIR/out}"
 BUILT_BIN="${BUILT_BIN:-$OUT/bin-$TARGET}"
-BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-37.0.0}"
+PLATFORM_TOOLS_VERSION="${PLATFORM_TOOLS_VERSION:-}"
+BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-}"
 CMDLINE_TOOLS_URL="${CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip}"
 DEST="${DEST:-$ROOTDIR}"
 cd "$ROOTDIR"
@@ -79,12 +85,20 @@ fetch_unpack() {
 
 # REPO_OS_OVERRIDE makes sdkmanager fetch a specific OS's packages so each
 # platform gets the matching SDK to splice into. bionic/BSD reuse the Linux SDK.
+# PT_OS is the same OS as Google's platform-tools zips name it.
 case "$PLATFORM" in
-  windows) REPO_OS_OVERRIDE=windows ;;
-  macos)   REPO_OS_OVERRIDE=macosx ;;
-  *)       REPO_OS_OVERRIDE=linux ;;
+  windows) REPO_OS_OVERRIDE=windows; PT_OS=windows ;;
+  macos)   REPO_OS_OVERRIDE=macosx;  PT_OS=darwin ;;
+  *)       REPO_OS_OVERRIDE=linux;   PT_OS=linux ;;
 esac
 export REPO_OS_OVERRIDE
+
+# The platform-tools revision the sources declare: what adb/fastboot --version
+# report, and the official package the tools go into.
+PT_TEMPLATE="$ROOTDIR/src/development/sdk/plat_tools_source.prop_template"
+if [ -z "$PLATFORM_TOOLS_VERSION" ] && [ -f "$PT_TEMPLATE" ]; then
+  PLATFORM_TOOLS_VERSION="$(sed -n 's/^Pkg\.Revision=//p' "$PT_TEMPLATE" | tr -d '\r')"
+fi
 
 # sdkmanager runs on the linux cmdline-tools, but the copy we *ship* must match
 # $PLATFORM. Derive that zip from CMDLINE_TOOLS_URL; SHIP_CMDLINE_TOOLS_URL pins
@@ -97,15 +111,40 @@ esac
 SHIP_CMDLINE_TOOLS_URL="${SHIP_CMDLINE_TOOLS_URL:-${CMDLINE_TOOLS_URL/commandlinetools-linux-/commandlinetools-$CMDLINE_TOOLS_OS-}}"
 
 # --- fetch the official SDK (build-tools + platform-tools) -------------------
-log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"
 HOST_SDK="$ROOTDIR/android-sdk"
+SDKMANAGER="$HOST_SDK/cmdline-tools/bin/sdkmanager"
 rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
-( cd "$HOST_SDK"
-  fetch_unpack "$CMDLINE_TOOLS_URL" "$PWD/commandlinetools.zip"
-  # Bounded "y" stream, not `yes`: under pipefail `yes` takes SIGPIPE (141) when
-  # sdkmanager closes stdin, aborting the script.
-  printf 'y\n%.0s' {1..100} | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
-  cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;$BUILD_TOOLS_VERSION" "platform-tools" )
+fetch_unpack "$CMDLINE_TOOLS_URL" "$HOST_SDK/commandlinetools.zip" "$HOST_SDK"
+# Bounded "y" stream, not `yes`: under pipefail `yes` takes SIGPIPE (141) when
+# sdkmanager closes stdin, aborting the script.
+printf 'y\n%.0s' {1..100} | "$SDKMANAGER" --sdk_root="$HOST_SDK" --licenses
+
+# platform-tools: Google keeps every released revision's zip, while sdkmanager
+# only offers the latest. Revisions that never shipped (or a tag without the
+# template) get the latest.
+PT_URL="https://dl.google.com/android/repository/platform-tools_r${PLATFORM_TOOLS_VERSION}-${PT_OS}.zip"
+if [ -n "$PLATFORM_TOOLS_VERSION" ] \
+   && aria2c --dry-run=true --console-log-level=error --max-tries=3 "$PT_URL" >/dev/null 2>&1; then
+  PT_LATEST=""; PT_DESC="$PLATFORM_TOOLS_VERSION"
+else
+  log "No official platform-tools ${PLATFORM_TOOLS_VERSION:-(unknown)} for $PT_OS; using the latest"
+  PT_LATEST=platform-tools; PT_DESC=latest
+fi
+
+# build-tools: sdkmanager lists them all. Take the newest stable one of the
+# platform-tools major (same AOSP generation as the aapt2/aidl/dexdump built
+# here), else the newest stable overall.
+if [ -z "$BUILD_TOOLS_VERSION" ]; then
+  BT_AVAIL="$("$SDKMANAGER" --sdk_root="$HOST_SDK" --list 2>/dev/null \
+    | sed -n 's/^ *build-tools;\([0-9][0-9.]*\) .*/\1/p' | sort -uV)"
+  BUILD_TOOLS_VERSION="$(printf '%s\n' "$BT_AVAIL" | grep "^${PLATFORM_TOOLS_VERSION%%.*}\." | tail -n1 || true)"
+  [ -n "$BUILD_TOOLS_VERSION" ] || BUILD_TOOLS_VERSION="$(printf '%s\n' "$BT_AVAIL" | tail -n1)"
+fi
+[ -n "$BUILD_TOOLS_VERSION" ] || { echo "no build-tools revision to install" >&2; exit 1; }
+
+log "Setting up the official SDK: build-tools $BUILD_TOOLS_VERSION, platform-tools $PT_DESC"
+"$SDKMANAGER" --sdk_root="$HOST_SDK" "build-tools;$BUILD_TOOLS_VERSION" $PT_LATEST
+[ -n "$PT_LATEST" ] || fetch_unpack "$PT_URL" "$HOST_SDK/platform-tools.zip" "$HOST_SDK"
 
 # --- splice our ELF host tools over the official ones -----------------------
 log "Splicing custom host tools into the SDK"
@@ -132,6 +171,22 @@ rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscr
 rm -f "$HOST_SDK/platform-tools/AdbWinApi.dll" "$HOST_SDK/platform-tools/AdbWinUsbApi.dll"
 rm -f "$BT/libbcc.dll" "$BT/libbcinfo.dll" "$BT/libclang_android.dll" "$BT/libLLVM_android.dll"
 find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true
+
+# --- official binaries we did not rebuild -----------------------------------
+# Anything native still at the top of either package is Google's own build
+# (x86-64, and missing the lib64 pruned above), so it would not run on most
+# targets. Ship ours or nothing: drop it, and say so.
+drop_unreplaced() {
+  find "$1" -maxdepth 1 -type f | while IFS= read -r file; do
+    [ -f "$BUILT_BIN/$(basename "$file")" ] && continue
+    if file "$file" | grep -qE 'ELF|Mach-O|PE32'; then
+      echo "Dropping $(basename "$file"): official build, not rebuilt for $TARGET"
+      rm -f "$file"
+    fi
+  done
+}
+drop_unreplaced "$BT"
+drop_unreplaced "$HOST_SDK/platform-tools"
 
 # --- convert the bash launcher scripts to POSIX sh --------------------------
 # Unix-host SDKs ship bash launchers; windows ships .bat, so skip there.

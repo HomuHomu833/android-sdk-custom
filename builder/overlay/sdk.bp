@@ -1,0 +1,13 @@
+// development/sdk
+
+// adb/fastboot --version print PLATFORM_TOOLS_VERSION, which upstream's
+// genrule reads from the release's own plat_tools_source.prop_template. Only
+// an explicit --var sdk:platform_tools_version=X (build.sh passes
+// $PLATFORM_TOOLS_VERSION when set) replaces it.
+amend {
+    name: "platform_tools_version",
+    cmd: select(soong_config_variable("sdk", "platform_tools_version"), {
+        any @ version: "echo '#define PLATFORM_TOOLS_VERSION \"" + version + "\"' > $(out)",
+        default: unset,
+    }),
+}

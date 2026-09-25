@@ -1,0 +1,36 @@
+art: pick TwoWordReturn by pointer width, not by CPU.
+
+instruction_set.h only knows the five CPUs ART runs on and #errors on the
+rest; the tools here (dexdump, veridex) never call the entrypoints it is
+for, but the header still has to compile on every host CPU. The choice is
+purely about the width of uintptr_t, which also gets x32 right.
+
+--- a/src/art/libartbase/arch/instruction_set.h
++++ b/src/art/libartbase/arch/instruction_set.h
+@@ -305,7 +305,7 @@
+ //            when the garbage collector can move objects concurrently. Ensure that required locks
+ //            are held when using!
+ 
+-#if defined(__i386__) || defined(__arm__)
++#if !defined(__LP64__)
+ using TwoWordReturn = uint64_t;
+ 
+ // Encodes method_ptr==nullptr and code_ptr==nullptr
+@@ -321,7 +321,7 @@
+   return ((hi64 << 32) | lo32);
+ }
+ 
+-#elif defined(__x86_64__) || defined(__aarch64__) || defined(__riscv)
++#else
+ 
+ // Note: TwoWordReturn can't be constexpr for 64-bit targets. We'd need a constexpr constructor,
+ //       which would violate C-linkage in the entrypoint functions.
+@@ -345,8 +345,6 @@
+   ret.hi = hi;
+   return ret;
+ }
+-#else
+-#error "Unsupported architecture"
+ #endif
+ 
+ }  // namespace art

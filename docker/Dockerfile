@@ -16,17 +16,19 @@ ARG REPO_OWNER=HomuHomu833
 ARG MACOS_SDK_VERSION=26.1
 
 ENV DEBIAN_FRONTEND=noninteractive
-# - build-essential/clang/lld: host compiler for the native protoc the cross
-#   build runs at codegen.
-# - go/bison/flex/m4: needed by selinux, e2fsprogs, aidl, soong tooling.
-# - autoconf/automake/libtool/autoconf-archive/pkg-config: autotools deps for the
-#   bundled zlib/bzip2 and sources that regenerate configure.
-# - jq: fetch-source.sh reads repos.json. file/zip/unzip/xz: splice + archive.
+# - python3: builder (Android.bp -> CMake) and the genrules' Python tools;
+#   fetch-source.sh reads the release manifest with it.
+# - build-essential/clang/lld/zlib1g-dev: host compiler (and static libz) for
+#   the native aprotoc, and cargo's host build scripts.
+# - bison/flex/m4: the yacc/lex sources (aidl). patch: patch-source.sh.
+# - autoconf/automake/libtool/autoconf-archive/pkg-config and the -dev libraries
+#   below: building osxcross (cctools-port, xar).
+# - file/unzip/xz/p7zip: make-sdk.sh's splice + archive.
 # - openjdk-21-jre-headless: sdkmanager needs a JRE to fetch the official SDK.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates aria2 xz-utils unzip zip p7zip-full git make cmake ninja-build \
-        build-essential clang lld file tree jq openjdk-21-jre-headless \
-        golang-go bison flex m4 python3 \
+        build-essential clang lld file tree patch openjdk-21-jre-headless \
+        bison flex m4 python3 \
         autoconf automake libtool autoconf-archive pkg-config \
         zlib1g-dev libssl-dev libxml2-dev liblzma-dev libbz2-dev uuid-dev cpio bzip2 \
     && rm -rf /var/lib/apt/lists/*
@@ -64,7 +66,7 @@ RUN arch="$(uname -m)"; \
         && rm /tmp/zig.tar.xz \
         && mv "/opt/zig-${zig_arch}-linux-${ZIG_VERSION}" /opt/zig \
         && chmod -R a+w /opt/zig/lib; \
-    fi   # build.sh overlays patches/zig here at run time (non-root)
+    fi   # build.sh overlays patches/musl/zig here at run time (non-root)
 
 # zig-as-llvm: thin cc/c++/ar/strip/... wrappers around zig (keyed off
 # $ZIG_TARGET); they `exec zig`, so zig must be on PATH (below).
@@ -89,7 +91,7 @@ RUN arch="$(uname -m)"; \
         *) echo "WARNING: llvm-mingw does not support host arch '$arch'; Windows cross-builds will be unavailable" ;; \
     esac
 # Not on PATH: build.sh calls it by absolute path, so its windows clang doesn't
-# shadow the host clang used for native protoc.
+# shadow the host clang used for the native aprotoc.
 
 # osxcross: macOS cross toolchain (cctools-port + clang wrappers) with the macOS
 # SDK baked into /opt/osxcross/SDK; zig segfaults building Darwin binaries.

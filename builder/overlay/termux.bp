@@ -1,0 +1,33 @@
+// Termux USB shim for the bionic adb/fastboot. build.sh builds
+// patches/termux/libtermuxadb with cargo and passes --var sdk:termux_usb=true
+// plus -DTERMUXADB_LIB; patch-source.sh routes the Linux USB code through it.
+// It stays inert at runtime unless LIBUSB_TERMUX_IMPL=1.
+cc_prebuilt_library_static {
+    name: "libtermuxadb",
+    srcs: select(soong_config_variable("sdk", "termux_usb"), {
+        true: ["${TERMUXADB_LIB}"],
+        default: [],
+    }),
+    static_libs: [
+        "libusb",
+        "liblog",
+    ],
+}
+
+amend {
+    name: "adb",
+    target: {
+        linux_bionic: {
+            static_libs: ["libtermuxadb"],
+        },
+    },
+}
+
+amend {
+    name: "fastboot",
+    target: {
+        linux_bionic: {
+            static_libs: ["libtermuxadb"],
+        },
+    },
+}

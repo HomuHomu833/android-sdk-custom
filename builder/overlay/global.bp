@@ -1,0 +1,302 @@
+// What to build, and the flags Soong's cc/config adds to every module.
+//
+// Overlay files are read after every upstream Android.bp. Relative paths in
+// them resolve against the repo root, so they can reach include/ and patches/.
+// Besides the upstream module types they understand:
+//
+//   amend { name: "<module>", ... }   merged on top of the upstream module
+//                                     (append semantics, like target.* are),
+//                                     so srcs/cflags/exclude_* just add up;
+//                                     target_alias: { bsd: "linux" } in one
+//                                     also gives target.bsd(_<arch>) that
+//                                     module's target.linux(_<arch>);
+//   sdk_tools { tools: [...] }        the modules built by default (ones a
+//                                     release lacks are skipped);
+//   soong_config_values { ns: { var: value } }
+//                                     Soong config variables, as a product
+//                                     config would set them;
+//
+// and a module of any other type replaces the upstream module of that name.
+// target: keys also accept bsd, freebsd, netbsd and openbsd, which Soong has
+// no notion of. select(soong_config_variable("sdk", ...)) reads --var values.
+
+// What an AOSP source build of the platform sets. ART only enables its host
+// tools (dexdump, veridex) when it is built from source.
+soong_config_values {
+    art_module: {
+        source_build: true,
+    },
+}
+
+// The binaries the official build-tools and platform-tools packages ship, in
+// any release from 29 on; make-sdk.sh swaps ours in for theirs by file name
+// and drops the ones it has no build of. A release without a module (casefold
+// arrived in 30.0.5, dmtracedump left after 34.0.4) just skips it; e2fsdroid
+// and sload_f2fs shipped until 33.0.3, on Linux and macOS only.
+sdk_tools {
+    name: "build-tools",
+    tools: [
+        "aapt",
+        "aapt2",
+        "aidl",
+        "dexdump",
+        "split-select",
+        "zipalign",
+    ],
+}
+
+sdk_tools {
+    name: "platform-tools",
+    tools: [
+        "adb",
+        "dmtracedump",
+        "e2fsdroid",
+        "etc1tool",
+        "fastboot",
+        "hprof-conv",
+        "make_f2fs",
+        "make_f2fs_casefold",
+        "mke2fs",
+        "sload_f2fs",
+        "sqlite3",
+    ],
+    target: {
+        windows: {
+            exclude_tools: [
+                "e2fsdroid",
+                "sload_f2fs",
+            ],
+        },
+        // f2fs-tools leans on Linux-only headers throughout. e2fsdroid has
+        // never been built for the BSDs here, so it stays out with them.
+        bsd: {
+            exclude_tools: [
+                "e2fsdroid",
+                "make_f2fs",
+                "make_f2fs_casefold",
+                "sload_f2fs",
+            ],
+        },
+    },
+}
+
+// Flags ahead of every cc module's own (emitted once, as add_compile_options
+// and add_link_options). Mirrors cc/config/global.go and the *_host.go
+// toolchains, minus debug info, -Werror policy and the flags tied to Soong's
+// own prebuilt clang. exclude_cflags and friends here are removed from every
+// module's flags; host_ldlibs go to every binary.
+cc_defaults {
+    name: "builder_defaults",
+    cflags: [
+        // commonGlobalCflags
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Wpointer-arith",
+        "-Wno-error=deprecated-declarations",
+        "-Wno-c23-extensions",
+        "-Wno-c99-designator",
+        "-Wno-gnu-folding-constant",
+        "-Wno-inconsistent-missing-override",
+        "-Wno-reorder-init-list",
+        "-Wno-sign-compare",
+        "-Wno-unused",
+        "-DANDROID",
+        "-DNDEBUG",
+        "-UDEBUG",
+        "-D__compiler_offsetof=__builtin_offsetof",
+        "-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
+        "-fcolor-diagnostics",
+        "-ffp-contract=off",
+        "-fno-exceptions",
+        "-fno-strict-aliasing",
+        // noOverrideGlobalCflags (the -Wno- half)
+        "-Wno-missing-field-initializers",
+        "-Wno-packed-non-pod",
+        "-Wno-implicit-int-float-conversion",
+        "-Wno-tautological-overlap-compare",
+        "-Wno-deprecated-copy",
+        "-Wno-zero-as-null-pointer-constant",
+        "-Wno-deprecated-anon-enum-enum-conversion",
+        "-Wno-deprecated-enum-enum-conversion",
+        "-Wno-non-c-typedef-for-linkage",
+        "-Wno-align-mismatch",
+        "-Wno-vla-cxx-extension",
+        "-Wno-cast-function-type-mismatch",
+        // Our toolchains are older or newer than Soong's clang; unknown -W
+        // flags from Android.bp must not end the build.
+        "-Wno-unknown-warning-option",
+        // 32-bit hosts need 64-bit off_t for lseek (Soong only has 64-bit hosts)
+        "-D_FILE_OFFSET_BITS=64",
+    ],
+    cppflags: [
+        // commonGlobalCppflags
+        "-Wimplicit-fallthrough",
+        "-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS",
+        "-Wno-gnu-include-next",
+    ],
+    target: {
+        // Hardening, as linuxCflags/linuxLdflags and linuxBionicCflags have
+        // it (musl ignores _FORTIFY_SOURCE).
+        linux: {
+            cflags: [
+                "-U_FORTIFY_SOURCE",
+                "-D_FORTIFY_SOURCE=3",
+                "-fstack-protector-strong",
+            ],
+            ldflags: [
+                "-Wl,-z,noexecstack",
+                "-Wl,-z,relro",
+                "-Wl,-z,now",
+            ],
+        },
+        linux_glibc: {
+            host_ldlibs: [
+                "-ldl",
+                "-lpthread",
+                "-lm",
+                "-lrt",
+            ],
+        },
+        linux_musl: {
+            cflags: ["-DANDROID_HOST_MUSL"],
+            host_ldlibs: [
+                "-ldl",
+                "-lpthread",
+                "-lm",
+                "-lrt",
+            ],
+        },
+        linux_bionic: {
+            host_ldlibs: [
+                "-ldl",
+                "-lm",
+            ],
+        },
+        darwin: {
+            // darwinCflags, plus the fortify level the sqlite build asks for
+            // (libSystem has the checked functions)
+            cflags: [
+                "-fPIC",
+                "-fstack-protector-strong",
+                "-U_FORTIFY_SOURCE",
+                "-D_FORTIFY_SOURCE=3",
+            ],
+            host_ldlibs: [
+                "-lm",
+                "-lpthread",
+            ],
+        },
+        windows: {
+            // windowsCflags
+            cflags: [
+                "-DUSE_MINGW",
+                "-DWIN32_LEAN_AND_MEAN",
+                "-Wno-unused-parameter",
+                "-D__STDC_CONSTANT_MACROS",
+                "-D__USE_MINGW_ANSI_STDIO=1",
+                "-D_WIN32_WINNT=0x0A00",
+                "-DWINVER=0x0A00",
+                "-mno-ms-bitfields",
+                // Soong gets these from -lssp; llvm-mingw's CRT implements
+                // both and its driver links the stack protector's support.
+                "-U_FORTIFY_SOURCE",
+                "-D_FORTIFY_SOURCE=3",
+                "-fstack-protector-strong",
+            ],
+            // windowsLdflags
+            ldflags: [
+                "-Wl,--dynamicbase",
+                "-Wl,--nxcompat",
+            ],
+        },
+        windows_x86_64: {
+            ldflags: ["-Wl,--high-entropy-va"],
+        },
+        windows_arm64: {
+            ldflags: ["-Wl,--high-entropy-va"],
+        },
+        bsd: {
+            // The Linux hardening minus fortify, which not every BSD libc
+            // implements.
+            cflags: ["-fstack-protector-strong"],
+            ldflags: [
+                "-Wl,-z,noexecstack",
+                "-Wl,-z,relro",
+                "-Wl,-z,now",
+            ],
+            host_ldlibs: [
+                "-lpthread",
+                "-lm",
+            ],
+        },
+        // BoringSSL (see boringssl.bp) has runtime CPU detection for only
+        // some BSD/ARM pairs, and only in newer releases (none on NetBSD).
+        // Fix the ARM capabilities at compile time instead, as BoringSSL
+        // itself does on OpenBSD arm32. ARM only: older BoringSSL also skips
+        // x86 detection under this macro.
+        bsd_arm: {
+            cflags: ["-DOPENSSL_STATIC_ARMCAP"],
+        },
+        bsd_arm64: {
+            cflags: ["-DOPENSSL_STATIC_ARMCAP"],
+        },
+    },
+    // CPUs Soong has never built for get none of the arch.* sources (assembly,
+    // SIMD) Android.bp keeps for its own. Where one shares another CPU's
+    // predefined macros, the portable code would still reach for them, so
+    // switch those paths off: BoringSSL's assembly (asflags too, as its
+    // Linux source list assembles every flavour), libpng's SIMD filters and
+    // zstd's x86-64 Huffman loop.
+    arch: {
+        // BoringSSL's ARM assembly is also little-endian only
+        // (patches/misc/boringssl-target-cpus.patch).
+        armeb: {
+            cflags: [
+                "-DOPENSSL_NO_ASM",
+                "-DPNG_ARM_NEON_OPT=0",
+            ],
+            asflags: ["-DOPENSSL_NO_ASM"],
+        },
+        thumbeb: {
+            cflags: [
+                "-DOPENSSL_NO_ASM",
+                "-DPNG_ARM_NEON_OPT=0",
+            ],
+            asflags: ["-DOPENSSL_NO_ASM"],
+        },
+        aarch64_be: {
+            cflags: [
+                "-DOPENSSL_NO_ASM",
+                "-DPNG_ARM_NEON_OPT=0",
+            ],
+            asflags: ["-DOPENSSL_NO_ASM"],
+        },
+        // (BoringSSL is assembly-free on Windows upstream.)
+        arm64ec: {
+            cflags: ["-DPNG_ARM_NEON_OPT=0"],
+        },
+        // BoringSSL's x86-64 assembly assumes 64-bit pointers.
+        x32: {
+            cflags: [
+                "-DOPENSSL_NO_ASM",
+                "-DZSTD_DISABLE_ASM",
+            ],
+            asflags: ["-DOPENSSL_NO_ASM"],
+        },
+        // Older BoringSSL also has ppc64le assembly, which no Android.bp lists.
+        powerpc64le: {
+            cflags: [
+                "-DOPENSSL_NO_ASM",
+                "-DPNG_POWERPC_VSX_OPT=0",
+            ],
+            asflags: ["-DOPENSSL_NO_ASM"],
+        },
+        powerpc64: {
+            cflags: ["-DPNG_POWERPC_VSX_OPT=0"],
+        },
+        loongarch64: {
+            cflags: ["-DPNG_LOONGARCH_LSX_OPT=0"],
+        },
+    },
+}

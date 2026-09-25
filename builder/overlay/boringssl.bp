@@ -1,0 +1,19 @@
+// external/boringssl
+
+// The source lists add BoringSSL's assembly under target.linux (or, in older
+// releases, target.linux_<arch>). Those are its ELF flavours, which the BSDs
+// assemble just as well, so they get the same lists. How the BSDs learn the
+// CPU's features is in global.bp (bsd_arm, bsd_arm64).
+amend {
+    name: "libcrypto_sources",
+    target_alias: {
+        bsd: "linux",
+    },
+}
+
+amend {
+    name: "libcrypto_bcm_sources",
+    target_alias: {
+        bsd: "linux",
+    },
+}

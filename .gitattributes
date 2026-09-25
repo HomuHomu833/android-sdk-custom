@@ -3,3 +3,5 @@ scripts/* text eol=lf
 *.sh text eol=lf
 Dockerfile text eol=lf
 *.patch text eol=lf
+*.py text eol=lf
+*.bp text eol=lf
