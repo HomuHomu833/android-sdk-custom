@@ -167,6 +167,11 @@ cc_defaults {
             ],
         },
         linux_bionic: {
+            // __ANDROID__ means an Android device; linux_bionic builds are host
+            // tools that happen to use bionic. Soong's toolchains leave it
+            // undefined (-U__ANDROID__ for x86_64, a plain aarch64-linux triple
+            // for arm64); the NDK clang we use defines it.
+            cflags: ["-U__ANDROID__"],
             host_ldlibs: [
                 "-ldl",
                 "-lm",

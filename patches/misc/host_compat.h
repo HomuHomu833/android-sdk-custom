@@ -224,12 +224,13 @@ const char *getprogname(void) {
 #endif
 
 /* --- stdio *_unlocked extensions --------------------------------------------
- * bionic/macOS/MinGW lack the glibc GNU *_unlocked stdio funcs (used by libselinux
- * as a single-threaded perf hint); map them to the locked equivalents. FreeBSD
- * ships them, so it's excluded. fgets_unlocked matches libselinux
- * label_internal.h's exact spelling (it redefines unconditionally) to stay
- * token-identical and avoid -Wmacro-redefined. */
-#if (defined(__APPLE__) || defined(_WIN32) || defined(__ANDROID__) || \
+ * bionic (below API 28)/macOS/MinGW lack the glibc GNU *_unlocked stdio funcs
+ * (used by libselinux as a single-threaded perf hint); map them to the locked
+ * equivalents. FreeBSD ships them, so it's excluded. fgets_unlocked matches
+ * libselinux label_internal.h's exact spelling (it redefines unconditionally) to
+ * stay token-identical and avoid -Wmacro-redefined. */
+#if (defined(__APPLE__) || defined(_WIN32) || \
+     (defined(__BIONIC__) && __ANDROID_API__ < 28) || \
      defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(__FreeBSD__)
 #ifndef fgets_unlocked
 #define fgets_unlocked(buf, size, fp) fgets(buf, size, fp)
@@ -335,19 +336,18 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
  * it only on macOS/MinGW/musl/BSD. (errno resolves at the expansion site.) */
 #if defined(__APPLE__) || defined(_WIN32) || \
     defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
-    (defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__))
+    (defined(__linux__) && !defined(__GLIBC__) && !defined(__BIONIC__))
 #ifndef TEMP_FAILURE_RETRY
 #define TEMP_FAILURE_RETRY(expression) (({ long int __result; do __result = (long int)(expression); while (__result == -1 && errno == EINTR); __result; }))
 #endif
 #endif
 
 /* --- reallocarray() ---------------------------------------------------------
- * libselinux (selinux_internal.c) calls reallocarray(), which macOS/MinGW lack
- * and bionic only has from API 29. glibc, musl and all BSDs declare it
- * themselves, so they're excluded to avoid a clash. */
-#if (!defined(__ANDROID_API__) || __ANDROID_API__ < 29) \
-    && !defined(__GLIBC__) \
-    && !(defined(__linux__) && !defined(__ANDROID__)) \
+ * libselinux (selinux_internal.c) calls reallocarray(), which macOS/MinGW lack.
+ * glibc, musl and all BSDs declare it themselves, so they're excluded to avoid a
+ * clash. So is bionic: it only has it from API 29, and libselinux's linux_bionic
+ * build (no HAVE_REALLOCARRAY there) defines its own for exactly that case. */
+#if !defined(__linux__) \
     && !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 #include <errno.h>
 #include <stdlib.h>
@@ -363,8 +363,66 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) {
 }
 #endif
 
-/* --- bionic / Android NDK fallbacks ----------------------------------------- */
-#if defined(__ANDROID__)
+/* --- bionic / Android NDK fallbacks -----------------------------------------
+ * Keyed on __BIONIC__: the bionic build undefines __ANDROID__, as Soong's
+ * linux_bionic toolchains do. Everything below links from the NDK's static
+ * libc.a, which carries every API level. */
+#if defined(__BIONIC__)
+
+/* __system_property_read_callback()/__system_property_wait(): bionic API 26+,
+ * but libbase, libcutils and libbuildversion read properties through them. The
+ * headers hide them below that, so declare them. */
+#if __ANDROID_API__ < 26
+#include <stdbool.h>
+#include <stdint.h>
+#include <sys/system_properties.h>
+#include <time.h>
+
+__BEGIN_DECLS
+void __system_property_read_callback(const prop_info *pi,
+    void (*callback)(void *cookie, const char *name, const char *value, uint32_t serial),
+    void *cookie);
+bool __system_property_wait(const prop_info *pi, uint32_t old_serial,
+    uint32_t *new_serial_ptr, const struct timespec *relative_timeout);
+__END_DECLS
+#endif /* API < 26 */
+
+/* backtrace(): bionic API 33+; abseil's stacktrace falls back to it through
+ * <execinfo.h> on Linux CPUs it has no unwinder for (arm). A strong declaration,
+ * so the static link pulls it from libc.a rather than leaving it null. */
+#if __ANDROID_API__ < 33
+__BEGIN_DECLS
+int backtrace(void **buffer, int size);
+__END_DECLS
+#endif /* API < 33 */
+
+/* qsort_r(): bionic API 36+; zstd's dictBuilder (cover.c) takes its glibc path
+ * on any __linux__ without __ANDROID__. qsort() with the comparator and its
+ * argument in thread-locals, restored afterwards for nested calls. */
+#if __ANDROID_API__ < 36
+#include <stdlib.h>
+
+static __thread __attribute__((__unused__))
+int (*__host_compat_qsort_r_cmp)(const void *, const void *, void *);
+static __thread __attribute__((__unused__)) void *__host_compat_qsort_r_arg;
+
+static inline __attribute__((__unused__))
+int __host_compat_qsort_r_thunk(const void *a, const void *b) {
+  return __host_compat_qsort_r_cmp(a, b, __host_compat_qsort_r_arg);
+}
+
+static inline __attribute__((__unused__))
+void qsort_r(void *base, size_t nmemb, size_t size,
+             int (*cmp)(const void *, const void *, void *), void *arg) {
+  int (*saved_cmp)(const void *, const void *, void *) = __host_compat_qsort_r_cmp;
+  void *saved_arg = __host_compat_qsort_r_arg;
+  __host_compat_qsort_r_cmp = cmp;
+  __host_compat_qsort_r_arg = arg;
+  qsort(base, nmemb, size, __host_compat_qsort_r_thunk);
+  __host_compat_qsort_r_cmp = saved_cmp;
+  __host_compat_qsort_r_arg = saved_arg;
+}
+#endif /* API < 36 */
 
 /* hasmntopt(): bionic API 26+; e2fsprogs ismounted.c uses it. */
 #if !defined(__ANDROID_API__) || __ANDROID_API__ < 26
@@ -401,7 +459,7 @@ int getlogin_r(char *buf, size_t bufsize) {
 }
 #endif /* API < 28 */
 
-#endif /* __ANDROID__ */
+#endif /* __BIONIC__ */
 
 /* --- Windows POSIX identity stubs -------------------------------------------
  * e2fsprogs blkid/cache.c safe_getenv() calls getuid/geteuid/getgid/getegid;

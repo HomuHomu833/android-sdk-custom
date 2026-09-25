@@ -81,8 +81,8 @@ sed -i '/return strerror_r(errnum, buf, buflen);/c\
 #endif' src/libbase/posix_strerror_r.cpp
 
 # libbuildversion: stamp a build number into soong_build_number, as the release
-# build does after linking. PLACEHOLDER itself stays, or the __ANDROID__ path
-# (bionic) would take the number as unstamped and report the device's instead.
+# build does after linking. PLACEHOLDER itself stays, or a device (__ANDROID__)
+# build would take the number as unstamped and report the device's instead.
 sed -i "s/^\( *char soong_build_number\[128\] = \)PLACEHOLDER;/\1\"$(date -u +%y%m%d%H%M%S)\";/" \
   src/soong/cc/libbuildversion/libbuildversion.cpp
 
