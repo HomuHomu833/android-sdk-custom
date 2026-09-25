@@ -105,7 +105,6 @@ cc_defaults {
         "-DNDEBUG",
         "-UDEBUG",
         "-D__compiler_offsetof=__builtin_offsetof",
-        "-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
         "-fcolor-diagnostics",
         "-ffp-contract=off",
         "-fno-exceptions",
