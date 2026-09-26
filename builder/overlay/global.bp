@@ -141,6 +141,11 @@ cc_defaults {
         "-Wimplicit-fallthrough",
         "-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS",
         "-Wno-gnu-include-next",
+        // A constexpr function that can never be a constant expression is
+        // fine since P2448R2, and Soong's clang accepts it in C++20 too; the
+        // clang 18 under osxcross still errors on it (androidfw's
+        // LocaleDataLookup.h).
+        "-Wno-invalid-constexpr",
     ],
     target: {
         // Hardening, as linuxCflags/linuxLdflags and linuxBionicCflags have
