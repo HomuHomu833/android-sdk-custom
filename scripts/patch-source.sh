@@ -436,6 +436,12 @@ grep -q '^#include <vector>' src/core/fastboot/fastboot_driver_interface.h ||
 sed -i 's/^#elif !defined(alloca)$/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n#include <stdlib.h>\n#define ABSL_INTERNAL_HAVE_ALLOCA 1\n#elif !defined(alloca)/' \
   src/abseil-cpp/absl/debugging/stacktrace.cc
 
+# libbase properties.cpp (older releases): prop_info_cmp's operator()s are not
+# const, and newer libc++ (zig's) calls the comparator through a const object.
+# Upstream made them const later.
+sed -i -E 's/^(  bool operator\(\)\((const prop_info& lhs|std::string_view lhs), [^)]*\)) \{/\1 const {/' \
+  src/libbase/properties.cpp
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
