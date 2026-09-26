@@ -253,6 +253,18 @@ cc_defaults {
         bsd_arm64: {
             cflags: ["-DOPENSSL_STATIC_ARMCAP"],
         },
+        // Abseil reads the PowerPC timebase frequency on glibc, Linux, AIX and
+        // FreeBSD only and #errors elsewhere; take its clock_gettime() cycle
+        // clock instead. Global, as its headers read the switch too.
+        netbsd_powerpc: {
+            cflags: ["-DABSL_USE_UNSCALED_CYCLECLOCK=0"],
+        },
+        openbsd_powerpc: {
+            cflags: ["-DABSL_USE_UNSCALED_CYCLECLOCK=0"],
+        },
+        openbsd_powerpc64: {
+            cflags: ["-DABSL_USE_UNSCALED_CYCLECLOCK=0"],
+        },
     },
     // CPUs Soong has never built for get none of the arch.* sources (assembly,
     // SIMD) Android.bp keeps for its own. Where one shares another CPU's
