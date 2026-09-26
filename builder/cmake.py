@@ -36,10 +36,16 @@ def q(s):
     return '"%s"' % s
 
 
+_GX = {"$": "$<1:$>", ">": "$<ANGLE-R>", ",": "$<COMMA>", ";": "$<SEMICOLON>"}
+
+
 def gx(s):
-    """Escape a flag for use inside a $<cond:...> generator expression."""
-    return s.replace("$", "$<1:$>").replace(">", "$<ANGLE-R>").replace(",", "$<COMMA>") \
-        .replace(";", "$<SEMICOLON>")
+    """Escape a flag for use inside a $<cond:...> generator expression.
+
+    One character at a time: chained replace() would escape the ">" that
+    the "$" escape itself introduces, leaving an unclosed $<1:...
+    """
+    return "".join(_GX.get(c, c) for c in s)
 
 
 def opt(f):
