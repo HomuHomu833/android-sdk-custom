@@ -67,6 +67,14 @@ sdk_tools {
                 "sload_f2fs",
             ],
         },
+        // Both take their fs_config from libcutils, which builds it (and has
+        // <private/fs_config.h> include <linux/capability.h>) for Linux only.
+        darwin: {
+            exclude_tools: [
+                "e2fsdroid",
+                "sload_f2fs",
+            ],
+        },
         // f2fs-tools leans on Linux-only headers throughout. e2fsdroid has
         // never been built for the BSDs here, so it stays out with them.
         bsd: {

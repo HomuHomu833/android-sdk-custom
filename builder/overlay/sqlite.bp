@@ -35,3 +35,15 @@ amend {
         },
     },
 }
+
+// sqlite-defaults asks for _FORTIFY_SOURCE=3 everywhere, but the BSDs build
+// without fortify (global.bp): NetBSD's swaps getcwd/read/readlink for
+// inline wrappers, and sqlite's syscall table takes their addresses.
+amend {
+    name: "sqlite-defaults",
+    target: {
+        bsd: {
+            exclude_cflags: ["-D_FORTIFY_SOURCE=3"],
+        },
+    },
+}
