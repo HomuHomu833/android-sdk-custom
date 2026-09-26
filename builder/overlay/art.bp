@@ -75,3 +75,18 @@ amend {
         bsd: "darwin",
     },
 }
+
+// zig's cc driver, which the Linux builds link with, rejects --exclude-libs.
+// ART passes it only to keep libziparchive's symbols out of what its gtests
+// export (b/264235288).
+amend {
+    name: "art_defaults",
+    target: {
+        linux_glibc: {
+            exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
+        },
+        linux_musl: {
+            exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
+        },
+    },
+}
