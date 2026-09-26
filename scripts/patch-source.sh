@@ -704,6 +704,16 @@ termux_func = '''static std::unique_ptr<usb_handle> find_usb_device_termux(const
     return usb;
 }'''
 
+# Older fastboot's filter_usb_device() has no cfg/alt_ifc out-parameters and
+# never sets an alternate interface.
+fdef = content.find('static int filter_usb_device(')
+if fdef != -1 and 'alt' not in content[fdef:content.find(')', fdef)]:
+    termux_func = termux_func.replace('int n, in, out, ifc, cfg, alt_ifc;', 'int n, in, out, ifc;')
+    termux_func = termux_func.replace('&in, &out, &ifc, &cfg, &alt_ifc) == 0) {', '&in, &out, &ifc) == 0) {')
+    a = termux_func.index('                // Skip the sysfs bConfigurationValue recheck')
+    b = termux_func.index('            } else {')
+    termux_func = termux_func[:a] + termux_func[b:]
+
 content = content[:start] + termux_func + '\n\n' + content[start:]
 content = content.replace(
     'find_usb_device("/sys/bus/usb/devices", callback)',
