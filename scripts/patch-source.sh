@@ -422,10 +422,12 @@ import re
 path = 'src/protobuf/src/google/protobuf/port_def.inc'
 with open(path) as f:
     content = f.read()
-old = re.compile(r'#if ABSL_HAVE_CPP_ATTRIBUTE\(clang::musttail\) && !defined\(__arm__\) &&.*?!defined\(__i386__\)\n', re.S)
-if old.search(content):
-    content = old.sub('#if ABSL_HAVE_CPP_ATTRIBUTE(clang::musttail) && (defined(__aarch64__) || \\\n'
-                      '    (defined(__x86_64__) && !defined(__arm64ec__)) || defined(_M_X64))\n', content, count=1)
+old = re.compile(r'#if (ABSL_HAVE_CPP_ATTRIBUTE|__has_cpp_attribute)\(clang::musttail\) && !defined\(__arm__\)(?:[^\n]*\\\n)*[^\n]*\n')
+m = old.search(content)
+if m:
+    content = (content[:m.start()] + '#if %s(clang::musttail) && (defined(__aarch64__) || \\\n'
+               '    (defined(__x86_64__) && !defined(__arm64ec__)) || defined(_M_X64))\n' % m.group(1)
+               + content[m.end():])
     with open(path, 'w') as f:
         f.write(content)
     print('protobuf musttail: limited to aarch64/x86_64')
