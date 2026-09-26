@@ -43,3 +43,15 @@ filegroup {
     name: "sdk_fastboot_usb_libusb",
     srcs: ["patches/sources/fastboot_usb_libusb.cpp"],
 }
+
+// libcutils compiles its own strlcpy() for glibc. build.sh force-includes
+// patches/misc/strl_compat.h there, which already supplies it (a static inline
+// below glibc 2.38, glibc's own from then on), and the two definitions clash.
+amend {
+    name: "libcutils",
+    target: {
+        linux_glibc: {
+            exclude_srcs: ["strlcpy.c"],
+        },
+    },
+}
