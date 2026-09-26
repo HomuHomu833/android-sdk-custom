@@ -451,6 +451,12 @@ sed -i 's/^#elif !defined(alloca)$/#elif defined(__FreeBSD__) || defined(__NetBS
 sed -i -E 's/^(  bool operator\(\)\((const prop_info& lhs|std::string_view lhs), [^)]*\)) \{/\1 const {/' \
   src/libbase/properties.cpp
 
+# e2fsprogs quotaio.h (older releases): quota_write_inode() is declared with an
+# enum quota_type but defined with unsigned int qtype_bits; hexagon's enums are
+# not unsigned int, so the two conflict. Declare it as upstream later did.
+sed -i 's/^errcode_t quota_write_inode(quota_ctx_t qctx, enum quota_type qtype);$/errcode_t quota_write_inode(quota_ctx_t qctx, unsigned int qtype_bits);/' \
+  src/e2fsprogs/lib/support/quotaio.h
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
