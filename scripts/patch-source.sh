@@ -430,6 +430,12 @@ PYEOF
 grep -q '^#include <vector>' src/core/fastboot/fastboot_driver_interface.h ||
   sed -i 's/^#include <string>$/#include <string>\n#include <vector>/' src/core/fastboot/fastboot_driver_interface.h
 
+# abseil stacktrace.cc (older releases): without <alloca.h> it declares its own
+# static alloca(), which the BSDs' <stdlib.h> already declares (NetBSD fails).
+# Take theirs; a no-op where the fallback is gone.
+sed -i 's/^#elif !defined(alloca)$/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n#include <stdlib.h>\n#define ABSL_INTERNAL_HAVE_ALLOCA 1\n#elif !defined(alloca)/' \
+  src/abseil-cpp/absl/debugging/stacktrace.cc
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
