@@ -151,7 +151,7 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    # reallocarray is API 29+ in bionic; host_compat.h shims it on lower APIs.
+    # host_compat.h fills in what bionic below the newest API level lacks.
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h -static"
     # r30's libc.a carries Rust's libstd, so rust_eh_personality arrives both
     # from there and from our own Rust shim in libtermuxadb.a. Both are the same

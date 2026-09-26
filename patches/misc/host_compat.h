@@ -342,27 +342,6 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 #endif
 #endif
 
-/* --- reallocarray() ---------------------------------------------------------
- * libselinux (selinux_internal.c) calls reallocarray(), which macOS/MinGW lack.
- * glibc, musl and all BSDs declare it themselves, so they're excluded to avoid a
- * clash. So is bionic: it only has it from API 29, and libselinux's linux_bionic
- * build (no HAVE_REALLOCARRAY there) defines its own for exactly that case. */
-#if !defined(__linux__) \
-    && !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
-#include <errno.h>
-#include <stdlib.h>
-
-static inline __attribute__((__unused__))
-void *reallocarray(void *ptr, size_t nmemb, size_t size) {
-  size_t bytes;
-  if (__builtin_mul_overflow(nmemb, size, &bytes)) {
-    errno = ENOMEM;
-    return NULL;
-  }
-  return realloc(ptr, bytes);
-}
-#endif
-
 /* --- bionic / Android NDK fallbacks -----------------------------------------
  * Keyed on __BIONIC__: the bionic build undefines __ANDROID__, as Soong's
  * linux_bionic toolchains do. Everything below links from the NDK's static
