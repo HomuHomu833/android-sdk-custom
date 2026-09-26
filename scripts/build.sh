@@ -86,6 +86,7 @@ fetch_unpack() {
 CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
 SOONG_VARS=()          # --var flags for the builder's select()s
 EXE_LDFLAGS_EXTRA=""   # appended to CMAKE_EXE_LINKER_FLAGS only (not shared libs)
+CROSS_ASMFLAGS=""      # CMAKE_ASM_FLAGS (the C flags force-include C headers)
 case "$PLATFORM" in
   linux)
     TC=/opt/zig-as-llvm
@@ -113,16 +114,19 @@ case "$PLATFORM" in
         CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE=1 -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
-    # Thumb is converted as Soong's arm but has no Neon and takes no assembly.
-    # (The CPUs Soong lacks altogether are handled in builder/overlay/global.bp.)
+    # Thumb is converted as Soong's arm but has no Neon and takes no assembly;
+    # the assembler needs the same defines, or BoringSSL's ARM-mode .S files
+    # assemble as Thumb. (The CPUs Soong lacks altogether are handled in
+    # builder/overlay/global.bp.)
     case "$TARGET" in
-      thumb-*|thumbeb-*) CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
+      thumb-*|thumbeb-*)
+        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
+        CROSS_ASMFLAGS="-DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
     esac
     # mips64 n64 and powerpc64 pick asm-generic/int-l64.h, typing __s64/__u64 as
-    # 'long' and clashing with e2fsprogs; glibc only. See
-    # patches/misc/force-int-ll64.h.
+    # 'long' and clashing with e2fsprogs. See patches/misc/force-int-ll64.h.
     case "$TARGET" in
-      mips64-*gnuabi64|mips64el-*gnuabi64|powerpc64-*-gnu*|powerpc64le-*-gnu*)
+      mips64-*abi64|mips64el-*abi64|powerpc64-*|powerpc64le-*)
         CROSS_CFLAGS="$CROSS_CFLAGS -include $ROOTDIR/patches/misc/force-int-ll64.h" ;;
     esac
     # x32: force local-exec TLS (lld can't relax R_X86_64_GOTTPOFF here; static so it fits).
@@ -212,7 +216,9 @@ case "$PLATFORM" in
     esac
     # Per-arch SIMD/TLS, same as linux.
     case "$TARGET" in
-      thumb-*|thumbeb-*) CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
+      thumb-*|thumbeb-*)
+        CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
+        CROSS_ASMFLAGS="-DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
     esac
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
@@ -435,6 +441,7 @@ cmake -GNinja \
   -DCMAKE_STRIP="$CROSS_STRIP" \
   -DCMAKE_C_FLAGS="$CROSS_CFLAGS" \
   -DCMAKE_CXX_FLAGS="$CROSS_CFLAGS" \
+  -DCMAKE_ASM_FLAGS="$CROSS_ASMFLAGS" \
   -DCMAKE_EXE_LINKER_FLAGS="$CROSS_LDFLAGS $EXE_LDFLAGS_EXTRA" \
   -DCMAKE_SHARED_LINKER_FLAGS="$CROSS_LDFLAGS" \
   -DPROTOC="$PROTOC" \
