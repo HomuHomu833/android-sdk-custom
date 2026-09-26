@@ -1,0 +1,10 @@
+// system/libbase
+
+// errors_unix.cpp (SystemErrorCodeToString) is listed for linux and darwin
+// only; the BSDs need it as much.
+amend {
+    name: "libbase_defaults",
+    target_alias: {
+        bsd: "linux",
+    },
+}

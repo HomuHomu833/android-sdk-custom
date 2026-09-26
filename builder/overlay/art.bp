@@ -65,3 +65,13 @@ amend {
         },
     },
 }
+
+// palette_fake.cc is listed for host_linux, darwin and windows only. The BSDs
+// take darwin's variant: the static one for hosts that don't dlopen the system
+// palette library.
+amend {
+    name: "libartpalette",
+    target_alias: {
+        bsd: "darwin",
+    },
+}
