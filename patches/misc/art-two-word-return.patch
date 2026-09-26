@@ -3,7 +3,8 @@ art: pick TwoWordReturn by pointer width, not by CPU.
 instruction_set.h only knows the five CPUs ART runs on and #errors on the
 rest; the tools here (dexdump, veridex) never call the entrypoints it is
 for, but the header still has to compile on every host CPU. The choice is
-purely about the width of uintptr_t, which also gets x32 right.
+purely about the width of uintptr_t: __SIZEOF_POINTER__, not __LP64__,
+which 64-bit Windows (LLP64) leaves undefined. That also gets x32 right.
 
 --- a/src/art/libartbase/arch/instruction_set.h
 +++ b/src/art/libartbase/arch/instruction_set.h
@@ -12,7 +13,7 @@ purely about the width of uintptr_t, which also gets x32 right.
  //            are held when using!
  
 -#if defined(__i386__) || defined(__arm__)
-+#if !defined(__LP64__)
++#if __SIZEOF_POINTER__ == 4
  using TwoWordReturn = uint64_t;
  
  // Encodes method_ptr==nullptr and code_ptr==nullptr
