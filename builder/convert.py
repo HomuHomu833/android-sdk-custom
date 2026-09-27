@@ -36,6 +36,24 @@ EXTERNAL_CFLAGS = [
 C_STD, CPP_STD = "gnu23", "gnu++20"
 EXPERIMENTAL_C_STD, EXPERIMENTAL_CPP_STD = "gnu2y", "gnu++2b"
 
+
+def soong_std_versions(tree):
+    """The release's own C/C++ standard defaults, from build/soong's
+    cc/config/global.go (CStdVersion and friends); ours where it has none."""
+    out = {"CStdVersion": C_STD, "CppStdVersion": CPP_STD,
+           "ExperimentalCStdVersion": EXPERIMENTAL_C_STD,
+           "ExperimentalCppStdVersion": EXPERIMENTAL_CPP_STD}
+    soong = tree.to_local("build/soong")
+    path = soong and os.path.join(soong, "cc", "config", "global.go")
+    if path and os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        for k in out:
+            m = re.search(r"\b%s\s*=\s*\"([^\"]+)\"" % k, src)
+            if m:
+                out[k] = m.group(1)
+    return out
+
 # host_ldlibs each host toolchain accepts (cc/config/*_host.go
 # AvailableLibraries); anything else is dropped, as Soong rejects it.
 AVAILABLE_LDLIBS = {
@@ -114,6 +132,7 @@ class Converter:
         self.order = []
         self._stack = []
         self.farm_roots = set()         # aosp project paths the build touches
+        self.stds = soong_std_versions(tree)
         if os_type.windows:
             self.ldlib_family = "windows"
         elif os_type.name == "darwin":
@@ -470,8 +489,9 @@ class Converter:
         t.conlyflags = _clean_flags(p.get("conlyflags", []), drop.get("conlyflags"))
         t.asflags = _clean_flags(p.get("asflags", []), drop.get("asflags"))
         t.cppflags = (["-frtti"] if p.get("rtti") else ["-fno-rtti"]) + t.cppflags
-        t.c_std = self._std(p.get("c_std"), C_STD, EXPERIMENTAL_C_STD)
-        t.cpp_std = self._std(p.get("cpp_std"), CPP_STD, EXPERIMENTAL_CPP_STD)
+        st = self.stds
+        t.c_std = self._std(p.get("c_std"), st["CStdVersion"], st["ExperimentalCStdVersion"])
+        t.cpp_std = self._std(p.get("cpp_std"), st["CppStdVersion"], st["ExperimentalCppStdVersion"])
         if p.get("gnu_extensions") is False:
             t.c_std = t.c_std.replace("gnu", "c")
             t.cpp_std = t.cpp_std.replace("gnu", "c")
