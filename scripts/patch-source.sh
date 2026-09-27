@@ -42,14 +42,12 @@ apply patches/misc/upb-aarch64-windows-no-asm.patch
 # BoringSSL: CPU detection for every target CPU, and getrandom's syscall number
 # from <sys/syscall.h> (x32 trips upstream's expected-number table).
 apply patches/misc/boringssl-target-cpus.patch
-if [ -f src/boringssl/src/crypto/rand/getrandom_fillin.h ]; then
-  apply patches/misc/boringssl-getrandom-syscall.patch
-else
-  # older BoringSSL keeps the header in crypto/rand_extra
-  sed 's#/crypto/rand/#/crypto/rand_extra/#' patches/misc/boringssl-getrandom-syscall.patch > "$ROOTDIR/.getrandom.patch"
-  apply "$ROOTDIR/.getrandom.patch"
-  rm -f "$ROOTDIR/.getrandom.patch"
-fi
+# The header has moved: crypto/rand (newest), crypto/rand_extra and
+# crypto/fipsmodule/rand (older); patch it wherever this release has it.
+fillin="$(cd src/boringssl/src && ls crypto/rand/getrandom_fillin.h crypto/rand_extra/getrandom_fillin.h crypto/fipsmodule/rand/getrandom_fillin.h 2>/dev/null | head -n1)"
+sed "s#/crypto/rand/getrandom_fillin.h#/${fillin}#" patches/misc/boringssl-getrandom-syscall.patch > "$ROOTDIR/.getrandom.patch"
+apply "$ROOTDIR/.getrandom.patch"
+rm -f "$ROOTDIR/.getrandom.patch"
 
 # ART: TwoWordReturn by pointer width, so instruction_set.h compiles on any CPU.
 apply patches/misc/art-two-word-return.patch
