@@ -146,6 +146,9 @@ cc_defaults {
         // clang 18 under osxcross still errors on it (androidfw's
         // LocaleDataLookup.h).
         "-Wno-invalid-constexpr",
+        // Newer clang errors by default when a member template's parameter
+        // shadows the enclosing one; older ART's stl_util.h does that.
+        "-Wno-strict-primary-template-shadow",
     ],
     target: {
         // Hardening, as linuxCflags/linuxLdflags and linuxBionicCflags have
