@@ -51,10 +51,10 @@ void usb_init() {
 // release the claimed WinUSB interfaces, otherwise re-claiming them on the next
 // adb start-server is unreliable.
 void usb_cleanup() {
+#if defined(SDK_ADB_HAS_CLOSE_USB_DEVICES)
     if (is_libusb_enabled()) {
         VLOG(USB) << "Windows libusb cleanup";
-#if defined(SDK_ADB_HAS_CLOSE_USB_DEVICES)
         close_usb_devices();
-#endif
     }
+#endif
 }
