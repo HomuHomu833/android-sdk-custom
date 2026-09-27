@@ -468,6 +468,13 @@ fi
 sed -i 's/^#ifndef bool$/#if !defined(bool) \&\& (!defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L) \&\& !defined(__cplusplus)/' \
   src/f2fs-tools/include/f2fs_fs.h
 
+# ART mem_map.h (older releases): only aarch64/riscv/Apple get the low-4G
+# allocator, other 64-bit CPUs #error (loongarch64, mips64, ppc64, s390x).
+# Newer ART uses it on every 64-bit host; do so for all but x86_64, which
+# keeps its MAP_32BIT path.
+sed -i 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
+  src/art/libartbase/base/mem_map.h
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
