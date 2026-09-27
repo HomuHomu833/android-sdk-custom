@@ -458,6 +458,13 @@ sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APP
 sed -i 's|#include <sys/user.h>|#if !defined(__NetBSD__)\n#include <sys/user.h>\n#endif|' \
   "src/libbase/cmsg.cpp"
 
+# googletest gtest-port.cc (older releases): FreeBSD aarch64's <sys/user.h>
+# clashes with clang's ptrauth_key. Skip it there and report no thread count,
+# as later googletest does.
+sed -i -e 's/^#  include <sys\/user.h>$/#  if !defined(__FreeBSD__) || !defined(__aarch64__)\n#   include <sys\/user.h>\n#  endif/' \
+  -e 's/^#elif GTEST_OS_DRAGONFLY || GTEST_OS_FREEBSD || GTEST_OS_GNU_KFREEBSD || \\$/#elif GTEST_OS_FREEBSD \&\& defined(__aarch64__)\nsize_t GetThreadCount() { return 0; }\n&/' \
+  src/googletest/googletest/src/gtest-port.cc
+
 # liblog logger_write.cpp: same getprogname() fallback issue.
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   "src/logging/liblog/logger_write.cpp"
