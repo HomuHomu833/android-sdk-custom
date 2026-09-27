@@ -544,7 +544,8 @@ sed -i 's/^#ifndef bool$/#if !defined(bool) \&\& (!defined(__STDC_VERSION__) || 
 # allocator, other 64-bit CPUs #error (loongarch64, mips64, ppc64, s390x).
 # Newer ART uses it on every 64-bit host; do so for all but x86_64, which
 # keeps its MAP_32BIT path.
-sed -i 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
+sed -i -e 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
+  -e 's/(defined(__aarch64__) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
   src/art/libartbase/base/mem_map.h
 
 # adb sysdeps/env.cpp (platform-tools-35.0.1 and earlier): calls getenv()
