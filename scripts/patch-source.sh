@@ -587,11 +587,19 @@ sed -i -e '/^typedef HRESULT(WINAPI\* SetThreadDescription)(HANDLE hThread, PCWS
   -e 's/reinterpret_cast<SetThreadDescription>(/reinterpret_cast<HRESULT(WINAPI *)(HANDLE, PCWSTR)>(/' \
   src/adb/sysdeps_win32.cpp
 
-# Older libcutils defines its own gettid() unless glibc is 2.32+; glibc has had
-# one since 2.30, so on 2.30/2.31 the two clash.
-[ -f src/core/libcutils/threads.cpp ] && \
+# Older libcutils declares and defines its own gettid() unless glibc is 2.32+.
+# glibc has had one since 2.30, and zig's glibc headers declare it (noexcept)
+# whatever the target version. So leave it to glibc from 2.30, and below that
+# match the header's declaration; the definition still supplies the symbol.
+if [ -f src/core/libcutils/threads.cpp ]; then
   sed -i 's/defined(__GLIBC__) && __GLIBC_MINOR__ >= 32/defined(__GLIBC__) \&\& __GLIBC_MINOR__ >= 30/' \
     src/core/libcutils/threads.cpp
+  sed -i 's/^pid_t gettid() {$/pid_t gettid()\n#if defined(__GLIBC__)\n__THROW\n#endif\n{/' \
+    src/core/libcutils/threads.cpp
+  sed -i -e 's/__GLIBC__ >= 2 && __GLIBC_MINOR__ < 32/__GLIBC__ >= 2 \&\& __GLIBC_MINOR__ < 30/' \
+    -e 's/^extern pid_t gettid();$/#if defined(__GLIBC__)\nextern pid_t gettid() __THROW;\n#else\nextern pid_t gettid();\n#endif/' \
+    src/core/libcutils/include/cutils/threads.h
+fi
 
 # Older libziparchive builds a span from an ssize_t size, which narrows on
 # 32-bit hosts.
