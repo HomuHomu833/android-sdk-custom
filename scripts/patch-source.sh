@@ -159,7 +159,9 @@ sed -i '/^\(bool\|int\) is_adb_interface(int usb_class/i #endif  // native USB p
 # ...and the matching native-transport registration helpers in transport.cpp.
 sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
   src/adb/transport.cpp
-sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^#endif/ { /^#endif/i #endif  // native USB path
+# Close it right after unregister_usb_transport(): older adb keeps more host
+# code (atransport's reverse config) before the enclosing #endif.
+sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^}/ { /^}/a #endif  // native USB path
 }' src/adb/transport.cpp
 
 # ADB Windows: make usb_libusb_hotplug.cpp's timeval time_t->long cast explicit.
