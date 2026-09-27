@@ -135,7 +135,10 @@ void fill_ifc_info(const libusb_device_descriptor& dd, const libusb_interface_de
 
 }  // namespace
 
-std::unique_ptr<UsbTransport> usb_open(ifc_match_func callback, uint32_t timeout_ms) {
+// Older fastboot's usb.h returns a raw UsbTransport*; take whichever it declares.
+using UsbOpenResult = decltype(usb_open(nullptr, 0));
+
+UsbOpenResult usb_open(ifc_match_func callback, uint32_t timeout_ms) {
     libusb_context* ctx = nullptr;
     if (libusb_init(&ctx) != 0) {
         LOG(ERROR) << "fastboot: libusb_init failed";
@@ -196,5 +199,5 @@ std::unique_ptr<UsbTransport> usb_open(ifc_match_func callback, uint32_t timeout
 
     libusb_free_device_list(devs, 1);
     if (!result) libusb_exit(ctx);  // the transport owns ctx on success
-    return result;
+    return UsbOpenResult(result.release());
 }
