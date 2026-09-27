@@ -583,6 +583,17 @@ sed -i -e '/^typedef HRESULT(WINAPI\* SetThreadDescription)(HANDLE hThread, PCWS
   -e 's/reinterpret_cast<SetThreadDescription>(/reinterpret_cast<HRESULT(WINAPI *)(HANDLE, PCWSTR)>(/' \
   src/adb/sysdeps_win32.cpp
 
+# Older libcutils defines its own gettid() unless glibc is 2.32+; glibc has had
+# one since 2.30, so on 2.30/2.31 the two clash.
+[ -f src/core/libcutils/threads.cpp ] && \
+  sed -i 's/defined(__GLIBC__) && __GLIBC_MINOR__ >= 32/defined(__GLIBC__) \&\& __GLIBC_MINOR__ >= 30/' \
+    src/core/libcutils/threads.cpp
+
+# Older libziparchive builds a span from an ssize_t size, which narrows on
+# 32-bit hosts.
+sed -i 's/return {buf.first, ssize_t(buf.second)};/return {buf.first, size_t(buf.second)};/' \
+  src/libziparchive/zip_archive.cc
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
