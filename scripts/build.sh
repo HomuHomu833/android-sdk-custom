@@ -207,7 +207,7 @@ case "$PLATFORM" in
     esac
     # host_compat.h supplies glibc/bionic-isms BSDs omit. XML_DEV_URANDOM: expat
     # can't link-test arc4random_buf under the zig BSD sysroots, so use /dev/urandom.
-    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat -DXML_DEV_URANDOM"
+    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat -DXML_DEV_URANDOM -Dfseeko64=fseeko -Dftello64=ftello"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     # OpenBSD's zig sysroot lacks <dev/usb/*>, so libusb's openbsd_usb.c needs the
     # vendored usb.h -- scoped, or it would shadow FreeBSD's/NetBSD's real one.
