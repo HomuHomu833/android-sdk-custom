@@ -106,7 +106,7 @@ case "$PLATFORM" in
       *musl*)
         # host_compat.h supplies GNU/bionic-isms musl omits (e.g. TEMP_FAILURE_RETRY);
         # patches/compat/musl has the <sys/cdefs.h> musl doesn't ship.
-        CROSS_CFLAGS="-Wno-error=date-time -isystem $ROOTDIR/patches/compat/musl -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
+        CROSS_CFLAGS="-Wno-error=date-time -isystem $ROOTDIR/patches/compat/musl -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -Dfseeko64=fseeko -Dftello64=ftello -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
         # strlcpy/strlcat: glibc declares them only from 2.38; force-include a shim
