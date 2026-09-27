@@ -566,6 +566,13 @@ for f in src/core/fs_mgr/liblp/super_layout_builder.cpp src/fs_mgr/liblp/super_l
     sed -i '0,/^#include <liblp\/super_layout_builder.h>$/s//#include <liblp\/super_layout_builder.h>\n\n#include <algorithm>/' "$f"
 done
 
+# adb sysdeps_win32.cpp (platform-tools-34 and earlier): a typedef named
+# SetThreadDescription clashes with the function MinGW's headers declare.
+# Cast to the pointer type inline instead, as later releases do.
+sed -i -e '/^typedef HRESULT(WINAPI\* SetThreadDescription)(HANDLE hThread, PCWSTR lpThreadDescription);$/d' \
+  -e 's/reinterpret_cast<SetThreadDescription>(/reinterpret_cast<HRESULT(WINAPI *)(HANDLE, PCWSTR)>(/' \
+  src/adb/sysdeps_win32.cpp
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
