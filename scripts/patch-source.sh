@@ -627,6 +627,11 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
+# Older libutils LruCache.h derives its functors from std::unary_function,
+# which C++17 removed and newer libc++ drops; nothing uses the base.
+sed -i 's/ : public std::unary_function<KeyedEntry\*, hash_t> {$/ {/' \
+  src/core/libutils/include/utils/LruCache.h
+
 # Older headers that use std::function without <functional> (newer libc++
 # no longer pulls it in transitively). Add it ahead of their first #include <>.
 for f in src/adb/adb_mdns.h src/core/fastboot/fastboot.h \
