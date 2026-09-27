@@ -627,6 +627,11 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
+# Older adb's Windows adb_iovec has a size_t iov_len, but it has to match
+# WSABUF's 32-bit len (sysdeps_win32.cpp static_asserts it; 64-bit Windows
+# fails). Later adb made it unsigned int.
+sed -i 's/^    size_t iov_len;$/    unsigned int iov_len;/' src/adb/sysdeps/uio.h
+
 # Older e2fsprogs ships a mingw unistd.h with its own getuid/geteuid/getgid/
 # getegid stubs; host_compat.h already provides them on Windows.
 [ -f src/e2fsprogs/include/mingw/unistd.h ] && \
