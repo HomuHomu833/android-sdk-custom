@@ -492,6 +492,13 @@ sed -i 's/std::vector<const android::StringPiece>&& args/std::vector<android::St
 # <fp.h>. Newer libpng dropped the branch; stop macOS from taking it.
 sed -i 's/    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)$/    defined(THINK_C) || defined(__SC__)/' src/libpng/pngpriv.h
 
+# ART globals.h (platform-tools-35.0.1): GetPageSizeSlow() calls sysconf()
+# unconditionally, which Windows lacks. Later releases fall back to 4096.
+f=src/art/libartbase/base/globals.h
+if [ -f "$f" ] && ! grep -q 'static const size_t page_size = 4096;' "$f"; then
+  sed -i 's/^  static const size_t page_size = sysconf(_SC_PAGE_SIZE);$/#ifdef _WIN32\n  static const size_t page_size = 4096;\n#else\n  static const size_t page_size = sysconf(_SC_PAGE_SIZE);\n#endif/' "$f"
+fi
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
