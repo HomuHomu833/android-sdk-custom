@@ -481,6 +481,12 @@ if [ -f src/adb/sysdeps/env.cpp ] && ! grep -q '^#include <stdlib.h>' src/adb/sy
   sed -i '0,/^#include "sysdeps\/env.h"$/s//#include <stdlib.h>\n\n#include "sysdeps\/env.h"/' src/adb/sysdeps/env.cpp
 fi
 
+# aapt2 util/Files (platform-tools-35.0.1 and earlier): BuildPath() takes a
+# std::vector of const StringPiece, which newer libc++ rejects (no allocator
+# for const types). Upstream later changed the signature; drop the const.
+sed -i 's/std::vector<const android::StringPiece>&& args/std::vector<android::StringPiece>\&\& args/; s/std::vector<const StringPiece>&& args/std::vector<StringPiece>\&\& args/' \
+  src/base/tools/aapt2/util/Files.h src/base/tools/aapt2/util/Files.cpp
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
