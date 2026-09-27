@@ -487,6 +487,11 @@ fi
 sed -i 's/std::vector<const android::StringPiece>&& args/std::vector<android::StringPiece>\&\& args/; s/std::vector<const StringPiece>&& args/std::vector<StringPiece>\&\& args/' \
   src/base/tools/aapt2/util/Files.h src/base/tools/aapt2/util/Files.cpp
 
+# libpng pngpriv.h (older releases): takes classic Mac OS's <fp.h> whenever
+# TARGET_OS_MAC is defined, which modern macOS SDKs define without shipping
+# <fp.h>. Newer libpng dropped the branch; stop macOS from taking it.
+sed -i 's/    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)$/    defined(THINK_C) || defined(__SC__)/' src/libpng/pngpriv.h
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
