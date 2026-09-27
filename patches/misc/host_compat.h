@@ -466,4 +466,19 @@ static inline gid_t getegid(void) { return 0; }
 #endif
 #endif
 
+/* --- Windows C++: headers older AOSP gets transitively ----------------------
+ * llvm-mingw's libc++ has dropped most transitive includes, and older AOSP
+ * code uses std::sort, std::back_inserter, std::vector, std::unique_ptr ...
+ * without including their headers. Provide them up front for C++ on Windows,
+ * before any of adb's function-renaming macros exist. */
+#if defined(_WIN32) && defined(__cplusplus)
+#include <algorithm>
+#include <functional>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+#endif
+
 #endif /* HOST_COMPAT_H */
