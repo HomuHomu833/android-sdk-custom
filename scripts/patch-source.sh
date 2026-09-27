@@ -51,6 +51,12 @@ if [ ! -f src/boringssl/src/include/openssl/target.h ]; then
     -e 's/^#elif defined\(__MIPSEL__\) && (!?)defined\(__LP64__\)$/#elif (defined(__MIPSEL__) || defined(__MIPSEB__)) \&\& \1defined(__LP64__)/' \
     -e 's/^#error "Unknown target CPU"$/#if defined(__loongarch64) || defined(__s390x__) || defined(__powerpc64__)\n#define OPENSSL_64_BIT\n#elif defined(__powerpc__) || defined(__hexagon__)\n#define OPENSSL_32_BIT\n#else\n#error "Unknown target CPU"\n#endif/' \
     src/boringssl/src/include/openssl/base.h
+  # Some also have a ppc64le branch keyed on _LITTLE_ENDIAN, which FreeBSD
+  # defines on big-endian too, and whose CPU detection calls Linux's
+  # getauxval(). No Android.bp builds its assembly; let ppc64 fall through to
+  # the plain 64-bit entry above.
+  sed -i '/^#elif (defined(__PPC64__) || defined(__powerpc64__)) && defined(_LITTLE_ENDIAN)$/,/^#define OPENSSL_PPC64LE$/d' \
+    src/boringssl/src/include/openssl/base.h
   # arm_arch.h (ARMV7_NEON and friends, which the C CPU detection uses) is
   # guarded on the little-endian macros there too.
   sed -i 's/^#if defined(__ARMEL__) || defined(_M_ARM) || defined(__AARCH64EL__) ||/#if defined(__ARMEL__) || defined(__ARMEB__) || defined(_M_ARM) || defined(__AARCH64EL__) || defined(__AARCH64EB__) ||/' \
