@@ -627,6 +627,15 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
+# Older ART safe_copy.cc takes PAGE_SIZE from <sys/user.h>, which not every
+# libc/CPU defines (musl armeb, glibc loongarch64). Later ART uses its own
+# kPageSize from globals.h; do the same.
+if grep -q 'PAGE_SIZE' src/art/libartbase/base/safe_copy.cc; then
+  sed -i -e 's/\bPAGE_SIZE\b/kPageSize/g' \
+    -e 's/^#include "bit_utils.h"$/#include "bit_utils.h"\n#include "globals.h"/' \
+    src/art/libartbase/base/safe_copy.cc
+fi
+
 # Older adb's Windows adb_iovec has a size_t iov_len, but it has to match
 # WSABUF's 32-bit len (sysdeps_win32.cpp static_asserts it; 64-bit Windows
 # fails). Later adb made it unsigned int.
