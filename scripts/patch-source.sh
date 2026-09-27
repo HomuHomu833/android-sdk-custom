@@ -518,6 +518,14 @@ if [ -f "$f" ] && ! grep -q 'static const size_t page_size = 4096;' "$f"; then
   sed -i 's/^  static const size_t page_size = sysconf(_SC_PAGE_SIZE);$/#ifdef _WIN32\n  static const size_t page_size = 4096;\n#else\n  static const size_t page_size = sysconf(_SC_PAGE_SIZE);\n#endif/' "$f"
 fi
 
+# ART stl_util.h uses std::vector and std::unique_ptr without including them,
+# relying on what the including file pulled in first; on older releases
+# fd_file.cc reaches it without them under llvm-mingw's libc++.
+f=src/art/libartbase/base/stl_util.h
+if [ -f "$f" ] && ! grep -q '^#include <vector>' "$f"; then
+  sed -i '0,/^#include <sstream>$/s//#include <memory>\n#include <sstream>\n#include <vector>/' "$f"
+fi
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
