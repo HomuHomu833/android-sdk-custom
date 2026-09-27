@@ -475,6 +475,12 @@ sed -i 's/^#ifndef bool$/#if !defined(bool) \&\& (!defined(__STDC_VERSION__) || 
 sed -i 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
   src/art/libartbase/base/mem_map.h
 
+# adb sysdeps/env.cpp (platform-tools-35.0.1 and earlier): calls getenv()
+# without <stdlib.h>, which musl's headers do not pull in. Upstream added it.
+if [ -f src/adb/sysdeps/env.cpp ] && ! grep -q '^#include <stdlib.h>' src/adb/sysdeps/env.cpp; then
+  sed -i '0,/^#include "sysdeps\/env.h"$/s//#include <stdlib.h>\n\n#include "sysdeps\/env.h"/' src/adb/sysdeps/env.cpp
+fi
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
