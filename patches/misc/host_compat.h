@@ -473,10 +473,17 @@ static inline gid_t getegid(void) { return 0; }
  * before any of adb's function-renaming macros exist. */
 #if defined(_WIN32) && defined(__cplusplus)
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <set>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #endif
