@@ -627,6 +627,12 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
+# Older e2fsprogs ships a mingw unistd.h with its own getuid/geteuid/getgid/
+# getegid stubs; host_compat.h already provides them on Windows.
+[ -f src/e2fsprogs/include/mingw/unistd.h ] && \
+  sed -i '/^__inline [_a-z]* get[e]\{0,1\}[ug]id(void){return [01];}$/d' \
+    src/e2fsprogs/include/mingw/unistd.h
+
 # Older libutils LruCache.h derives its functors from std::unary_function,
 # which C++17 removed and newer libc++ drops; nothing uses the base.
 sed -i 's/ : public std::unary_function<KeyedEntry\*, hash_t> {$/ {/' \
