@@ -42,6 +42,16 @@ apply patches/misc/upb-aarch64-windows-no-asm.patch
 # BoringSSL: CPU detection for every target CPU, and getrandom's syscall number
 # from <sys/syscall.h> (x32 trips upstream's expected-number table).
 apply patches/misc/boringssl-target-cpus.patch
+# Older releases keep that CPU list in base.h; make the same changes there.
+if [ ! -f src/boringssl/src/include/openssl/target.h ]; then
+  sed -i -E \
+    -e 's/^#if defined\(__x86_64\) \|\| defined\(_M_AMD64\) \|\| defined\(_M_X64\)$/#if defined(__arm64ec__) || defined(_M_ARM64EC)\n#define OPENSSL_64_BIT\n#define OPENSSL_AARCH64\n#elif defined(__x86_64) || defined(_M_AMD64) || defined(_M_X64)/' \
+    -e 's/^#elif defined\(__AARCH64EL__\) \|\| defined\(_M_ARM64\)$/#elif defined(__AARCH64EL__) || defined(__AARCH64EB__) || defined(_M_ARM64)/' \
+    -e 's/^#elif defined\(__ARMEL__\) \|\| defined\(_M_ARM\)$/#elif defined(__ARMEL__) || defined(__ARMEB__) || defined(_M_ARM)/' \
+    -e 's/^#elif defined\(__MIPSEL__\) && (!?)defined\(__LP64__\)$/#elif (defined(__MIPSEL__) || defined(__MIPSEB__)) \&\& \1defined(__LP64__)/' \
+    -e 's/^#error "Unknown target CPU"$/#if defined(__loongarch64) || defined(__s390x__) || defined(__powerpc64__)\n#define OPENSSL_64_BIT\n#elif defined(__powerpc__) || defined(__hexagon__)\n#define OPENSSL_32_BIT\n#else\n#error "Unknown target CPU"\n#endif/' \
+    src/boringssl/src/include/openssl/base.h
+fi
 # The header has moved: crypto/rand (newest), crypto/rand_extra and
 # crypto/fipsmodule/rand (older); patch it wherever this release has it.
 fillin="$(cd src/boringssl/src && ls crypto/rand/getrandom_fillin.h crypto/rand_extra/getrandom_fillin.h crypto/fipsmodule/rand/getrandom_fillin.h 2>/dev/null | head -n1)"
