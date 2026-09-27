@@ -472,6 +472,11 @@ static inline gid_t getegid(void) { return 0; }
  * without including their headers. Provide them up front for C++ on Windows,
  * before any of adb's function-renaming macros exist. */
 #if defined(_WIN32) && defined(__cplusplus)
+/* These pull in <time.h> first, and MinGW only declares localtime_r/gmtime_r
+ * when this is set by then (aapt's ZipEntry.cpp and others rely on them). */
+#ifndef _POSIX_THREAD_SAFE_FUNCTIONS
+#define _POSIX_THREAD_SAFE_FUNCTIONS 1
+#endif
 #include <algorithm>
 #include <atomic>
 #include <functional>
