@@ -535,6 +535,11 @@ if [ -f "$f" ] && ! grep -q '^#include <print>' "$f"; then
   sed -i 's|^#include <android-base/utf8.h>$|#include <android-base/utf8.h>\n#include <android-base/logging.h>\n#if __has_include(<print>)\n#include <print>\n#endif|' "$f"
 fi
 
+# androidfw LoadedArsc.h (platform-tools-34.x): overlayable_infos_ is a vector
+# of const pairs, which newer libc++ rejects; later releases dropped the const.
+sed -i 's/std::vector<const std::pair<OverlayableInfo, std::unordered_set<uint32_t>>> overlayable_infos_;/std::vector<std::pair<OverlayableInfo, std::unordered_set<uint32_t>>> overlayable_infos_;/' \
+  src/base/libs/androidfw/include/androidfw/LoadedArsc.h
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
