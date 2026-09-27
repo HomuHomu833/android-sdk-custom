@@ -366,9 +366,28 @@ new3 = """#elif defined(__NetBSD__)
     PLOG(WARNING) << "Unable to set the name of another thread to '" << thread_name << "'";
   }
 #endif"""
+# Older ART (platform-tools-35.0.1 and before) only names the current thread.
+old3b = """#else  // __APPLE__
+  pthread_setname_np(thread_name);
+#endif"""
+new3b = """#elif defined(__NetBSD__)
+  {
+    char buf_netbsd[16];
+    strncpy(buf_netbsd, s, sizeof(buf_netbsd) - 1);
+    buf_netbsd[sizeof(buf_netbsd) - 1] = '\\0';
+    pthread_setname_np(pthread_self(), "%s", buf_netbsd);
+  }
+#elif defined(__OpenBSD__)
+  (void)s;
+#else  // __APPLE__
+  pthread_setname_np(thread_name);
+#endif"""
 if old3 in content:
     content = content.replace(old3, new3, 1)
     print('SetThreadName BSD elif patch applied')
+elif old3b in content:
+    content = content.replace(old3b, new3b, 1)
+    print('SetThreadName BSD elif patch applied (older ART)')
 else:
     print('SetThreadName BSD elif patch: pattern not found (already applied?)')
 
