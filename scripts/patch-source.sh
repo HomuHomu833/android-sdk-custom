@@ -457,6 +457,14 @@ sed -i -E 's/^(  bool operator\(\)\((const prop_info& lhs|std::string_view lhs),
 sed -i 's/^errcode_t quota_write_inode(quota_ctx_t qctx, enum quota_type qtype);$/errcode_t quota_write_inode(quota_ctx_t qctx, unsigned int qtype_bits);/' \
   src/e2fsprogs/lib/support/quotaio.h
 
+# fmt 10 (older releases): newer clang rejects its consteval format-string
+# check ("not valid in a constant expression" in format-inl.h). Turn the
+# compile-time check off; formatting itself is unchanged.
+if grep -q '^#define FMT_VERSION 10' src/fmtlib/include/fmt/core.h 2>/dev/null; then
+  grep -q '^#define FMT_CONSTEVAL$' src/fmtlib/include/fmt/core.h ||
+    sed -i 's/^#ifndef FMT_CONSTEVAL$/#define FMT_CONSTEVAL\n#ifndef FMT_CONSTEVAL/' src/fmtlib/include/fmt/core.h
+fi
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
