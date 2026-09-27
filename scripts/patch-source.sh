@@ -446,8 +446,15 @@ sed -i 's/^#if defined(__APPLE__)$/#if defined(__APPLE__) || defined(__FreeBSD__
   "src/libbase/include/android-base/off64_t.h"
 
 # libbase file.cpp: GetExecutablePath() has no BSD branch.
-sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#elif defined(__EMSCRIPTEN__)/' \
-  "src/libbase/file.cpp"
+# (Older releases have no __EMSCRIPTEN__ branch to put it before; use the
+# function's final #else there.)
+if grep -q '^#elif defined(__EMSCRIPTEN__)' src/libbase/file.cpp; then
+  sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#elif defined(__EMSCRIPTEN__)/' \
+    "src/libbase/file.cpp"
+else
+  sed -i '/^std::string GetExecutablePath() {/,/^}/ s/^#else$/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#else/' \
+    "src/libbase/file.cpp"
+fi
 
 # libbase logging.cpp: the getprogname() fallback uses glibc-only
 # program_invocation_short_name; BSDs have native getprogname().
