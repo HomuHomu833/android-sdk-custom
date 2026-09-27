@@ -121,8 +121,15 @@ sed -i '/^bool is_libusb_enabled() {/,/^}/ s/#if defined(__APPLE__)/#if defined(
 
 # ADB Windows+BSD: exclude the legacy native BlockingConnection USB path (dead,
 # won't link), keeping is_adb_interface()/is_libusb_enabled().
-sed -i '/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path' \
-  src/adb/client/transport_usb.cpp
+# (platform-tools-34 and earlier wrap that code in #if ADB_HOST/#else/#endif; open
+# the guard before it there, or the two conditionals interleave.)
+if grep -q '^#if ADB_HOST$' src/adb/client/transport_usb.cpp; then
+  usb_guard_at='^#if ADB_HOST$'
+else
+  usb_guard_at='^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {'
+fi
+sed -i "0,/${usb_guard_at}/{/${usb_guard_at}/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path
+}" src/adb/client/transport_usb.cpp
 sed -i '/^bool is_adb_interface(int usb_class/i #endif  // native USB path\n' \
   src/adb/client/transport_usb.cpp
 # ...and the matching native-transport registration helpers in transport.cpp.
