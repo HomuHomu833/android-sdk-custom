@@ -552,6 +552,13 @@ sed -i 's/std::vector<const std::pair<OverlayableInfo, std::unordered_set<uint32
 # calls getthrid() directly.
 sed -i 's/^\ttid = syscall(SYS_getthrid);$/\ttid = getthrid();/' src/libusb/libusb/os/threads_posix.c
 
+# liblp super_layout_builder.cpp (older releases, still in system/core): uses
+# std::sort without <algorithm>, which llvm-mingw's libc++ does not pull in.
+for f in src/core/fs_mgr/liblp/super_layout_builder.cpp src/fs_mgr/liblp/super_layout_builder.cpp; do
+  [ -f "$f" ] && ! grep -q '^#include <algorithm>' "$f" &&
+    sed -i '0,/^#include <liblp\/super_layout_builder.h>$/s//#include <liblp\/super_layout_builder.h>\n\n#include <algorithm>/' "$f"
+done
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
