@@ -547,6 +547,11 @@ fi
 sed -i 's/std::vector<const std::pair<OverlayableInfo, std::unordered_set<uint32_t>>> overlayable_infos_;/std::vector<std::pair<OverlayableInfo, std::unordered_set<uint32_t>>> overlayable_infos_;/' \
   src/base/libs/androidfw/include/androidfw/LoadedArsc.h
 
+# libusb threads_posix.c (platform-tools-34 and earlier): OpenBSD's thread id
+# via syscall(SYS_getthrid); OpenBSD no longer exposes syscall(). Newer libusb
+# calls getthrid() directly.
+sed -i 's/^\ttid = syscall(SYS_getthrid);$/\ttid = getthrid();/' src/libusb/libusb/os/threads_posix.c
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
