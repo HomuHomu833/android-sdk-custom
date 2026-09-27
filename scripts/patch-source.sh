@@ -601,6 +601,10 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
+# Older adb_mdns.h uses std::function without <functional>.
+grep -q '<functional>' src/adb/adb_mdns.h || \
+  sed -i '0,/^#include <optional>$/s//#include <functional>\n#include <optional>/' src/adb/adb_mdns.h
+
 # Older libziparchive builds a span from an ssize_t size, which narrows on
 # 32-bit hosts.
 sed -i 's/return {buf.first, ssize_t(buf.second)};/return {buf.first, size_t(buf.second)};/' \
