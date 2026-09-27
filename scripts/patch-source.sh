@@ -526,6 +526,15 @@ if [ -f "$f" ] && ! grep -q '^#include <vector>' "$f"; then
   sed -i '0,/^#include <sstream>$/s//#include <memory>\n#include <sstream>\n#include <vector>/' "$f"
 fi
 
+# adb sysdeps.h (platform-tools-35.0.1 and earlier): the Windows fwrite ->
+# adb_fwrite macro reaches libc++'s <print> (via logging.h's <ostream>) before
+# it is included, turning std::fwrite into std::adb_fwrite. Include both first,
+# as upstream later did.
+f=src/adb/sysdeps.h
+if [ -f "$f" ] && ! grep -q '^#include <print>' "$f"; then
+  sed -i 's|^#include <android-base/utf8.h>$|#include <android-base/utf8.h>\n#include <android-base/logging.h>\n#if __has_include(<print>)\n#include <print>\n#endif|' "$f"
+fi
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
