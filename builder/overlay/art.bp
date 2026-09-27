@@ -76,7 +76,7 @@ amend {
     },
 }
 
-// zig's cc driver, which the Linux builds link with, rejects --exclude-libs,
+// zig's cc driver, which the Linux and BSD builds link with, rejects --exclude-libs,
 // and so does Apple's ld (older releases pass it for every not_windows host).
 // ART passes it only to keep libziparchive's symbols out of what its gtests
 // export (b/264235288).
@@ -90,6 +90,9 @@ amend {
             exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
         },
         darwin: {
+            exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
+        },
+        bsd: {
             exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
         },
     },
