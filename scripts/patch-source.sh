@@ -627,13 +627,13 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
-# Older adb_mdns.h uses std::function without <functional>.
-grep -q '<functional>' src/adb/adb_mdns.h || \
-  sed -i '0,/^#include <optional>$/s//#include <functional>\n#include <optional>/' src/adb/adb_mdns.h
-
-# Older fastboot.h uses std::function without <functional> too.
-grep -q '<functional>' src/core/fastboot/fastboot.h || \
-  sed -i '0,/^#include <string>$/s//#include <functional>\n#include <string>/' src/core/fastboot/fastboot.h
+# Older headers that use std::function without <functional> (newer libc++
+# no longer pulls it in transitively). Add it ahead of their first #include <>.
+for f in src/adb/adb_mdns.h src/core/fastboot/fastboot.h \
+    src/adb/tls/include/adb/tls/tls_connection.h; do
+  [ -f "$f" ] && grep -q 'std::function' "$f" && ! grep -q '<functional>' "$f" && \
+    sed -i '0,/^#include </s//#include <functional>\n#include </' "$f"
+done
 
 # Older libziparchive builds a span from an ssize_t size, which narrows on
 # 32-bit hosts.
