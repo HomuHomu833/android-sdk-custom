@@ -586,6 +586,15 @@ grep -q 'DIOCGMEDIASIZE' src/f2fs-tools/lib/libf2fs.c ||
 #define BLKGETSIZE64	0\
 #endif' src/f2fs-tools/lib/libf2fs.c
 
+# ICU's double-conversion #errors on CPUs outside its list of those with exact
+# IEEE doubles. Hexagon's (hardware or soft-float) are, as are LoongArch's and
+# RISC-V's, which older releases' copies do not list yet.
+dc=src/icu/icu4c/source/i18n/double-conversion-utils.h
+grep -q '__hexagon__' "$dc" || {
+  sed -i 's/^#if defined(_M_X64) || defined(__x86_64__) || \\$/#if defined(_M_X64) || defined(__x86_64__) || defined(__hexagon__) || defined(__loongarch__) || defined(__riscv) || \\/' "$dc"
+  grep -q '__hexagon__' "$dc"
+}
+
 # ART mem_map.h (older releases): only aarch64/riscv/Apple get the low-4G
 # allocator, other 64-bit CPUs #error (loongarch64, mips64, ppc64, s390x).
 # Newer ART uses it on every 64-bit host; do so for all but x86_64, which
