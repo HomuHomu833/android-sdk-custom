@@ -1,0 +1,68 @@
+// external/zlib (Chromium's zlib from Android 13 on). Its SIMD is set up for
+// the hosts Soong has: x86 anywhere, arm64 on Linux/macOS, bionic. Elsewhere
+// cpu_features.c's portable CPU_NO_SIMD build stands in: 32-bit ARM hosts may
+// lack NEON, RISC-V hosts the V extension, and Windows/BSD ARM get no probing.
+zlib_neon = [
+    "-DADLER32_SIMD_NEON",
+    "-DCRC32_ARMV8_CRC32",
+    "-DARMV8_OS_LINUX",
+]
+
+zlib_rvv = [
+    "-DRISCV_RVV",
+    "-DADLER32_SIMD_RVV",
+    "-DDEFLATE_SLIDE_HASH_RVV",
+]
+
+amend {
+    name: "libz_defaults",
+    target: {
+        glibc_arm: {
+            exclude_cflags: zlib_neon,
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        musl_arm: {
+            exclude_cflags: zlib_neon,
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        glibc_riscv64: {
+            exclude_cflags: zlib_rvv,
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        musl_riscv64: {
+            exclude_cflags: zlib_rvv,
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        windows_arm: {
+            exclude_cflags: zlib_neon + ["-DX86_WINDOWS"],
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        windows_arm64: {
+            exclude_cflags: zlib_neon + ["-DX86_WINDOWS"],
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        windows_arm64ec: {
+            exclude_cflags: ["-DX86_WINDOWS"],
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        // cpuid works the same on the BSDs as on Linux
+        bsd_x86: {
+            cflags: ["-DX86_NOT_WINDOWS"],
+        },
+        bsd_x86_64: {
+            cflags: ["-DX86_NOT_WINDOWS"],
+        },
+        bsd_arm: {
+            exclude_cflags: zlib_neon,
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        bsd_arm64: {
+            exclude_cflags: zlib_neon,
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+        bsd_riscv64: {
+            exclude_cflags: zlib_rvv,
+            cflags: ["-DCPU_NO_SIMD"],
+        },
+    },
+}

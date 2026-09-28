@@ -28,6 +28,8 @@
     {"path": "src/icu", "aosp": "external/icu", "sparse": ["/**/*.bp", "/android_icu4c/include/", "/libandroidicuinit/", "/libandroidicu/", "/icu4c/source/common/", "/icu4c/source/i18n/", "/icu4c/source/stubdata/"]},
     {"path": "src/lz4", "aosp": "external/lz4"},
     {"path": "src/zstd", "aosp": "external/zstd"},
+    {"path": "src/zlib", "aosp": "external/zlib"},
+    {"path": "src/bzip2", "aosp": "external/bzip2"},
     {"path": "src/lzma", "aosp": "external/lzma"},
     {"path": "src/libusb", "aosp": "external/libusb"},
     {"path": "src/brotli", "aosp": "external/brotli", "sparse": ["/*", "!/js/**", "!/java/**", "!/tests/**", "!/research/**", "/**/*.bp"]},

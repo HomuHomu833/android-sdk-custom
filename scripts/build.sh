@@ -11,7 +11,6 @@ ARCH="${ARCH:-${TARGET%%-*}}"
 OUT="${OUT:-$ROOTDIR/out}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 BUILD_DIR="${BUILD_DIR:-$ROOTDIR/build}"
-EXTRA_PREFIX="${EXTRA_PREFIX:-$ROOTDIR/extrabuild}"
 cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -350,47 +349,12 @@ if [ ! -x "$PROTOC" ]; then
     aarch64|arm64) HOST_ARCH=arm64 ;;
     *)             HOST_ARCH="$(uname -m)" ;;
   esac
-  HOST_ZLIB="$(find /usr/lib /usr/lib64 -name libz.a 2>/dev/null | head -n1)"
-  [ -n "$HOST_ZLIB" ] || { echo "host protoc: no libz.a on the build machine (zlib1g-dev)" >&2; exit 1; }
   python3 -m builder --root "$ROOTDIR" --os linux_glibc --arch "$HOST_ARCH" \
-    --tools aprotoc --var "sdk:zlib=$HOST_ZLIB" --var sdk:host_protoc=true \
-    --out "$HOST_BUILD/generated"
+    --tools aprotoc --var sdk:host_protoc=true --out "$HOST_BUILD/generated"
   cmake -GNinja -S "$HOST_BUILD/generated" -B "$HOST_BUILD/cmake" \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_ASM_COMPILER=clang
   ninja -C "$HOST_BUILD/cmake" -j"$JOBS" aprotoc
-fi
-
-# --- extra deps: zlib + bzip2 static archives, cross-compiled. -static (musl
-# only; zig won't statically link glibc/bsd libc) affects only test binaries ---
-case "$TARGET" in
-  *musl*) DEP_STATIC="-static" ;;
-  *)      DEP_STATIC="" ;;
-esac
-mkdir -p "$EXTRA_PREFIX"
-if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
-  log "Building zlib (static, $TARGET)"
-  # MIPS -mabicalls needs -fPIC (else a clang warning trips zlib's configure).
-  # -fno-sanitize=undefined: libz.a is prebuilt, so the ubsan runtime isn't linked
-  # in, leaving __ubsan_handle_* undefined.
-  case "$TARGET" in
-    mips*|mipsel*) ZLIB_CFLAGS="-fPIC -fno-sanitize=undefined" ;;
-    *)             ZLIB_CFLAGS="-fno-sanitize=undefined" ;;
-  esac
-  ( cd "$ROOTDIR"
-    fetch_unpack https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz /tmp/zlib-1.3.1.tar.xz
-    cd zlib-1.3.1
-    CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$ZLIB_CFLAGS" ./configure --prefix="$EXTRA_PREFIX" --static
-    make -j"$JOBS" install )
-fi
-if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
-  log "Building bzip2 (static, $TARGET)"
-  ( cd "$ROOTDIR"
-    fetch_unpack https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz /tmp/bzip2-1.0.8.tar.gz
-    cd bzip2-1.0.8
-    make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" libbz2.a
-    cp -f libbz2.a "$EXTRA_PREFIX/lib/"
-    cp -f bzlib.h "$EXTRA_PREFIX/include/" )
 fi
 
 # --- the SDK host tools -----------------------------------------------------
@@ -409,7 +373,6 @@ cmake -GNinja \
   -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
   -DCMAKE_CROSSCOMPILING=True \
   -DCMAKE_SYSTEM_PROCESSOR="$ARCH" \
-  -DCMAKE_PREFIX_PATH="$EXTRA_PREFIX" \
   -DCMAKE_C_COMPILER="$CROSS_CC" \
   -DCMAKE_CXX_COMPILER="$CROSS_CXX" \
   -DCMAKE_ASM_COMPILER="$CROSS_CC" \
