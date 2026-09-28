@@ -42,6 +42,14 @@
 
 #include "libusbi.h"
 
+/* libusb before API 0x01000109 (platform-tools-33.0.2 and earlier) takes no
+ * context in usbi_dbg(). */
+#if LIBUSB_API_VERSION < 0x01000109
+#define sdk_usbi_dbg(ctx, ...) usbi_dbg(__VA_ARGS__)
+#else
+#define sdk_usbi_dbg usbi_dbg
+#endif
+
 #define DEVPATH		"/dev/"
 #define UGEN_FMT	DEVPATH "ugen%u.%u"
 
@@ -154,7 +162,7 @@ fbsd_get_device_list(struct libusb_context *ctx,
 	char node[32];
 	int fd;
 
-	usbi_dbg(ctx, " ");
+	sdk_usbi_dbg(ctx, " ");
 
 	if ((dir = opendir(DEVPATH)) == NULL)
 		return _errno_to_libusb(errno);
@@ -258,7 +266,7 @@ fbsd_open(struct libusb_device_handle *handle)
 		hpriv->fs_inited = 1;
 	/* If USB_FS_INIT fails, control transfers still work; bulk will error. */
 
-	usbi_dbg(HANDLE_CTX(handle), "open %s: fd %d", dpriv->devnode, hpriv->fd);
+	sdk_usbi_dbg(HANDLE_CTX(handle), "open %s: fd %d", dpriv->devnode, hpriv->fd);
 	return LIBUSB_SUCCESS;
 }
 
