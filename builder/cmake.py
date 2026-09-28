@@ -14,8 +14,6 @@ set(SDK "{sdk}")                               # this repo (overlay files)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${{CMAKE_BINARY_DIR}}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${{CMAKE_BINARY_DIR}}/lib")
-# Module names carry their own "lib" (libz, not z), as Soong's files do; no
-# second one from CMake (liblibz.a).
 set(CMAKE_STATIC_LIBRARY_PREFIX "")
 """
 
