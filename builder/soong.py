@@ -562,6 +562,13 @@ def _glob_re(pattern):
     return re.compile("^" + "".join(out) + "$")
 
 
+# Sparse checkouts (repos.json "sparse"): the files git skipped, per project
+# root. glob() records any it would have matched, so __main__ can fail loudly
+# instead of building with sources quietly missing.
+SPARSE_SKIPPED = {}
+SPARSE_MISSES = set()
+
+
 def glob(base, pattern):
     """Soong-style glob of `pattern` (relative, may contain **) under base."""
     if not any(c in pattern for c in "*?"):
@@ -580,6 +587,14 @@ def glob(base, pattern):
                 rel = os.path.relpath(full, base).replace(os.sep, "/")
                 if rx.match(rel):
                     hits.append(full)
+        nstart = os.path.normpath(start)
+        for proot, skipped in SPARSE_SKIPPED.items():
+            if not (nstart + os.sep).startswith(os.path.normpath(proot) + os.sep):
+                continue
+            for full in skipped:
+                if full.startswith(nstart) and \
+                        rx.match(os.path.relpath(full, base).replace(os.sep, "/")):
+                    SPARSE_MISSES.add(full)
         _glob_cache[key] = hits
     return list(_glob_cache[key])
 

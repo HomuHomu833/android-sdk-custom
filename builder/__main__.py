@@ -12,8 +12,11 @@ import argparse
 import glob as _glob
 import json
 import os
+import re
+import subprocess
 import sys
 
+from . import soong
 from .blueprint import SelectConfig
 from .cmake import Emitter
 from .convert import GLOBAL_INCLUDES, Converter
@@ -43,6 +46,44 @@ def release_version(tree, variables):
 
 def version_tuple(v):
     return tuple(int(x) for x in v.split(".") if x.isdigit())
+
+
+def sparse_skipped(local):
+    """Files a sparse checkout left out (git's skip-worktree entries)."""
+    try:
+        r = subprocess.run(["git", "-C", local, "ls-files", "-t"], capture_output=True,
+                           text=True, encoding="utf-8", errors="replace", check=True)
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+    return {os.path.normpath(os.path.join(local, l[2:]))
+            for l in r.stdout.splitlines() if l.startswith("S ")}
+
+
+def sparse_check(tree, out, text, notes):
+    """Exit when the build uses a file the sparse checkout skipped."""
+    skipped = set().union(*soong.SPARSE_SKIPPED.values())
+    if not skipped:
+        return
+    misses = set(soong.SPARSE_MISSES)
+    scripts = _glob.glob(os.path.join(out, "gen", ".scripts", "*"))
+    refs = re.findall(r'\$\{AOSP\}/([^"\s;>)\']+)', text)
+    for s in scripts:
+        with open(s, encoding="utf-8", errors="replace") as f:
+            refs += re.findall(r'\$\{AOSP\}/([^"\s;>)\']+)', f.read())
+    refs += [m.group(1) for n in notes
+             for m in [re.search(r"include_dirs (\S+) is not in the source set", n)] if m]
+    for ref in set(refs):
+        p = tree.to_local(ref.rstrip("/"))
+        if not p:
+            continue
+        p = os.path.normpath(p)
+        if p in skipped or (not os.path.exists(p)
+                            and any(s.startswith(p + os.sep) for s in skipped)):
+            misses.add(p)
+    if misses:
+        sys.exit("builder: this build uses files the sparse checkout left out; add them to "
+                 "the project's \"sparse\" patterns in repos.json:\n  " +
+                 "\n  ".join(sorted(tree.to_aosp(m) or m for m in misses)))
 
 
 def make_link(src, dst):
@@ -92,6 +133,10 @@ def main(argv=None):
     if not present:
         sys.exit("builder: no sources under %s (run scripts/fetch-source.sh)" % root)
     tree = Tree(root, present)
+    for r in repos:
+        local = os.path.join(root, r["path"])
+        if r.get("sparse") and os.path.isdir(local):
+            soong.SPARSE_SKIPPED[local] = sparse_skipped(local)
 
     overlays = []
     for o in [os.path.join(HERE, "overlay")] + args.overlay:
@@ -168,6 +213,7 @@ def main(argv=None):
                        and os.path.isdir(tree.to_local(i))]
 
     text = Emitter(conv, built, root, global_includes, needs, globals_).render()
+    sparse_check(tree, out, text, notes)
     with open(os.path.join(out, "CMakeLists.txt"), "w", newline="\n") as f:
         f.write(text)
     for n in dict.fromkeys(notes):

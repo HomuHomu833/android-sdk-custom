@@ -22,8 +22,8 @@ if [ ! -f "$MANIFEST/default.xml" ] || [ "$(cat "$MANIFEST/.tag" 2>/dev/null)" !
 fi
 
 # "<local dir>\t<project name>\t<sparse patterns>" for each repos.json entry
-# this release has. "sparse" lists the checkout patterns of a project the tools
-# use only part of (frameworks/base, external/icu); keep every *.bp for Soong.
+# this release has. "sparse" holds git's non-cone patterns for projects whose
+# tests/data we skip; "/**/*.bp" goes last so the builder still sees every .bp.
 PLAN="$(python3 - "$MANIFEST/default.xml" repos.json <<'PY'
 import json, sys, xml.etree.ElementTree as ET
 projects = {}
