@@ -10,9 +10,9 @@ ARG REPO_OWNER=HomuHomu833
 ARG MACOS_SDK_VERSION=26.1
 
 ENV DEBIAN_FRONTEND=noninteractive
-# python3: builder and genrules; clang/lld/zlib1g-dev: the host aprotoc and
-# cargo; bison/flex/m4: aidl; patch: patch-source.sh; autotools and the -dev
-# libs: osxcross; file/unzip/xz/p7zip: make-sdk.sh; the JRE: sdkmanager.
+# python3: builder and genrules; clang/lld: the host aprotoc and cargo;
+# bison/flex/m4: aidl; patch: patch-source.sh; autotools and the -dev libs
+# (zlib1g-dev too): osxcross; file/unzip/xz/p7zip: make-sdk.sh; JRE: sdkmanager.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates aria2 xz-utils unzip zip p7zip-full git make cmake ninja-build \
         build-essential clang lld file tree patch openjdk-21-jre-headless \
