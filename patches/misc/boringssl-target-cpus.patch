@@ -1,12 +1,6 @@
-boringssl: recognise every CPU the SDK is built for.
-
-target.h ends in #error "Unknown target CPU" for anything outside BoringSSL's
-supported list. Add the word size (and, where BoringSSL has a family macro,
-the family) for loongarch64, s390x, ppc, hexagon and the big-endian ARM/MIPS
-variants. None of these get assembly: the BE ARM builds define
-OPENSSL_NO_ASM (builder/overlay/global.bp), since BoringSSL's ARM asm is
-little-endian only. arm64ec also defines __x86_64__, so match it first and
-treat it as the AArch64 it runs as (Windows builds use OPENSSL_NO_ASM anyway).
+boringssl: recognise every CPU the SDK is built for (loongarch64, s390x, ppc,
+hexagon, big-endian ARM/MIPS) instead of #error. None of them get assembly;
+arm64ec, which also defines __x86_64__, is matched first as the AArch64 it is.
 
 --- a/src/boringssl/src/include/openssl/target.h
 +++ b/src/boringssl/src/include/openssl/target.h

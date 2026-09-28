@@ -1,10 +1,6 @@
-// BSD implementation of openscreen GetAllInterfaces().
-//
-// Derived from network_interface_mac.cc with BSD-specific adaptations:
-//   - <netinet6/in6_var.h> instead of <netinet/in_var.h>
-//   - ifru_flags6 (not ifru_flags) for SIOCGIFAFLAG_IN6 result
-//   - LLADDR() cast to const uint8_t* (avoids caddr_t const-qualification
-//     mismatch and the broken sizeof(pointer) static_assert)
+// openscreen's GetAllInterfaces() for the BSDs, from network_interface_mac.cc:
+// <netinet6/in6_var.h>, ifru_flags6 for SIOCGIFAFLAG_IN6, and LLADDR() cast to
+// const uint8_t* (caddr_t constness, sizeof(pointer) static_assert).
 
 #include <net/if.h>
 #include <net/if_dl.h>

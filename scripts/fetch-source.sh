@@ -1,17 +1,7 @@
 #!/usr/bin/env bash
-# Clone the AOSP projects the SDK tools are built from, then hand off to
-# patch-source.sh for the in-place source fixups. Runs identically in CI and in
-# `docker run`.
-#
-#   TAG       AOSP tag/branch to build (default: master), e.g. android-17.0.0_r1
-#             or any platform-tools-* tag
-#   ROOTDIR   checkout root holding repos.json / patches/ (default: cwd)
-#   TARGET    target triple, forwarded to patch-source.sh (optional here)
-#
-# Where things live moves between releases (adb left system/core for
-# packages/modules/adb, libbase became system/libbase, ...). repos.json lists
-# every project the tools need in any release, keyed by AOSP path; the manifest
-# of $TAG says which of them this release has, and under which project name.
+# Clone the repos.json projects the release $TAG has (per its manifest, as
+# they move between releases), then run patch-source.sh.
+# Env: TAG (android-* or platform-tools-* tag), ROOTDIR, TARGET.
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"

@@ -1,14 +1,9 @@
 // development/host/windows
 
-// Google's Windows adb and fastboot talk to devices through AdbWinApi.dll
-// (and the AdbWinUsbApi.dll it loads for WinUSB devices), which the SDK ships
-// prebuilt: their source is an MSVC/ATL project Soong does not build. Build
-// that source here and link it into adb and fastboot, which then work as
-// upstream's do, AdbWinApi by default and libusb with ADB_LIBUSB=1. It
-// replaces the prebuilt module of this name, so upstream's
-// shared_libs: ["AdbWinApi"] links it. patch-source.sh (AdbWinApi) adapts the
-// sources, patches/compat/adbwinapi stands in for the ATL they use and
-// patches/sources/adbwinapi_static.cpp for the DLL glue.
+// Google ships AdbWinApi/AdbWinUsbApi as prebuilt DLLs (an MSVC/ATL project).
+// Build that source into this module, which replaces the prebuilt one, so
+// adb and fastboot link it: AdbWinApi by default, libusb with ADB_LIBUSB=1.
+// Fixups: patch-source.sh, patches/compat/adbwinapi, patches/sources.
 cc_library_static {
     name: "AdbWinApi",
     host_supported: true,

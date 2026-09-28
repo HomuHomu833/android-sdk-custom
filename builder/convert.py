@@ -18,9 +18,8 @@ import shlex
 from .soong import (CC_TYPES, DEFAULTS_TYPES, GEN_TYPES, VARIANT_PREPEND, ResolveError,
                     _merge, glob, match_exclude)
 
-# Soong's cc/config global flags that carry meaning for the code being built.
-# Hardening, debug-info and -Werror flags are toolchain policy, not semantics,
-# and are left to the toolchain wrappers (build.sh) instead.
+# Soong's global include dirs, and the warning flags it adds for external/.
+# The global flags (optimization, hardening) live in overlay/global.bp.
 GLOBAL_INCLUDES = [
     "system/core/include", "system/logging/liblog/include", "system/media/audio/include",
     "hardware/libhardware/include", "hardware/libhardware_legacy/include",
@@ -63,7 +62,7 @@ AVAILABLE_LDLIBS = {
     "windows": {"bcrypt", "dbghelp", "gdi32", "imagehlp", "iphlpapi", "netapi32", "ntdll",
                 "oleaut32", "ole32", "opengl32", "powrprof", "psapi", "pthread", "ucrt",
                 "userenv", "uuid", "version", "ws2_32", "windowscodecs",
-                # llvm-mingw's USB/setup libs, used by the libusb windows backend
+                # llvm-mingw's USB/setup libs: the AdbWinApi and libusb backends
                 "setupapi", "cfgmgr32", "winusb", "advapi32", "shell32", "wlanapi", "crypt32"},
     "bsd": {"c", "m", "pthread", "util", "execinfo", "kvm", "usb", "rt"},
 }

@@ -1,38 +1,20 @@
-// What to build, and the flags Soong's cc/config adds to every module.
-//
-// Overlay files are read after every upstream Android.bp. Relative paths in
-// them resolve against the repo root, so they can reach include/ and patches/.
-// Besides the upstream module types they understand:
-//
-//   amend { name: "<module>", ... }   merged on top of the upstream module
-//                                     (append semantics, like target.* are),
-//                                     so srcs/cflags/exclude_* just add up;
-//                                     target_alias: { bsd: "linux" } in one
-//                                     also gives target.bsd(_<arch>) that
-//                                     module's target.linux(_<arch>);
-//   sdk_tools { tools: [...] }        the modules built by default (ones a
-//                                     release lacks are skipped);
-//   soong_config_values { ns: { var: value } }
-//                                     Soong config variables, as a product
-//                                     config would set them;
-//
-// and a module of any other type replaces the upstream module of that name.
-// target: keys also accept bsd, freebsd, netbsd and openbsd, which Soong has
-// no notion of. select(soong_config_variable("sdk", ...)) reads --var values.
+// Overlays load after every Android.bp; paths are the repo's, or a fetched
+// project's when they start with its AOSP path. amend merges onto a module
+// (target_alias copies target sections), sdk_tools lists the tools, any other
+// type replaces its namesake. target: also takes bsd/freebsd/netbsd/openbsd.
 
 // What an AOSP source build of the platform sets. ART only enables its host
-// tools (dexdump, veridex) when it is built from source.
+// tools (dexdump) when it is built from source.
 soong_config_values {
     art_module: {
         source_build: true,
     },
 }
 
-// The binaries the official build-tools and platform-tools packages ship, in
-// any release from 29 on; make-sdk.sh swaps ours in for theirs by file name
-// and drops the ones it has no build of. A release without a module (casefold
-// arrived in 30.0.5, dmtracedump left after 34.0.4) just skips it; e2fsdroid
-// and sload_f2fs shipped until 33.0.3, on Linux and macOS only.
+// Every binary the official packages ship, from 29 on (make-sdk.sh swaps
+// ours in by name and drops any it lacks). Releases without a module skip it:
+// casefold arrived in 30.0.5, dmtracedump left after 34.0.4, e2fsdroid and
+// sload_f2fs after 33.0.3 (Linux/macOS only).
 sdk_tools {
     name: "build-tools",
     tools: [
@@ -88,11 +70,9 @@ sdk_tools {
     },
 }
 
-// Flags ahead of every cc module's own (emitted once, as add_compile_options
-// and add_link_options). Mirrors cc/config/global.go and the *_host.go
-// toolchains, minus debug info, -Werror policy and the flags tied to Soong's
-// own prebuilt clang. exclude_cflags and friends here are removed from every
-// module's flags; host_ldlibs go to every binary.
+// Flags ahead of every module's own, as cc/config/global.go and *_host.go set
+// them, minus debug info, -Werror and Soong-clang specifics. exclude_* here
+// strips flags from every module; host_ldlibs go to every binary.
 cc_defaults {
     name: "builder_defaults",
     cflags: [
@@ -252,11 +232,9 @@ cc_defaults {
                 "-lm",
             ],
         },
-        // BoringSSL (see boringssl.bp) has runtime CPU detection for only
-        // some BSD/ARM pairs, and only in newer releases (none on NetBSD).
-        // Fix the ARM capabilities at compile time instead, as BoringSSL
-        // itself does on OpenBSD arm32. ARM only: older BoringSSL also skips
-        // x86 detection under this macro.
+        // BoringSSL lacks runtime ARM CPU detection on most BSDs (and all
+        // before 34.0.5): fix the caps at compile time, as it does itself on
+        // OpenBSD arm32. ARM only, as older releases also skip x86 detection.
         bsd_arm: {
             cflags: ["-DOPENSSL_STATIC_ARMCAP"],
         },
@@ -286,12 +264,9 @@ cc_defaults {
             cflags: ["-DABSL_USE_UNSCALED_CYCLECLOCK=0"],
         },
     },
-    // CPUs Soong has never built for get none of the arch.* sources (assembly,
-    // SIMD) Android.bp keeps for its own. Where one shares another CPU's
-    // predefined macros, the portable code would still reach for them, so
-    // switch those paths off: BoringSSL's assembly (asflags too, as its
-    // Linux source list assembles every flavour), libpng's SIMD filters and
-    // zstd's x86-64 Huffman loop.
+    // CPUs Soong never built for get none of Android.bp's arch.* sources, but
+    // may share another CPU's macros; turn off the code that expects them:
+    // BoringSSL asm (asflags too), libpng SIMD, zstd's x86-64 Huffman loop.
     arch: {
         // BoringSSL's ARM assembly is also little-endian only
         // (patches/misc/boringssl-target-cpus.patch).

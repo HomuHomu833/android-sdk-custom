@@ -1,21 +1,8 @@
 #!/usr/bin/env bash
-# Cross-build the Android SDK host tools for one target. All inputs are env vars
-# so CI and `docker run` behave identically. Run fetch-source.sh first.
-#
-#   PLATFORM   linux | bionic | macos | windows | bsd
-#   TARGET     target triple (e.g. x86_64-linux-musl, aarch64-linux-android,
-#              aarch64-freebsd-none, arm-openbsd-eabi)
-#   ARCH       CMAKE_SYSTEM_PROCESSOR (default: triple's arch field)
-#   ROOTDIR    checkout root (default: cwd)
-#   OUT        stripped host tools land here (default: $ROOTDIR/out)
-#   JOBS       parallelism (default: nproc)
-#   NDK_VERSION/NDK_REVISION  official NDK for the bionic clang (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 24, riscv64 forced 35; bionic only)
-#   PLATFORM_TOOLS_VERSION  overrides the version adb/fastboot report (default:
-#              the release's own, from development/sdk/plat_tools_source.prop_template)
-#
-# The CMake project is generated from the sources' own Android.bp files by
-# builder (see builder/__main__.py); nothing here lists sources.
+# Cross-build the SDK host tools for one target from the project builder/
+# generates out of the sources' Android.bp. Run fetch-source.sh first.
+# Env: PLATFORM (linux|bionic|macos|windows|bsd), TARGET, ARCH, ROOTDIR, OUT,
+# JOBS, NDK_VERSION/NDK_REVISION, ANDROID_PLATFORM, PLATFORM_TOOLS_VERSION.
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -52,18 +39,9 @@ unpack() {
   esac
 }
 
-# Download URL to ARCHIVE and unpack it into DEST (default: the current
-# directory), re-downloading when the unpack fails. ARCHIVE is removed on the
-# way out. Usage: fetch_unpack URL ARCHIVE [DEST]
-#
-# aria2c's own retries cannot see a truncated download. Endpoints that generate
-# archives on the fly, such as codeload, stream them chunked with
-# no Content-Length (aria2 logs the size as "0B/0B"), so when the far end cuts
-# the stream short there is no expected size to compare against: aria2 prints
-# "(OK):download completed" and exits 0 on a 600KiB truncation of a 200MiB
-# archive, and the damage only surfaces further down as "gzip: stdin:
-# unexpected end of file". Unpacking is the only integrity check available, so
-# the retry has to wrap the download and the unpack together.
+# Download URL to ARCHIVE and unpack it into DEST (default: .). aria2c can't
+# spot a truncated chunked download (it exits 0), and unpacking is the only
+# integrity check, so the retry wraps both. Usage: fetch_unpack URL ARCHIVE [DEST]
 fetch_unpack() {
   local url="$1" archive="$2" dest="${3:-.}" i=0
   mkdir -p "$dest"

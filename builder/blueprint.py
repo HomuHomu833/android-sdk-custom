@@ -115,10 +115,9 @@ def _lex(text, path):
 
 
 # --- AST ---------------------------------------------------------------------
-# Expressions are tuples: ("lit", v) ("var", name) ("list", [e]) ("map", [(k, e)])
-# ("add", [e]) ("select", conds, cases) ("unset",). A select condition is
-# (func_name, [args]); a case is ([patterns], expr) and a pattern is one of
-# ("lit", v) ("default",) ("any", bind_name_or_None).
+# Expressions: ("lit", v) ("var", name) ("list", [e]) ("map", [(k, e)])
+# ("add", [e]) ("select", conds, cases) ("unset",); a condition is (func,
+# [args]), a case ([patterns], expr), a pattern ("lit", v) ("default",) ("any", name).
 
 
 class Module:

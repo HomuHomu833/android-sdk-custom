@@ -1,19 +1,8 @@
 #!/usr/bin/env bash
-# Splice the freshly cross-built host tools into Google's official Android SDK
-# (build-tools + platform-tools) and archive the result.
-#
-#   TARGET               target triple (names the artifact, locates the binaries)
-#   BUILT_BIN            dir of built host tools (default: $OUT/bin-$TARGET)
-#   PLATFORM_TOOLS_VERSION  official platform-tools revision to splice into
-#                        (default: the one the sources declare, in
-#                        src/development/sdk/plat_tools_source.prop_template;
-#                        the latest when Google has no zip of it)
-#   BUILD_TOOLS_VERSION  official build-tools revision (default: the newest
-#                        stable one of the same major as platform-tools)
-#   CMDLINE_TOOLS_URL    commandline-tools zip (default: linux 13114758)
-#   ROOTDIR              work dir (default: cwd)
-#   DEST                 where the archive is written (default: $ROOTDIR)
-#                        windows -> .7z, everything else -> .tar.xz
+# Splice the built tools into Google's platform-tools of the sources' revision
+# and the newest build-tools of its major, then archive (.7z on windows).
+# Env: TARGET, PLATFORM, BUILT_BIN, PLATFORM_TOOLS_VERSION, BUILD_TOOLS_VERSION,
+# CMDLINE_TOOLS_URL, ROOTDIR, DEST.
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -52,18 +41,9 @@ unpack() {
   esac
 }
 
-# Download URL to ARCHIVE and unpack it into DEST (default: the current
-# directory), re-downloading when the unpack fails. ARCHIVE is removed on the
-# way out. Usage: fetch_unpack URL ARCHIVE [DEST]
-#
-# aria2c's own retries cannot see a truncated download. Endpoints that generate
-# archives on the fly, such as codeload, stream them chunked with
-# no Content-Length (aria2 logs the size as "0B/0B"), so when the far end cuts
-# the stream short there is no expected size to compare against: aria2 prints
-# "(OK):download completed" and exits 0 on a 600KiB truncation of a 200MiB
-# archive, and the damage only surfaces further down as "gzip: stdin:
-# unexpected end of file". Unpacking is the only integrity check available, so
-# the retry has to wrap the download and the unpack together.
+# Download URL to ARCHIVE and unpack it into DEST (default: .). aria2c can't
+# spot a truncated chunked download (it exits 0), and unpacking is the only
+# integrity check, so the retry wraps both. Usage: fetch_unpack URL ARCHIVE [DEST]
 fetch_unpack() {
   local url="$1" archive="$2" dest="${3:-.}" i=0
   mkdir -p "$dest"
@@ -167,7 +147,7 @@ rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
 rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscript*
 
 # --- drop now-useless DLLs (windows base) -----------------------------------
-# AdbWin*Api (linked into adb/fastboot, builder/overlay/adbwinapi.bp), libwinpthread-1 (static), RenderScript libs (pruned above).
+# AdbWin*Api (linked into adb/fastboot), libwinpthread-1 (static), RenderScript.
 rm -f "$HOST_SDK/platform-tools/AdbWinApi.dll" "$HOST_SDK/platform-tools/AdbWinUsbApi.dll"
 rm -f "$BT/libbcc.dll" "$BT/libbcinfo.dll" "$BT/libclang_android.dll" "$BT/libLLVM_android.dll"
 find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true

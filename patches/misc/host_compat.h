@@ -1,18 +1,13 @@
-/* Host-tool build compatibility shim (force-included via build.sh).
- *
- * AOSP host-tool code expects glibc/musl GNU extensions and newer POSIX/libc APIs
- * the target libc (bionic, macOS, MinGW, BSD) may not ship; this header fills the
- * gaps so the cross-build compiles without source patches. Each section is guarded
- * by its platform define. */
+/* Force-included by build.sh: the glibc/GNU extensions and newer libc APIs
+ * AOSP host code expects but bionic, macOS, MinGW or the BSDs may lack, each
+ * section guarded by its platform. */
 #ifndef HOST_COMPAT_H
 #define HOST_COMPAT_H
 
-/* --- BSD feature-test macros (MUST precede all #includes) -------------------
- * The opening #include <stdint.h> pulls in <sys/cdefs.h>, which evaluates these
- * then, so set them first. NetBSD: _NETBSD_SOURCE enables the extension API
- * (locale_t, _l-functions) libcxx needs, which liblog's -D_XOPEN_SOURCE=700 would
- * otherwise suppress. FreeBSD/OpenBSD: __BSD_VISIBLE enables BSD APIs (vasprintf,
- * getprogname); OpenBSD also needs _BSD_SOURCE so cdefs.h keeps __BSD_VISIBLE. */
+/* --- BSD feature-test macros (before any #include: <sys/cdefs.h> reads them)
+ * NetBSD: _NETBSD_SOURCE, for the locale_t API libc++ needs despite liblog's
+ * _XOPEN_SOURCE=700. FreeBSD/OpenBSD: __BSD_VISIBLE (vasprintf, getprogname);
+ * OpenBSD also _BSD_SOURCE so cdefs.h keeps it. */
 #if defined(__NetBSD__)
 # ifndef _NETBSD_SOURCE
 #  define _NETBSD_SOURCE 1
@@ -58,10 +53,9 @@
 #endif
 
 /* --- BSD pthread process-shared stubs ---------------------------------------
- * AOSP's Mutex/Condition/RWLock SHARED ctors call pthread_*attr_setpshared() —
- * dead code on host but must compile. NetBSD guards all three behind
- * _PTHREAD_PSHARED (never defined); OpenBSD lacks mutex/cond (rwlock is present);
- * FreeBSD declares all three. */
+ * Mutex/Condition/RWLock SHARED ctors call pthread_*attr_setpshared() (dead on
+ * host). NetBSD hides all three behind _PTHREAD_PSHARED; OpenBSD lacks the
+ * mutex/cond ones. */
 #if defined(__NetBSD__) && !defined(_PTHREAD_PSHARED)
 # define pthread_rwlockattr_setpshared(attr, val) (0)
 # define pthread_mutexattr_setpshared(attr, val)  (0)
@@ -168,10 +162,8 @@ typedef unsigned int gid_t;
 #endif
 
 /* --- macOS BSD extensions ---------------------------------------------------
- * macOS Clang with -std=gnu* doesn't auto-define _DARWIN_C_SOURCE, and AOSP code
- * with _XOPEN_SOURCE=700 hides BSD extensions (flock, getprogname); define it to
- * restore them. Valueless to match e2fsprogs' bare #define (cdefs.h only tests
- * defined()), avoiding -Wmacro-redefined. */
+ * _XOPEN_SOURCE=700 hides flock/getprogname unless _DARWIN_C_SOURCE is set.
+ * Defined valueless like e2fsprogs' own, avoiding -Wmacro-redefined. */
 #if defined(__APPLE__)
 #ifndef _DARWIN_C_SOURCE
 #define _DARWIN_C_SOURCE
@@ -224,11 +216,9 @@ const char *getprogname(void) {
 #endif
 
 /* --- stdio *_unlocked extensions --------------------------------------------
- * bionic (below API 28)/macOS/MinGW lack the glibc GNU *_unlocked stdio funcs
- * (used by libselinux as a single-threaded perf hint); map them to the locked
- * equivalents. FreeBSD ships them, so it's excluded. fgets_unlocked matches
- * libselinux label_internal.h's exact spelling (it redefines unconditionally) to
- * stay token-identical and avoid -Wmacro-redefined. */
+ * bionic < 28, macOS and MinGW lack glibc's *_unlocked stdio (libselinux uses
+ * them); map to the locked ones. fgets_unlocked is spelled exactly as
+ * libselinux redefines it, avoiding -Wmacro-redefined. FreeBSD has them. */
 #if (defined(__APPLE__) || defined(_WIN32) || \
      (defined(__BIONIC__) && __ANDROID_API__ < 28) || \
      defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(__FreeBSD__)
@@ -270,10 +260,8 @@ const char *getprogname(void) {
 #endif
 
 /* --- Windows stat() macros --------------------------------------------------
- * MinGW omits S_ISLNK/S_ISSOCK; provide them for libselinux (stringrep.c,
- * label_file.h). ADB TUs (ADB_HOST) are excluded for S_IFLNK/S_ISLNK/lstat —
- * adb/sysdeps/stat.h owns those, and pre-defining here would trip
- * -Wmacro-redefined when it redefines them bare. */
+ * MinGW lacks S_ISLNK/S_ISSOCK (libselinux). Not for adb (ADB_HOST): its
+ * sysdeps/stat.h defines them bare, which would trip -Wmacro-redefined. */
 #if defined(_WIN32)
 /* S_IFSOCK is not defined by adb's stat.h, so always provide it */
 #ifndef S_IFSOCK
@@ -467,10 +455,9 @@ static inline gid_t getegid(void) { return 0; }
 #endif
 
 /* --- Windows C++: headers older AOSP gets transitively ----------------------
- * llvm-mingw's libc++ has dropped most transitive includes, and older AOSP
- * code uses std::sort, std::back_inserter, std::vector, std::unique_ptr ...
- * without including their headers. Provide them up front for C++ on Windows,
- * before any of adb's function-renaming macros exist. */
+ * llvm-mingw's libc++ dropped most transitive includes that older AOSP relies
+ * on (std::sort, back_inserter, vector, unique_ptr...); include them up front,
+ * before adb's function-renaming macros exist. */
 #if defined(_WIN32) && defined(__cplusplus)
 /* These pull in <time.h> first, and MinGW only declares localtime_r/gmtime_r
  * when this is set by then (aapt's ZipEntry.cpp and others rely on them). */

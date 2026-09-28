@@ -1,15 +1,7 @@
-Make adb's Rust-backed mDNS bridge optional.
+Make adb's Rust mDNS bridge optional: targets without a Rust std build adb
+with -DADB_NO_RUST_MDNS (builder/overlay/adb.bp, scripts/build.sh) and use
+the openscreen backend, which is fully functional, instead.
 
-Upstream made the Rust `adbmdns`/`libadbmdns_bridge` backend the default mDNS
-implementation (transport_mdns.cpp calls StartAdbMdnsDiscovery(), which lives in
-the Rust-dependent client/adbmdns/adbmdns.cpp). That bridge can only be built on
-targets that have a Rust std (bionic, linux, macOS, windows, tier-2 BSDs). On the
-exotic BSD/PowerPC/`-none` triples there is no Rust toolchain, so we compile adb
-with -DADB_NO_RUST_MDNS and fall back to the fully-functional openscreen backend.
-This is real configuration (openscreen mDNS works); it is not a stub.
-
-The build sets ADB_NO_RUST_MDNS on adb when build.sh built no Rust bridge for
-the target; see builder/overlay/adb.bp and scripts/build.sh.
 --- a/src/adb/client/transport_mdns.cpp
 +++ b/src/adb/client/transport_mdns.cpp
 @@ -37,8 +37,10 @@

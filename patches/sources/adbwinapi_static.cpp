@@ -1,10 +1,6 @@
-/*
- * AdbWinApi.dll loads AdbWinUsbApi.dll from its DllMain and takes the one
- * routine it exports, InstantiateWinUsbInterface. With both linked into the
- * executable (builder/overlay/adbwinapi.bp) there is nothing to load:
- * patch-source.sh points adb_api.cpp's InstantiateWinUsbInterface straight
- * at this copy of that routine.
- */
+/* AdbWinApi.dll loads AdbWinUsbApi.dll to get InstantiateWinUsbInterface.
+ * Linked into the executable instead (builder/overlay/adbwinapi.bp), this is
+ * that routine, and patch-source.sh points adb_api.cpp's hook straight at it. */
 
 #include "stdafx.h"
 // The API half's stdafx.h is the one found from here; the WinUSB half's adds this.

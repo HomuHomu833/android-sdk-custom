@@ -1,9 +1,6 @@
-/*
- * The part of ATL that AdbWinApi and AdbWinUsbApi use (development/host/
- * windows/usb), for mingw, which has no ATL. Their other ATL use, the
- * CAtlDllModuleT DLL module, stays out: builder/overlay/adbwinapi.bp links
- * them into adb and fastboot instead of building DLLs.
- */
+/* The ATL that AdbWinApi and AdbWinUsbApi use, for mingw (which has none).
+ * Their CAtlDllModuleT DLL glue is replaced instead: builder/overlay/
+ * adbwinapi.bp links them into adb and fastboot rather than building DLLs. */
 #pragma once
 
 #include <windows.h>

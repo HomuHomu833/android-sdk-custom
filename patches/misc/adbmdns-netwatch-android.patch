@@ -1,21 +1,7 @@
-Make the adbmdns crate build cross-platform (android + windows/macos hosts).
+Build the adbmdns crate for android and for windows/macOS hosts: route
+target_os="android" to the netlink backend with RTMGRP_LINK inlined, and make
+nix (unix-only) and windows-sys dependencies of the targets that use them.
 
-Upstream's adbmdns is a host-only tool wired for target_os = linux/macos/windows
-with manifest assumptions that don't hold for our cross builds:
-
-  1. netwatch.rs: route target_os="android" to the linux (netlink) backend, so the
-     bionic build resolves monitor_network_changes_native().
-  2. netwatch_linux.rs: the libc crate doesn't export RTMGRP_LINK for android;
-     inline its UAPI value (1) — the netlink multicast-group bitmask.
-  3. Cargo.toml: nix (used only by netwatch_linux) was an unconditional dependency,
-     but nix is unix-only and fails to build for windows. Make it target-specific
-     (linux/android) and add the "net" feature it needs for net::if_.
-  4. Cargo.toml: windows-sys was likewise unconditional and fails to build (WSADATA/
-     SERVENT) on non-windows targets. Gate it under cfg(windows).
-
-The crate's own per-OS code (netwatch_{linux,darwin,windows}) is already cfg-gated;
-only the manifest and the android specifics needed fixing. BSD has no netwatch
-backend at all and uses the openscreen fallback (see scripts/build.sh).
 --- a/src/adb/client/adbmdns/netwatch.rs
 +++ b/src/adb/client/adbmdns/netwatch.rs
 @@ -20,7 +20,7 @@

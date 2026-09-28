@@ -1,10 +1,6 @@
-boringssl: take getrandom's syscall number from <sys/syscall.h>.
-
-getrandom_fillin.h cross-checks __NR_getrandom against a table of expected
-numbers and #errors on a mismatch, which x32 hits (its numbers carry
-__X32_SYSCALL_BIT). Trust the libc header when it has the number and use the
-table only as the fallback it was meant to be; CPUs outside the table then use
-the syscall too instead of falling back to /dev/urandom.
+boringssl: take getrandom's syscall number from <sys/syscall.h>, using the
+expected-number table only as the fallback: x32's numbers carry
+__X32_SYSCALL_BIT and tripped its #error.
 
 --- a/src/boringssl/src/crypto/rand/getrandom_fillin.h
 +++ b/src/boringssl/src/crypto/rand/getrandom_fillin.h

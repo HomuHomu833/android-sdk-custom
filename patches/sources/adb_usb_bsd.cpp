@@ -1,11 +1,6 @@
-// BSD ADB USB entry points for the libusb build.
-//
-// BSD uses libusb as the only USB backend (no native BSD USB backend is
-// compiled — the legacy BlockingConnection path is excluded via guards in
-// patch-source.sh, same approach as Windows).
-//
-// usb_init() starts the libusb hotplug scanner; usb_cleanup() closes all open
-// USB device transports.  These mirror the macOS / Linux libusb-enabled path.
+// adb's USB entry points on the BSDs, where libusb is the only backend
+// (patch-source.sh guards out the native one): usb_init() starts the libusb
+// hotplug scanner, usb_cleanup() closes the open USB transports.
 
 #include "client/usb.h"
 // Newer adb split the libusb backend; older releases declare

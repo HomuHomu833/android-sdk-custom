@@ -1,9 +1,6 @@
-androidfw CombinedIterator: make RefPair usable by newer libc++ algorithms.
-
-RefPair is the proxy reference of CombinedIterator. Newer libc++ (the one
-zig, NDK r30 and llvm-mingw ship) compares it through C++20 rewritten
-operator== candidates, which need the comparisons to be const, and swaps
-the prvalues operator* returns, which needs rvalue swap overloads.
+androidfw CombinedIterator: newer libc++ (zig's, NDK r30's, llvm-mingw's)
+compares its RefPair proxy through C++20 rewritten operator== candidates and
+swaps prvalues, so make the comparisons const and add rvalue swap overloads.
 
 --- a/src/base/libs/androidfw/include/androidfw/CombinedIterator.h
 +++ b/src/base/libs/androidfw/include/androidfw/CombinedIterator.h

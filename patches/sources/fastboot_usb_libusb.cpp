@@ -1,14 +1,5 @@
-/*
- * libusb-based USB backend for fastboot.
- *
- * fastboot upstream ships native backends only (usb_linux.cpp / usb_osx.cpp /
- * usb_windows.cpp); the windows one needs the prebuilt AdbWinApi (shipped 32-bit
- * only). This backend implements the same usb.h interface over libusb (WinUSB on
- * Windows), so fastboot can be built for windows with no AdbWinApi dependency.
- *
- * builder/overlay/core.bp compiles it in place of usb_windows.cpp on Windows,
- * and on the BSDs, which have no native backend at all.
- */
+/* fastboot's usb.h interface over libusb, for the BSDs, where upstream has no
+ * backend at all (builder/overlay/core.bp). */
 
 #include "usb.h"
 

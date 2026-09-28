@@ -1,17 +1,8 @@
 #!/usr/bin/env bash
-# In-place source fixups for the AOSP host-tool build.
-#
-#   ROOTDIR   checkout root (default: cwd)
-#   TARGET    target triple; only the per-target sections look at it
-#
-# This is about the code only. Which files are compiled, with which flags, is
-# the builder's business (builder/overlay/*.bp), and new source files the
-# build adds live in patches/sources/ and are compiled from there.
-#
-# Best effort: the same script runs on every release the build supports, so a
-# fixup whose code a release has changed (or does not have yet) is reported and
-# skipped instead of failing the build. Run it once on a fresh checkout;
-# re-running re-applies the seds.
+# Best-effort source fixups for the non-Soong toolchains, run on every release:
+# a fixup a release doesn't need is reported and skipped. What gets compiled
+# is builder/overlay's business; new files live in patches/sources/.
+# Env: ROOTDIR, TARGET (only the per-target sections read it).
 set -Euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -201,11 +192,9 @@ sed -i 's|^#include "\.\.\\api\\\(.*\)"$|#include "../api/\1"|' "$awa"/winusb/*.
 sed -i '/^ADBAPIHANDLE /,/^}/ s/\breturn false;/return NULL;/' "$awa"/api/*.cpp "$awa"/winusb/*.cpp
 
 # --- arm64ec (Windows) ------------------------------------------------------
-# protobuf guards its x86 asm on __x86_64__ in several spellings -- plain
-# "&& __GNUC__" (parse_context.h's ror/movb, port_def.inc's prefetcht0) and
-# "__GCC_ASM_FLAG_OUTPUTS__ &&" (varint_shuffle.h's btc), which clang also defines
-# on AArch64. arm64ec assembles none of it and every site has a portable #else, so
-# require a non-EC target for the macro itself rather than per guard spelling.
+# protobuf guards its x86 asm on __x86_64__ in several spellings; arm64ec
+# defines it but assembles none of it, and every site has a portable #else.
+# So require a non-EC target at every __x86_64__ test.
 grep -rl 'defined(__x86_64__)' src/protobuf/src 2>/dev/null | while read -r _f; do
   sed -i 's@defined(__x86_64__)@(defined(__x86_64__) \&\& !defined(__arm64ec__))@g' "$_f"
 done
@@ -251,12 +240,10 @@ case "$TARGET" in
     ;;
 esac
 
-# cacheflush(): ART's 32-bit ARM path calls it, and only bionic has it. glibc,
-# musl and the BSDs export no cacheflush on ARM, so there it becomes the
-# compiler runtime's __clear_cache (the cacheflush syscall on Linux,
-# sysarch(ARM_SYNC_ICACHE) on the BSDs). mingw maps onto Win32
-# FlushInstructionCache, declared by hand so <windows.h> stays behind utils.cc's
-# own ERROR-macro dance.
+# cacheflush(): ART's 32-bit ARM path calls it, but only bionic has it. Elsewhere
+# it becomes the compiler runtime's __clear_cache, or on mingw Win32's
+# FlushInstructionCache (declared by hand: <windows.h> must stay behind
+# utils.cc's own ERROR-macro handling).
 sed -i '/#include "os.h"/a\
 #if defined(__arm__)\
 #if defined(_WIN32)\
@@ -343,10 +330,9 @@ for f in lib/support/prof_err.c lib/ext2fs/ext2_err.c; do
 done
 
 # --- BSD --------------------------------------------------------------------
-# Soong has no BSD target. These add BSD branches next to the Linux/macOS ones;
-# the ones that only add #if'd code are applied for every target.
-# libbase/threads.cpp GetThreadId() has no BSD branch, so it falls off a non-void
-# function and clang's trap crashes adb at startup. Add the BSD calls + headers.
+# Soong has no BSD target: these add BSD branches next to the Linux/macOS ones.
+# libbase GetThreadId() has none, so it falls off a non-void function and
+# clang's trap crashes adb at startup. Add the BSD calls and headers.
 sed -i '/#include <unistd.h>/a\
 #if defined(__FreeBSD__)\n#include <pthread_np.h>\n#elif defined(__NetBSD__)\n#include <lwp.h>\n#endif' src/libbase/threads.cpp
 sed -i '/return syscall(__NR_gettid);/a\

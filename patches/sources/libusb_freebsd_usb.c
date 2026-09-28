@@ -65,14 +65,9 @@ struct device_priv {
 };
 
 struct handle_priv {
-	/*
-	 * adb drives this backend from two threads at once (a bulk-IN read
-	 * thread and a bulk-OUT write thread) via the synchronous
-	 * libusb_bulk_transfer API. The single ugen fd and its USB_FS_COMPLETE
-	 * queue are shared, so access is serialized by `lock`, and completions
-	 * are dispatched into per-slot done/status/actlen so each waiting thread
-	 * only consumes its own transfer's result.
-	 */
+	/* adb reads and writes from two threads through the synchronous bulk API.
+	 * They share one ugen fd and completion queue, so `lock` serializes access
+	 * and completions land in per-slot done/status/actlen for their waiter. */
 	pthread_mutex_t	lock;
 	int		fd;		/* O_RDWR node fd; also USB_FS_* target */
 	int		fs_inited;	/* USB_FS_INIT has run */
@@ -695,13 +690,9 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 	}
 	pthread_mutex_unlock(&hpriv->lock);
 
-	/*
-	 * Wait for *this* slot to complete. Multiple threads may poll the shared
-	 * fd concurrently; whoever wakes drains every ready completion into the
-	 * per-slot table (under the lock), so each thread finds its own. A short
-	 * poll slice bounds how long we hold nothing while another thread owns
-	 * the wakeup.
-	 */
+	/* Wait for this slot. Whichever thread wakes drains every ready completion
+	 * into the per-slot table (under the lock); the short poll slice bounds the
+	 * time spent while another thread owns the wakeup. */
 	for (;;) {
 		pfd.fd = hpriv->fd;
 		pfd.events = POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM;

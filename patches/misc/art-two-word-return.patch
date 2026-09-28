@@ -1,10 +1,6 @@
-art: pick TwoWordReturn by pointer width, not by CPU.
-
-instruction_set.h only knows the five CPUs ART runs on and #errors on the
-rest; the tools here (dexdump, veridex) never call the entrypoints it is
-for, but the header still has to compile on every host CPU. The choice is
-purely about the width of uintptr_t: __SIZEOF_POINTER__, not __LP64__,
-which 64-bit Windows (LLP64) leaves undefined. That also gets x32 right.
+art: pick TwoWordReturn by pointer width (__SIZEOF_POINTER__), not by CPU,
+so instruction_set.h compiles on every host CPU dexdump is built for; that
+also covers LLP64 Windows and x32.
 
 --- a/src/art/libartbase/arch/instruction_set.h
 +++ b/src/art/libartbase/arch/instruction_set.h
