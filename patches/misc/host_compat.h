@@ -52,6 +52,12 @@
 # endif
 #endif
 
+/* FreeBSD/OpenBSD report a missing xattr as ENOATTR and have no ENODATA
+ * (f2fs-tools' xattr.c). */
+#if (defined(__FreeBSD__) || defined(__OpenBSD__)) && !defined(ENODATA)
+# define ENODATA ENOATTR
+#endif
+
 /* --- BSD pthread process-shared stubs ---------------------------------------
  * Mutex/Condition/RWLock SHARED ctors call pthread_*attr_setpshared() (dead on
  * host). NetBSD hides all three behind _PTHREAD_PSHARED; OpenBSD lacks the

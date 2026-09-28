@@ -65,9 +65,9 @@ fetch_unpack() {
 
 # REPO_OS_OVERRIDE makes sdkmanager fetch a specific OS's packages so each
 # platform gets the matching SDK to splice into. bionic/BSD reuse the Linux SDK.
-# PT_OS is the same OS as Google's platform-tools zips name it.
+# PT_OS: how Google's platform-tools zips name the OS (win from 35.0.1 on).
 case "$PLATFORM" in
-  windows) REPO_OS_OVERRIDE=windows; PT_OS=windows ;;
+  windows) REPO_OS_OVERRIDE=windows; PT_OS="win windows" ;;
   macos)   REPO_OS_OVERRIDE=macosx;  PT_OS=darwin ;;
   *)       REPO_OS_OVERRIDE=linux;   PT_OS=linux ;;
 esac
@@ -102,9 +102,15 @@ printf 'y\n%.0s' {1..100} | "$SDKMANAGER" --sdk_root="$HOST_SDK" --licenses
 # platform-tools: Google keeps every released revision's zip, while sdkmanager
 # only offers the latest. Revisions that never shipped (or a tag without the
 # template) get the latest.
-PT_URL="https://dl.google.com/android/repository/platform-tools_r${PLATFORM_TOOLS_VERSION}-${PT_OS}.zip"
-if [ -n "$PLATFORM_TOOLS_VERSION" ] \
-   && aria2c --dry-run=true --console-log-level=error --max-tries=3 "$PT_URL" >/dev/null 2>&1; then
+PT_URL=""
+for os_name in $PT_OS; do
+  url="https://dl.google.com/android/repository/platform-tools_r${PLATFORM_TOOLS_VERSION}-${os_name}.zip"
+  if [ -n "$PLATFORM_TOOLS_VERSION" ] \
+     && aria2c --dry-run=true --console-log-level=error --max-tries=3 "$url" >/dev/null 2>&1; then
+    PT_URL="$url"; break
+  fi
+done
+if [ -n "$PT_URL" ]; then
   PT_LATEST=""; PT_DESC="$PLATFORM_TOOLS_VERSION"
 else
   log "No official platform-tools ${PLATFORM_TOOLS_VERSION:-(unknown)} for $PT_OS; using the latest"
@@ -140,7 +146,14 @@ splice() {
 }
 BT="$HOST_SDK/build-tools/$BUILD_TOOLS_VERSION"
 splice "$BT"
-splice "$HOST_SDK/platform-tools"
+# Every build-tools release has all the build-tools we build, so the rest are
+# platform-tools: install them even where the (latest) zip no longer has them.
+for f in "$BUILT_BIN"/*; do
+  bname="$(basename "$f")"
+  [ -f "$f" ] && [ ! -e "$BT/$bname" ] || continue
+  echo "Installing $bname"
+  cp "$f" "$HOST_SDK/platform-tools/$bname"
+done
 
 # --- prune host-only / renderscript leftovers -------------------------------
 rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"

@@ -12,9 +12,8 @@ soong_config_values {
 }
 
 // Every binary the official packages ship, from 29 on (make-sdk.sh swaps
-// ours in by name and drops any it lacks). Releases without a module skip it:
-// casefold arrived in 30.0.5, dmtracedump left after 34.0.4, e2fsdroid and
-// sload_f2fs after 33.0.3 (Linux/macOS only).
+// ours in by name and drops any it lacks). Releases without a module skip it
+// (casefold arrived in 30.0.5); `until` names the first release without them.
 sdk_tools {
     name: "build-tools",
     tools: [
@@ -31,39 +30,35 @@ sdk_tools {
     name: "platform-tools",
     tools: [
         "adb",
-        "dmtracedump",
-        "e2fsdroid",
         "etc1tool",
         "fastboot",
         "hprof-conv",
         "make_f2fs",
         "make_f2fs_casefold",
         "mke2fs",
-        "sload_f2fs",
         "sqlite3",
+    ],
+}
+
+sdk_tools {
+    name: "platform-tools-dmtracedump",
+    until: "34.0.5",
+    tools: ["dmtracedump"],
+}
+
+// Not on Windows, as upstream. Their fs_config comes from libcutils, which
+// builds it for every other host until they were retired.
+sdk_tools {
+    name: "platform-tools-fs",
+    until: "34.0.0",
+    tools: [
+        "e2fsdroid",
+        "sload_f2fs",
     ],
     target: {
         windows: {
             exclude_tools: [
                 "e2fsdroid",
-                "sload_f2fs",
-            ],
-        },
-        // Both take their fs_config from libcutils, which builds it (and has
-        // <private/fs_config.h> include <linux/capability.h>) for Linux only.
-        darwin: {
-            exclude_tools: [
-                "e2fsdroid",
-                "sload_f2fs",
-            ],
-        },
-        // f2fs-tools leans on Linux-only headers throughout. e2fsdroid has
-        // never been built for the BSDs here, so it stays out with them.
-        bsd: {
-            exclude_tools: [
-                "e2fsdroid",
-                "make_f2fs",
-                "make_f2fs_casefold",
                 "sload_f2fs",
             ],
         },

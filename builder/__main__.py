@@ -30,6 +30,21 @@ def parse_var(s):
     return k, v
 
 
+def release_version(tree, variables):
+    """The platform-tools revision as a tuple: sdk:platform_tools_version, else
+    the release's own plat_tools_source.prop_template, else None."""
+    v = variables.get("sdk:platform_tools_version")
+    p = tree.to_local("development/sdk/plat_tools_source.prop_template")
+    if not v and p and os.path.isfile(p):
+        with open(p) as f:
+            v = next((l.split("=", 1)[1].strip() for l in f if l.startswith("Pkg.Revision=")), None)
+    return version_tuple(v) if v else None
+
+
+def version_tuple(v):
+    return tuple(int(x) for x in v.split(".") if x.isdigit())
+
+
 def make_link(src, dst):
     if os.path.lexists(dst):
         return
@@ -108,8 +123,14 @@ def main(argv=None):
         tools = [t for t in args.tools.split(",") if t]
     else:
         tools = []
+        version = release_version(tree, variables)
         for m in loader.sdk_tools:
             p = loader.flatten(m, os_type, args.arch)
+            # `until`: the first release that no longer ships these tools
+            if version and p.get("until") and version >= version_tuple(p["until"]):
+                notes.append("note: %s left the official package in %s; skipped"
+                             % (", ".join(p.get("tools", [])), p["until"]))
+                continue
             drop = set(p.get("exclude_tools", []))
             tools += [t for t in p.get("tools", []) if t not in drop]
     built = []

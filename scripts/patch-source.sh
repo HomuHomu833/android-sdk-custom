@@ -544,6 +544,48 @@ fi
 sed -i 's/^#ifndef bool$/#if !defined(bool) \&\& (!defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L) \&\& !defined(__cplusplus)/' \
   src/f2fs-tools/include/f2fs_fs.h
 
+# f2fs-tools on the BSDs: android_config.h has Linux/macOS/Windows blocks only,
+# so give them one (lseek64 comes from host_compat.h). The device size ioctls
+# are FreeBSD's/NetBSD's byte counts; OpenBSD has none, so only files size there.
+grep -q '__NetBSD__' src/f2fs-tools/include/android_config.h ||
+  sed -i '/^#if defined(_WIN32)$/i \
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\
+#define HAVE_FCNTL_H 1\
+#define HAVE_STDLIB_H 1\
+#define HAVE_STRING_H 1\
+#define HAVE_SYS_IOCTL_H 1\
+#define HAVE_SYS_MOUNT_H 1\
+#define HAVE_SYS_UTSNAME_H 1\
+#define HAVE_UNISTD_H 1\
+#define HAVE_CLOCK_GETTIME 1\
+#define HAVE_FSTAT 1\
+#define HAVE_FSYNC 1\
+#define HAVE_LSEEK64 1\
+#define HAVE_MEMSET 1\
+#define HAVE_PREAD 1\
+#define HAVE_PWRITE 1\
+#define HAVE_SPARSE_SPARSE_H 1\
+#define HAVE_LIBLZ4 1\
+#ifdef WITH_SLOAD\
+#define HAVE_LIBSELINUX 1\
+#endif\
+#endif\
+' src/f2fs-tools/include/android_config.h
+grep -q 'DIOCGMEDIASIZE' src/f2fs-tools/lib/libf2fs.c ||
+  sed -i '/^#endif \/\* APPLE_DARWIN \*\/$/a \
+\
+#if defined(__FreeBSD__)\
+#include <sys/disk.h>\
+#elif defined(__NetBSD__)\
+#include <sys/dkio.h>\
+#endif\
+#if defined(__FreeBSD__) || defined(__NetBSD__)\
+#define BLKGETSIZE64	DIOCGMEDIASIZE\
+#define BLKSSZGET	DIOCGSECTORSIZE\
+#elif defined(__OpenBSD__)\
+#define BLKGETSIZE64	0\
+#endif' src/f2fs-tools/lib/libf2fs.c
+
 # ART mem_map.h (older releases): only aarch64/riscv/Apple get the low-4G
 # allocator, other 64-bit CPUs #error (loongarch64, mips64, ppc64, s390x).
 # Newer ART uses it on every 64-bit host; do so for all but x86_64, which
