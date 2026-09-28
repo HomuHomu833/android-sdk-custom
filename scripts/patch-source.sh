@@ -627,10 +627,16 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
-# Older libutils gives only glibc (not musl) the libbacktrace headers its
-# CallStack.h includes; widen that block to host_linux, which covers both.
-sed -i '/^        linux_glibc: {$/{N;s/^        linux_glibc: {\n\(            header_libs: \["libbacktrace_headers"\],\)$/        host_linux: {\n\1/}' \
+# Older libutils gives only glibc (not musl or the BSDs) the libbacktrace
+# headers its CallStack.h includes; widen that block to not_windows.
+sed -i '/^        linux_glibc: {$/{N;s/^        linux_glibc: {\n\(            header_libs: \["libbacktrace_headers"\],\)$/        not_windows: {\n\1/}' \
   src/core/libutils/Android.bp
+
+# Older BoringSSL sizes its pthread CRYPTO_MUTEX by hand, too small for
+# NetBSD's pthread_rwlock_t on some CPUs (thread_pthread.c static_asserts).
+# Leave room; everything is linked statically, so the layout is private.
+sed -i 's/^  uint8_t padding\[3\*sizeof(int) + 5\*sizeof(unsigned) + 16 + 8\];$/  uint8_t padding[3*sizeof(int) + 5*sizeof(unsigned) + 16 + 8 + 64];/' \
+  src/boringssl/src/include/openssl/thread.h
 
 # Older aidl's lexer expects bison to define YYSTYPE/YYLTYPE, which the
 # glr.cc skeleton of newer bison doesn't; platform-tools-33.0.2 defines them.
