@@ -627,6 +627,18 @@ if [ -f src/core/libcutils/threads.cpp ]; then
     src/core/libcutils/include/cutils/threads.h
 fi
 
+# Older libutils gives only glibc (not musl) the libbacktrace headers its
+# CallStack.h includes; widen that block to host_linux, which covers both.
+sed -i '/^        linux_glibc: {$/{N;s/^        linux_glibc: {\n\(            header_libs: \["libbacktrace_headers"\],\)$/        host_linux: {\n\1/}' \
+  src/core/libutils/Android.bp
+
+# Older aidl's lexer expects bison to define YYSTYPE/YYLTYPE, which the
+# glr.cc skeleton of newer bison doesn't; platform-tools-33.0.2 defines them.
+if ! grep -q 'define YYSTYPE' src/aidl/aidl_language_l.ll; then
+  sed -i 's/^#include "aidl_language_y.h"$/#include "aidl_language_y.h"\n\n#ifndef YYSTYPE\n#define YYSTYPE yy::parser::semantic_type\n#endif\n\n#ifndef YYLTYPE\n#define YYLTYPE yy::parser::location_type\n#endif/' \
+    src/aidl/aidl_language_l.ll
+fi
+
 # Older ART safe_copy.cc takes PAGE_SIZE from <sys/user.h>, which not every
 # libc/CPU defines (musl armeb, glibc loongarch64). Later ART uses its own
 # kPageSize from globals.h; do the same.
