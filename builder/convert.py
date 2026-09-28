@@ -681,14 +681,15 @@ class Converter:
             if y.get("gen_position_hh"):
                 extra.append(self.cm(os.path.join(os.path.dirname(out), "position.hh")))
             t.gens.append(GenRule([self.cm(out), self.cm(hdr)] + extra, cmd, [self.cm(src)],
-                                  "bison %s" % os.path.basename(src)))
+                                  "Generating %s.{%s,h}" % (os.path.splitext(rel)[0], ext)))
             t.srcs += [self.cm(out), self.cm(hdr)] + extra
         for src in lexes:
             rel = self.tree_rel(src)
             ext = "cpp" if src.endswith(".ll") else "c"
             out = os.path.join(ldir, os.path.splitext(rel)[0] + "." + ext)
             cmd = ["${FLEX}"] + lflags + ["-o" + self.cm(out), rel]
-            t.gens.append(GenRule([self.cm(out)], cmd, [self.cm(src)], "flex %s" % os.path.basename(src)))
+            t.gens.append(GenRule([self.cm(out)], cmd, [self.cm(src)],
+                                  "Generating %s.%s" % (os.path.splitext(rel)[0], ext)))
             t.srcs.append(self.cm(out))
         aosp_dir = m.aosp_dir if not m.overlay else ""
         t.includes.append(self.cm(os.path.join(ydir, aosp_dir)))
