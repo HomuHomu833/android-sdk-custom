@@ -25,6 +25,7 @@
     {"path": "src/art", "aosp": "art"},
     {"path": "src/dalvik", "aosp": "dalvik"},
     {"path": "src/sqlite", "aosp": "external/sqlite"},
+    {"path": "src/icu", "aosp": "external/icu", "sparse": ["/**/Android.bp", "/icu4c/source/common/", "/icu4c/source/i18n/", "/icu4c/source/stubdata/"]},
     {"path": "src/lz4", "aosp": "external/lz4"},
     {"path": "src/zstd", "aosp": "external/zstd"},
     {"path": "src/lzma", "aosp": "external/lzma"},
