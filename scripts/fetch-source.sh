@@ -23,7 +23,7 @@ fi
 
 # "<local dir>\t<project name>\t<sparse patterns>" for each repos.json entry
 # this release has. "sparse" lists the checkout patterns of a project the tools
-# use only part of (external/icu's C sources, in a repo mostly Java and data).
+# use only part of (frameworks/base, external/icu); keep every *.bp for Soong.
 PLAN="$(python3 - "$MANIFEST/default.xml" repos.json <<'PY'
 import json, sys, xml.etree.ElementTree as ET
 projects = {}
