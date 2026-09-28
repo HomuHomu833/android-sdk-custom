@@ -6,3 +6,14 @@ cc_library_headers {
     name: "android.content.res.flags-aconfig-cc-host-ro",
     export_include_dirs: ["include"],
 }
+
+// aapt2 links libprotobuf-cpp-full and hands its protos to APIs taking
+// google::protobuf::Message, but older releases (platform-tools-33.0.1 and
+// earlier) leave proto.type unset, which cc/proto.go reads as lite. 33.0.2
+// set it; do the same everywhere.
+amend {
+    name: "libaapt2",
+    proto: {
+        type: "full",
+    },
+}

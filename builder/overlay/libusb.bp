@@ -6,6 +6,11 @@
 amend {
     name: "libusb",
     target: {
+        // Older releases (platform-tools-33.0.1 and earlier) point only glibc
+        // and bionic at linux/config.h.
+        linux_musl: {
+            local_include_dirs: ["linux"],
+        },
         bsd: {
             srcs: [
                 "libusb/os/events_posix.c",
