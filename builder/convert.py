@@ -180,6 +180,24 @@ class Converter:
     def mod_dir(self, m):
         return self.tree.root if m.overlay else m.dir
 
+    def split_path(self, m, rel):
+        """(base dir, rest) for a path relative to module m.
+
+        An overlay's paths name this repo's files, unless they start with a
+        fetched project's AOSP path (development/host/...): then they name
+        that project's files, so overlays can build upstream sources that no
+        Android.bp compiles.
+        """
+        if m.overlay:
+            p = rel.strip("/")
+            for a, l in self.tree.projects:
+                if p == a or p.startswith(a + "/"):
+                    return l, p[len(a) + 1:]
+        return self.mod_dir(m), rel
+
+    def mjoin(self, m, rel):
+        return os.path.join(*self.split_path(m, rel))
+
     def root_path(self, p):
         """Tree-root-relative path (include_dirs) to a local path."""
         if p.startswith("${"):
@@ -279,7 +297,7 @@ class Converter:
             if s.startswith("${"):
                 out.append(s)
                 continue
-            hits = glob(base, s)
+            hits = glob(*self.split_path(m, s))
             if any(c in s for c in "*?"):
                 hits = [h for h in hits if os.path.isfile(h)]
             out.extend(os.path.normpath(h) for h in hits)
@@ -463,7 +481,7 @@ class Converter:
             t.srcs.extend(self.convert(g, m).outputs)
 
         # include paths, in Soong's order
-        t.includes += [self.cm(os.path.join(mdir, d)) for d in p.get("local_include_dirs", [])]
+        t.includes += [self.cm(self.mjoin(m, d)) for d in p.get("local_include_dirs", [])]
         for d in p.get("include_dirs", []):
             lp = self.root_path(d)
             if lp is None or not (lp.startswith("${") or os.path.isdir(lp)):
@@ -473,9 +491,9 @@ class Converter:
         if p.get("include_build_directory", True):
             t.includes.append(self.cm(mdir))
         for d in p.get("export_include_dirs", []):
-            t.export_includes.append(d if d.startswith("${") else self.cm(os.path.join(mdir, d)))
+            t.export_includes.append(d if d.startswith("${") else self.cm(self.mjoin(m, d)))
         for d in p.get("export_system_include_dirs", []):
-            t.export_system_includes.append(self.cm(os.path.join(mdir, d)))
+            t.export_system_includes.append(self.cm(self.mjoin(m, d)))
 
         # flags
         third_party = aosp_dir.startswith(("external/", "vendor/", "hardware/", "device/"))
@@ -590,9 +608,9 @@ class Converter:
         if len(srcs) != 1:
             raise ResolveError("prebuilt %s needs exactly one src" % m.name)
         s = srcs[0]
-        t.prebuilt = s if s.startswith("${") else self.cm(os.path.join(self.mod_dir(m), s))
+        t.prebuilt = s if s.startswith("${") else self.cm(self.mjoin(m, s))
         for d in p.get("export_include_dirs", []):
-            t.export_includes.append(d if d.startswith("${") else self.cm(os.path.join(self.mod_dir(m), d)))
+            t.export_includes.append(d if d.startswith("${") else self.cm(self.mjoin(m, d)))
         t.ldlibs = self._ldlibs(p.get("host_ldlibs", []))
         for n in p.get("static_libs", []) + p.get("shared_libs", []):
             if n not in SYSTEM_LIBS:
@@ -614,7 +632,7 @@ class Converter:
         pdir = os.path.join(self.gen_dir, t.name, "proto")
         flags = []
         for d in pp.get("local_include_dirs", []):
-            flags.append("-I" + self.tree_rel(os.path.join(self.mod_dir(m), d)))
+            flags.append("-I" + self.tree_rel(self.mjoin(m, d)))
         for d in pp.get("include_dirs", []):
             lp = self.root_path(d)
             if lp:

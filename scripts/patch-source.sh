@@ -135,17 +135,18 @@ sed -i '/^#include <sys\/uio.h>/a #endif' src/selinux/libselinux/src/setrans_cli
 sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   src/e2fsprogs/lib/config.h
 
-# ADB Windows: default is_libusb_enabled() (should_use_libusb() in older adb) to
-# the libusb backend (no AdbWinApi).
-sed -i '/^bool \(is_libusb_enabled\|should_use_libusb\)() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(_WIN32) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
+# ADB BSD: default is_libusb_enabled() (should_use_libusb() in older adb) to
+# the libusb backend, the only one the BSDs have. Windows keeps upstream's
+# AdbWinApi default (built from source, see builder/overlay/adbwinapi.bp).
+sed -i '/^bool \(is_libusb_enabled\|should_use_libusb\)() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
   src/adb/client/transport_usb.cpp
 # Older still: no platform default at all, only ADB_LIBUSB=1.
-sed -i '/^bool should_use_libusb() {/,/^}/ s/^    static bool enable = getenv("ADB_LIBUSB") && strcmp(getenv("ADB_LIBUSB"), "1") == 0;$/#if defined(_WIN32) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n    static bool enable = true;\n#else\n&\n#endif/' \
+sed -i '/^bool should_use_libusb() {/,/^}/ s/^    static bool enable = getenv("ADB_LIBUSB") && strcmp(getenv("ADB_LIBUSB"), "1") == 0;$/#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n    static bool enable = true;\n#else\n&\n#endif/' \
   src/adb/client/transport_usb.cpp
 
-# ADB Windows+BSD: exclude the legacy native BlockingConnection USB path (dead,
+# ADB BSD: exclude the native BlockingConnection USB path (no native backend,
 # won't link), keeping is_adb_interface()/is_libusb_enabled().
-native_if='#if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path'
+native_if='#if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path'
 if grep -q '^#if ADB_HOST$' src/adb/client/transport_usb.cpp; then
   # platform-tools-34 and earlier: the read helpers sit in #if ADB_HOST/#else/
   # #endif and UsbConnection follows unguarded; some releases then open an
@@ -163,7 +164,7 @@ fi
 sed -i '/^\(bool\|int\) is_adb_interface(int usb_class/i #endif  // native USB path\n' \
   src/adb/client/transport_usb.cpp
 # ...and the matching native-transport registration helpers in transport.cpp.
-sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
+sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
   src/adb/transport.cpp
 # Close it right after unregister_usb_transport(): older adb keeps more host
 # code (atransport's reverse config) before the enclosing #endif.
@@ -181,6 +182,23 @@ sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVER
 # ADB Windows: reinterpret_cast adb_stat* to _stat64* for wstat() in stat.cpp.
 sed -i 's/wstat(path_wide\.c_str(), &st)/wstat(path_wide.c_str(), reinterpret_cast<struct _stat64*>(\&st))/' \
   src/adb/sysdeps/win32/stat.cpp
+
+# --- AdbWinApi (Windows) ----------------------------------------------------
+# builder/overlay/adbwinapi.bp links AdbWinApi and AdbWinUsbApi into adb and
+# fastboot instead of shipping Google's prebuilt DLLs. Their API is then
+# neither exported nor imported...
+awa=src/development/host/windows/usb
+sed -i 's/^#ifdef ADBWIN_EXPORTS$/#if defined(ADBWIN_STATIC)\n#define ADBWIN_API EXTERN_C\n#define ADBWIN_API_CLASS\n#elif defined(ADBWIN_EXPORTS)/' \
+  "$awa/api/adb_api.h"
+# ...the routine AdbWinApi.dll would fetch from AdbWinUsbApi.dll at load time is
+# a direct reference (patches/sources/adbwinapi_static.cpp)...
+sed -i 's/^PFN_INSTWINUSBINTERFACE InstantiateWinUsbInterface = NULL;$/#if defined(ADBWIN_STATIC)\nextern "C" AdbInterfaceObject* __cdecl AdbWinUsbApiInstantiateWinUsbInterface(const wchar_t*);\nPFN_INSTWINUSBINTERFACE InstantiateWinUsbInterface = AdbWinUsbApiInstantiateWinUsbInterface;\n#else\n&\n#endif/' \
+  "$awa/api/adb_api.cpp"
+# ...the WinUSB half's includes of the API half use Windows separators...
+sed -i 's|^#include "\.\.\\api\\\(.*\)"$|#include "../api/\1"|' "$awa"/winusb/*.h
+# ...and handle-returning functions return false for NULL, which stopped being
+# a null pointer constant in C++11.
+sed -i '/^ADBAPIHANDLE /,/^}/ s/\breturn false;/return NULL;/' "$awa"/api/*.cpp "$awa"/winusb/*.cpp
 
 # --- arm64ec (Windows) ------------------------------------------------------
 # protobuf guards its x86 asm on __x86_64__ in several spellings -- plain

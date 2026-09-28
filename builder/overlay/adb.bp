@@ -51,20 +51,13 @@ genrule {
     cmd: "cp $(in) $(out)",
 }
 
-// Windows: adb talks to devices through libusb instead of Google's AdbWinApi
-// driver DLLs (the SDK ships without them). patches/sources/
-// adb_usb_windows_libusb.cpp has the usb_init()/usb_cleanup() glue the dropped
-// usb_windows.cpp used to provide.
-cc_library_headers {
-    name: "AdbWinApi",
-}
-
+// Windows keeps upstream's backends: AdbWinApi (built from source, see
+// adbwinapi.bp) by default, libusb with ADB_LIBUSB=1. These are the system
+// libraries both of them and the rest of adb's Windows code import.
 amend {
     name: "libadb_host",
     target: {
         windows: {
-            exclude_srcs: ["client/usb_windows.cpp"],
-            srcs: [":sdk_adb_usb_windows_libusb"],
             host_ldlibs: [
                 "-lsetupapi",
                 "-lole32",
@@ -90,9 +83,4 @@ amend {
 filegroup {
     name: "sdk_adb_usb_bsd",
     srcs: ["patches/sources/adb_usb_bsd.cpp"],
-}
-
-filegroup {
-    name: "sdk_adb_usb_windows_libusb",
-    srcs: ["patches/sources/adb_usb_windows_libusb.cpp"],
 }

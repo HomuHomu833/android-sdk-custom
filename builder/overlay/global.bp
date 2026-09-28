@@ -218,6 +218,8 @@ cc_defaults {
                 "-D_WIN32_WINNT=0x0A00",
                 "-DWINVER=0x0A00",
                 "-mno-ms-bitfields",
+                // AdbWinApi is linked in, not a DLL (adbwinapi.bp)
+                "-DADBWIN_STATIC",
                 // Soong gets these from -lssp; llvm-mingw's CRT implements
                 // both and its driver links the stack protector's support.
                 "-U_FORTIFY_SOURCE",

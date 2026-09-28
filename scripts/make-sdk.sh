@@ -167,7 +167,7 @@ rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
 rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscript*
 
 # --- drop now-useless DLLs (windows base) -----------------------------------
-# AdbWin*Api (we use libusb), libwinpthread-1 (static), RenderScript libs (pruned above).
+# AdbWin*Api (linked into adb/fastboot, builder/overlay/adbwinapi.bp), libwinpthread-1 (static), RenderScript libs (pruned above).
 rm -f "$HOST_SDK/platform-tools/AdbWinApi.dll" "$HOST_SDK/platform-tools/AdbWinUsbApi.dll"
 rm -f "$BT/libbcc.dll" "$BT/libbcinfo.dll" "$BT/libclang_android.dll" "$BT/libLLVM_android.dll"
 find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true
