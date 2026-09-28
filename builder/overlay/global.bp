@@ -70,9 +70,13 @@ sdk_tools {
 // strips flags from every module; host_ldlibs go to every binary.
 cc_defaults {
     name: "builder_defaults",
-    cflags: [
+    // build.sh's host aprotoc (sdk:host_protoc) only runs our codegen, so it
+    // skips optimizing, and with it fortify.
+    cflags: select(soong_config_variable("sdk", "host_protoc"), {
+        true: ["-O0"],
+        default: ["-O2"],
+    }) + [
         // commonGlobalCflags
-        "-O2",
         "-Wall",
         "-Wextra",
         "-Wpointer-arith",
@@ -129,11 +133,13 @@ cc_defaults {
         // Hardening, as linuxCflags/linuxLdflags and linuxBionicCflags have
         // it (musl ignores _FORTIFY_SOURCE).
         linux: {
-            cflags: [
-                "-U_FORTIFY_SOURCE",
-                "-D_FORTIFY_SOURCE=3",
-                "-fstack-protector-strong",
-            ],
+            cflags: select(soong_config_variable("sdk", "host_protoc"), {
+                true: [],
+                default: [
+                    "-U_FORTIFY_SOURCE",
+                    "-D_FORTIFY_SOURCE=3",
+                ],
+            }) + ["-fstack-protector-strong"],
             ldflags: [
                 "-Wl,-z,noexecstack",
                 "-Wl,-z,relro",

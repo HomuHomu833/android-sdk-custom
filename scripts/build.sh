@@ -353,7 +353,8 @@ if [ ! -x "$PROTOC" ]; then
   HOST_ZLIB="$(find /usr/lib /usr/lib64 -name libz.a 2>/dev/null | head -n1)"
   [ -n "$HOST_ZLIB" ] || { echo "host protoc: no libz.a on the build machine (zlib1g-dev)" >&2; exit 1; }
   python3 -m builder --root "$ROOTDIR" --os linux_glibc --arch "$HOST_ARCH" \
-    --tools aprotoc --var "sdk:zlib=$HOST_ZLIB" --out "$HOST_BUILD/generated"
+    --tools aprotoc --var "sdk:zlib=$HOST_ZLIB" --var sdk:host_protoc=true \
+    --out "$HOST_BUILD/generated"
   cmake -GNinja -S "$HOST_BUILD/generated" -B "$HOST_BUILD/cmake" \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_ASM_COMPILER=clang
