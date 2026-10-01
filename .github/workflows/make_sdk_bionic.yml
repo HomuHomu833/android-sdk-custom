@@ -15,6 +15,10 @@ on:
         description: "Official NDK revision letter (optional)"
         required: false
         default: ""
+      only:
+        description: "Only these targets (JSON array), default all"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -29,5 +33,6 @@ jobs:
       tag: ${{ inputs.tag }}
       ndk_version: ${{ inputs.ndk_version }}
       ndk_revision: ${{ inputs.ndk_revision }}
+      only: ${{ inputs.only }}
       # riscv64-linux-android
       targets: '["aarch64-linux-android", "armv7a-linux-androideabi", "i686-linux-android", "x86_64-linux-android"]'

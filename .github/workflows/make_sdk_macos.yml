@@ -7,6 +7,10 @@ on:
         description: "AOSP source tag (android-* or platform-tools-*)"
         required: true
         default: "android-17.0.0_r1"
+      only:
+        description: "Only these targets (JSON array), default all"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -19,6 +23,7 @@ jobs:
     with:
       platform: macos
       tag: ${{ inputs.tag }}
+      only: ${{ inputs.only }}
       targets: >-
         ["x86_64-apple-darwin", "x86_64h-apple-darwin",
          "arm64-apple-darwin", "arm64e-apple-darwin"]

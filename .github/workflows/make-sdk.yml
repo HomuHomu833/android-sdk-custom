@@ -10,6 +10,11 @@ on:
         description: "JSON array of target triples"
         required: true
         type: string
+      only:
+        description: "JSON array replacing targets, when set"
+        required: false
+        type: string
+        default: ""
       tag:
         description: "AOSP source tag (android-* or platform-tools-*)"
         required: true
@@ -34,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(inputs.targets) }}
+        target: ${{ fromJSON(inputs.only != '' && inputs.only || inputs.targets) }}
     runs-on: ubuntu-24.04
     steps:
       - name: Maximize build space
