@@ -62,6 +62,6 @@ printf '%s\n' "$PLAN" | while IFS="$(printf '\t')" read -r path name sparse; do
 done
 
 # --- in-place source fixups -------------------------------------------------
-TARGET="${TARGET:-}" ROOTDIR="$ROOTDIR" "$SCRIPT_DIR/patch-source.sh"
+TAG="$TAG" TARGET="${TARGET:-}" ROOTDIR="$ROOTDIR" "$SCRIPT_DIR/patch-source.sh"
 
 log "Sources ready under $ROOTDIR/src"

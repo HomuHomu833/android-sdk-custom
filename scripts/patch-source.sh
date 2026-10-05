@@ -2,11 +2,12 @@
 # Best-effort source fixups for the non-Soong toolchains, run on every release:
 # a fixup a release doesn't need is reported and skipped. What gets compiled
 # is builder/overlay's business; new files live in patches/sources/.
-# Env: ROOTDIR, TARGET (only the per-target sections read it).
+# Env: ROOTDIR, TARGET (only the per-target sections read it), TAG.
 set -Euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
 TARGET="${TARGET:-}"
+TAG="${TAG:-}"
 cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -16,6 +17,20 @@ trap 'SKIPPED=$((SKIPPED + 1)); printf "\033[1;33mwarning:\033[0m patch-source.s
 
 # A unified diff against the checkout (paths src/...); forward only, no .rej.
 apply() { patch -p1 -N -s -r - --no-backup-if-mismatch -d "$ROOTDIR" -i "$1"; }
+
+# --- platform-tools revision ---------------------------------------------------
+# plat_tools_source.prop_template is what adb/fastboot --version, the builder's
+# release checks, the official package make-sdk.sh fetches and the release name
+# all read. A few tags never bumped it; set the revision they actually are.
+case "$TAG" in
+  platform-tools-34.0.0) pt_rev=34.0.0 ;;  # says 33.0.4
+  platform-tools-34.0.3) pt_rev=34.0.3 ;;  # says 34.0.1
+  *) pt_rev= ;;
+esac
+if [ -n "$pt_rev" ]; then
+  log "Platform-tools revision: $pt_rev"
+  sed -i "s/^Pkg\.Revision=.*/Pkg.Revision=$pt_rev/" src/development/sdk/plat_tools_source.prop_template
+fi
 
 # --- patches -------------------------------------------------------------------
 log "Applying patches"
