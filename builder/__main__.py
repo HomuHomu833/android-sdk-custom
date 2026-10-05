@@ -145,7 +145,8 @@ def main(argv=None):
     os_type = OS_TYPES[args.os]
     variables = dict(args.var)
     variables.setdefault("sdk:os", args.os)
-    loader = Loader(tree, SelectConfig(args.os, args.arch, variables), overlays)
+    version = release_version(tree, variables)
+    loader = Loader(tree, SelectConfig(args.os, args.arch, variables, version), overlays)
 
     out = os.path.abspath(args.out)
     gen = os.path.join(out, "gen")
@@ -168,7 +169,6 @@ def main(argv=None):
         tools = [t for t in args.tools.split(",") if t]
     else:
         tools = []
-        version = release_version(tree, variables)
         for m in loader.sdk_tools:
             p = loader.flatten(m, os_type, args.arch)
             # `until`: the first release that no longer ships these tools

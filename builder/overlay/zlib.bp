@@ -17,11 +17,16 @@ zlib_rvv = [
 amend {
     name: "libz_defaults",
     target: {
-        // Older zlib (Android 16 r1) only tells android_arm and linux_arm64
-        // how to probe CPU features; 32-bit ARM bionic hosts got the NEON
-        // code without a cpu_check_features(). Newer zlib does this itself.
+        // zlib in platform-tools 32.0.0 to 36.0.0 (android-16.0.0_r1) sets the
+        // CPU-feature probe OS only for android_arm, leaving 32-bit ARM bionic
+        // hosts NEON code without cpu_check_features(). Before 32.0.0 every arm
+        // got it; from 36.0.1 zlib's own linux_arm does.
         linux_bionic_arm: {
-            cflags: ["-DARMV8_OS_LINUX"],
+            cflags: select((platform_tools_version_at_least("32.0.0"),
+                            platform_tools_version_at_least("36.0.1")), {
+                (true, false): ["-DARMV8_OS_LINUX"],
+                (default, default): [],
+            }),
         },
         glibc_arm: {
             exclude_cflags: zlib_neon,

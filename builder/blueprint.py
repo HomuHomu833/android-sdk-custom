@@ -313,11 +313,15 @@ class SelectConfig:
     os()/arch() come from the target; soong_config_variable, release_flag and
     product_variable read from `variables` (keys like "ns:var" or "FLAG") and
     otherwise match nothing, so `default` wins, as for an unconfigured product.
+    platform_tools_version_at_least("X.Y.Z") (ours, not Soong's) is true/false
+    against the release's platform-tools revision, or matches only `default`
+    when that is unknown.
     """
 
-    def __init__(self, os_name, arch_name, variables=None):
+    def __init__(self, os_name, arch_name, variables=None, version=None):
         self.os, self.arch = os_name, arch_name
         self.variables = variables or {}
+        self.version = version  # platform-tools revision as a tuple, or None
 
     def value(self, func, args):
         if func == "os":
@@ -328,6 +332,10 @@ class SelectConfig:
             return self.variables.get(":".join(args))
         if func in ("release_flag", "product_variable"):
             return self.variables.get(args[0])
+        if func == "platform_tools_version_at_least":
+            if self.version is None:
+                return None
+            return self.version >= tuple(int(x) for x in args[0].split("."))
         if func == "boolean_var_for_testing":
             return None
         if func == "variant":
