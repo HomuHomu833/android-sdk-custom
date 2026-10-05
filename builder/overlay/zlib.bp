@@ -17,6 +17,12 @@ zlib_rvv = [
 amend {
     name: "libz_defaults",
     target: {
+        // Older zlib (Android 16 r1) only tells android_arm and linux_arm64
+        // how to probe CPU features; 32-bit ARM bionic hosts got the NEON
+        // code without a cpu_check_features(). Newer zlib does this itself.
+        linux_bionic_arm: {
+            cflags: ["-DARMV8_OS_LINUX"],
+        },
         glibc_arm: {
             exclude_cflags: zlib_neon,
             cflags: ["-DCPU_NO_SIMD"],
