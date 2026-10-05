@@ -10,7 +10,7 @@
 #     bash -c 'scripts/fetch-source.sh && scripts/build.sh'
 FROM ubuntu:24.04
 
-ARG ZIG_VERSION=0.17.0
+ARG ZIG_VERSION=0.18.0-dev.2+faa537cf9
 ARG LLVM_MINGW_VERSION=20260922
 ARG REPO_OWNER=HomuHomu833
 ARG MACOS_SDK_VERSION=26.1
