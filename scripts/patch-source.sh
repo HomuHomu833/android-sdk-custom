@@ -623,6 +623,11 @@ sed -i 's/std::vector<const android::StringPiece>&& args/std::vector<android::St
 # <fp.h>. Newer libpng dropped the branch; stop macOS from taking it.
 sed -i 's/    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)$/    defined(THINK_C) || defined(__SC__)/' src/libpng/pngpriv.h
 
+# zlib zutil.h (platform-tools 34.0.5 and older): the same classic Mac OS
+# check, which #defines fdopen() to NULL and breaks the SDK's stdio.h
+# declaration of it. zlib dropped TARGET_OS_MAC there in 35.0.1.
+sed -i 's/^#if defined(MACOS) || defined(TARGET_OS_MAC)$/#if defined(MACOS)/' src/zlib/zutil.h
+
 # ART globals.h (platform-tools-35.0.1): GetPageSizeSlow() calls sysconf()
 # unconditionally, which Windows lacks. Later releases fall back to 4096.
 f=src/art/libartbase/base/globals.h
