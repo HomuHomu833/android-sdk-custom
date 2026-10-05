@@ -28,7 +28,6 @@ case "$TAG" in
   *) pt_rev= ;;
 esac
 if [ -n "$pt_rev" ]; then
-  log "Platform-tools revision: $pt_rev"
   sed -i "s/^Pkg\.Revision=.*/Pkg.Revision=$pt_rev/" src/development/sdk/plat_tools_source.prop_template
 fi
 
