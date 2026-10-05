@@ -179,6 +179,9 @@ sed -i 's/wstat(path_wide\.c_str(), &st)/wstat(path_wide.c_str(), reinterpret_ca
 # fastboot instead of shipping Google's prebuilt DLLs. Their API is then
 # neither exported nor imported...
 awa=src/development/host/windows/usb
+# AOSP ships these with CRLF line endings, which the $-anchored edits below
+# would never match.
+sed -i 's/\r$//' "$awa"/api/* "$awa"/winusb/*
 sed -i 's/^#ifdef ADBWIN_EXPORTS$/#if defined(ADBWIN_STATIC)\n#define ADBWIN_API EXTERN_C\n#define ADBWIN_API_CLASS\n#elif defined(ADBWIN_EXPORTS)/' \
   "$awa/api/adb_api.h"
 # ...the routine AdbWinApi.dll would fetch from AdbWinUsbApi.dll at load time is
