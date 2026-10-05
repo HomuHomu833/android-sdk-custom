@@ -136,6 +136,11 @@ sed -i '0,/} while (0)/s/} while (0)/} while (0)\
 sed -i '/^#include <netdb.h>/i #ifndef _WIN32' src/selinux/libselinux/src/setrans_client.c
 sed -i '/^#include <sys\/uio.h>/a #endif' src/selinux/libselinux/src/setrans_client.c
 
+# selinux label_file.h (platform-tools 33.0.3 and older ship e2fsdroid and
+# sload_f2fs, which link it): FreeBSD and OpenBSD have no <sys/xattr.h>. Its
+# one getxattr() reads restorecon's cached digest; report none stored.
+sed -i 's|^#include <sys/xattr.h>$|#if defined(__FreeBSD__) \|\| defined(__OpenBSD__)\n#include <sys/types.h>\n#define getxattr(path, name, value, size) (errno = ENOTSUP, (ssize_t)-1)\n#else\n#include <sys/xattr.h>\n#endif|' src/selinux/libselinux/src/label_file.h
+
 # e2fsprogs config.h: exclude _WIN32/BSD from HAVE_SYS_SYSMACROS_H (no such header).
 sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   src/e2fsprogs/lib/config.h
