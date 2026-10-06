@@ -103,21 +103,19 @@ struct ip_mreqn {
 #endif
 
 /* --- FreeBSD/OpenBSD in_pktinfo / IP_PKTINFO --------------------------------
- * Added in FreeBSD 14.0 / OpenBSD 7.3; older zig sysroots lack them while adb's
- * openscreen udp_socket.cpp uses them unconditionally. Define them so it compiles;
- * at runtime older kernels just return ENOPROTOOPT and the code falls back. */
+ * Neither kernel has IP_PKTINFO; adb's openscreen udp_socket.cpp enables it to
+ * learn a datagram's destination address (and fails the multicast join if the
+ * option is refused). IP_RECVDSTADDR is their equivalent: it delivers that
+ * address as an IP_RECVDSTADDR control message holding a struct in_addr, which
+ * is read here through ipi_addr, the first member. */
 #if (defined(__FreeBSD__) || defined(__OpenBSD__)) && !defined(IP_PKTINFO)
 #include <netinet/in.h>
 struct in_pktinfo {
     struct in_addr  ipi_addr;      /* Header destination address */
-    struct in_addr  ipi_spec_dst;  /* Local source address */
-    unsigned int    ipi_ifindex;   /* Interface index */
+    struct in_addr  ipi_spec_dst;  /* Unused */
+    unsigned int    ipi_ifindex;   /* Unused */
 };
-#if defined(__FreeBSD__)
-#define IP_PKTINFO 19  /* FreeBSD 14+ */
-#else
-#define IP_PKTINFO 26  /* OpenBSD 7.3+ */
-#endif
+#define IP_PKTINFO IP_RECVDSTADDR
 #endif
 
 /* --- BSD mempcpy ------------------------------------------------------------

@@ -511,6 +511,13 @@ done
 sed -i 's/^    upper_bound_bytes = recv(fd.get(), nullptr, 0, MSG_PEEK | MSG_TRUNC);$/#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n    static thread_local char peek_buf[65536];\n    upper_bound_bytes = recv(fd.get(), peek_buf, sizeof(peek_buf), MSG_PEEK);\n#else\n&\n#endif/' \
   src/adb/sysdeps_unix.cpp 2>/dev/null || true
 
+# adb openscreen udp_socket.cpp: NetBSD's IP_PKTINFO sets a default source
+# (struct); the multicast join's "deliver IP_PKTINFO" switch is IP_RECVPKTINFO.
+sed -i 's/adb_setsockopt(fd_, IPPROTO_IP, IP_PKTINFO, &enable_pktinfo,/adb_setsockopt(fd_, IPPROTO_IP, SDK_IP_PKTINFO_ON, \&enable_pktinfo,/' \
+  src/adb/client/openscreen/platform/udp_socket.cpp 2>/dev/null &&
+sed -i '0,/^#include /s//#if defined(__NetBSD__)\n#define SDK_IP_PKTINFO_ON IP_RECVPKTINFO\n#else\n#define SDK_IP_PKTINFO_ON IP_PKTINFO\n#endif\n&/' \
+  src/adb/client/openscreen/platform/udp_socket.cpp || true
+
 # libbase logging.cpp: the getprogname() fallback uses glibc-only
 # program_invocation_short_name; BSDs have native getprogname().
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
