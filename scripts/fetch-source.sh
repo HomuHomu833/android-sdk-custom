@@ -40,6 +40,10 @@ PY
 
 # --- clone (shallow, detached) -------------------------------------------------
 log "Cloning AOSP sources @ $TAG"
+# patch-source.sh's aliases of older locations (src/adb -> core/adb, ...) are
+# removed when it exits; drop any an interrupted run left, or they would pass
+# for the projects they stand in for.
+find src -maxdepth 1 -type l -delete 2>/dev/null || true
 printf '%s\n' "$PLAN" | while IFS="$(printf '\t')" read -r path name sparse; do
   [ -n "$path" ] || continue
   if [ -d "$path" ]; then

@@ -128,8 +128,10 @@ def main(argv=None):
     with open(args.repos or os.path.join(root, "repos.json")) as f:
         repos = json.load(f)
     projects = [(r["aosp"], os.path.join(root, r["path"])) for r in repos]
-    # fetch-source.sh only clones what the release's manifest has
-    present = [(a, l) for a, l in projects if os.path.isdir(l)]
+    # fetch-source.sh only clones what the release's manifest has. A symlink
+    # is patch-source.sh's alias of an older location (src/adb -> core/adb),
+    # whose project is loaded from there already.
+    present = [(a, l) for a, l in projects if os.path.isdir(l) and not os.path.islink(l)]
     if not present:
         sys.exit("builder: no sources under %s (run scripts/fetch-source.sh)" % root)
     tree = Tree(root, present)
