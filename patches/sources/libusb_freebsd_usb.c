@@ -714,6 +714,10 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 			actlen = hpriv->cactlen[slot];
 			hpriv->done[slot] = 0;
 			pthread_mutex_unlock(&hpriv->lock);
+			if (status == USB_ERR_TIMEOUT)
+				return LIBUSB_ERROR_TIMEOUT;
+			if (status == USB_ERR_STALLED)
+				return LIBUSB_ERROR_PIPE;
 			if (status != 0)
 				return LIBUSB_ERROR_IO;
 			itransfer->transferred = (int)actlen;
@@ -727,8 +731,19 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 			clock_gettime(CLOCK_MONOTONIC, &now);
 			ms = (now.tv_sec - start.tv_sec) * 1000 +
 			    (now.tv_nsec - start.tv_nsec) / 1000000;
-			if (ms >= transfer->timeout)
+			if (ms >= transfer->timeout) {
+				/* Cancel it in the kernel too, so the slot is idle and
+				 * no late completion is taken for the next transfer. */
+				struct usb_fs_stop fsstop;
+				pthread_mutex_lock(&hpriv->lock);
+				memset(&fsstop, 0, sizeof(fsstop));
+				fsstop.ep_index = slot;
+				(void)ioctl(hpriv->fd, USB_FS_STOP, &fsstop);
+				(void)_fs_drain(hpriv);
+				hpriv->done[slot] = 0;
+				pthread_mutex_unlock(&hpriv->lock);
 				return LIBUSB_ERROR_TIMEOUT;
+			}
 		}
 	}
 }
