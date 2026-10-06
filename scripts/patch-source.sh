@@ -978,9 +978,9 @@ if [ "$TERMUX_OK" = 1 ]; then
   sed -i '/setup_daemon_logging();/a\        termuxadb::start();' "$am"
   sed -i '/return adb_commandline/i\    if (termuxadb::sendfd()) { return 0; }' "$am"
 
-  # adb 34.x-35.0.x default to libusb on Linux, which bypasses usb_linux.cpp
+  # adb 35.0.x default to libusb on Linux, which bypasses usb_linux.cpp
   # and so the shims; keep the native backend when the shim is on.
-  [ ! -f "$ad/client/transport_usb.cpp" ] || sed -i '/^bool is_libusb_enabled() {/,/^}/ s/^    char\* env = getenv("ADB_LIBUSB");$/    if (const char* t = getenv("LIBUSB_TERMUX_IMPL"); t \&\& *t \&\& strcmp(t, "0") != 0) enable = false;\n&/' \
+  [ ! -f "$ad/client/transport_usb.cpp" ] || sed -i '/^bool \(is_libusb_enabled\|should_use_libusb\)() {/,/^}/ s/^    char\* env = getenv("ADB_LIBUSB");$/    if (const char* t = getenv("LIBUSB_TERMUX_IMPL"); t \&\& *t \&\& strcmp(t, "0") != 0) enable = false;\n&/' \
     "$ad/client/transport_usb.cpp"
   done
 

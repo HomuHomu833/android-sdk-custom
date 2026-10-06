@@ -61,6 +61,21 @@ printf '%s\n' "$PLAN" | while IFS="$(printf '\t')" read -r path name sparse; do
   fi
 done
 
+# --- libusb for the BSDs ------------------------------------------------------
+# libusb before 1.0.24 (platform-tools 30.0.5 and earlier) picks its backend by
+# OS macro, has no events_posix.c and an older backend API, none of which the
+# BSD overlay and backends fit. adb only uses libusb's public API, so take the
+# platform-tools-31.0.0 libusb there.
+case "${TARGET:-}" in
+  *-freebsd-*|*-netbsd-*|*-openbsd-*)
+    if [ -d src/libusb ] && [ ! -f src/libusb/libusb/os/events_posix.c ]; then
+      log "BSD: libusb from platform-tools-31.0.0 (this release's predates 1.0.24)"
+      rm -rf src/libusb
+      git clone -q -c advice.detachedHead=false --depth 1 --branch platform-tools-31.0.0 \
+        "$AOSP/platform/external/libusb" src/libusb
+    fi ;;
+esac
+
 # --- in-place source fixups -------------------------------------------------
 TAG="$TAG" TARGET="${TARGET:-}" ROOTDIR="$ROOTDIR" "$SCRIPT_DIR/patch-source.sh"
 
