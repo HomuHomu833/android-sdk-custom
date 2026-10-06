@@ -12,8 +12,9 @@
  *     ordinary userland buffers; no mmap), modelled on FreeBSD's own libusb20
  *     ugen20 backend.
  *
- * It is synchronous (transfers complete inside submit_transfer, like the
- * OpenBSD/NetBSD backends), which is all fastboot/adb host tooling needs.
+ * Transfers run synchronously, like the OpenBSD/NetBSD backends;
+ * libusb_bsd_async.inc queues bulk/interrupt ones on a worker per endpoint
+ * so they are asynchronous and cancellable to libusb.
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
@@ -41,6 +42,7 @@
 #include <dev/usb/usb_ioctl.h>
 
 #include "libusbi.h"
+#include "libusb_bsd_async.inc"
 
 /* libusb before API 0x01000109 (platform-tools-33.0.2 and earlier) takes no
  * context in usbi_dbg(). */
@@ -98,7 +100,6 @@ static int fbsd_set_interface_altsetting(struct libusb_device_handle *, uint8_t,
 static int fbsd_clear_halt(struct libusb_device_handle *, unsigned char);
 static void fbsd_destroy_device(struct libusb_device *);
 static int fbsd_submit_transfer(struct usbi_transfer *);
-static int fbsd_cancel_transfer(struct usbi_transfer *);
 static int fbsd_handle_transfer_completion(struct usbi_transfer *);
 
 static int _errno_to_libusb(int);
@@ -122,9 +123,9 @@ const struct usbi_os_backend usbi_backend = {
 	.set_interface_altsetting = fbsd_set_interface_altsetting,
 	.clear_halt = fbsd_clear_halt,
 	.destroy_device = fbsd_destroy_device,
-	.submit_transfer = fbsd_submit_transfer,
-	.cancel_transfer = fbsd_cancel_transfer,
-	.handle_transfer_completion = fbsd_handle_transfer_completion,
+	.submit_transfer = sdk_aq_submit,
+	.cancel_transfer = sdk_aq_cancel,
+	.handle_transfer_completion = sdk_aq_handle_completion,
 	.device_priv_size = sizeof(struct device_priv),
 	.device_handle_priv_size = sizeof(struct handle_priv),
 };
@@ -450,19 +451,16 @@ fbsd_submit_transfer(struct usbi_transfer *itransfer)
 }
 
 int
-fbsd_cancel_transfer(struct usbi_transfer *itransfer)
-{
-	UNUSED(itransfer);
-	/* Synchronous backend: transfers finish inside submit, nothing to cancel. */
-	return LIBUSB_ERROR_NOT_SUPPORTED;
-}
-
-int
 fbsd_handle_transfer_completion(struct usbi_transfer *itransfer)
 {
 	return usbi_handle_transfer_completion(itransfer,
 	    LIBUSB_TRANSFER_COMPLETED);
 }
+
+#define SDK_AQ_SYNC_SUBMIT fbsd_submit_transfer
+#define SDK_AQ_SYNC_HANDLE fbsd_handle_transfer_completion
+#define SDK_AQ_IMPL
+#include "libusb_bsd_async.inc"
 
 int
 _errno_to_libusb(int err)
@@ -703,6 +701,26 @@ _sync_gen_transfer(struct usbi_transfer *itransfer)
 		 * becomes invalid. Bail so adb's read thread can tear down. */
 		if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL))
 			return LIBUSB_ERROR_NO_DEVICE;
+
+		/* Cancelled (libusb_bsd_async.inc): stop it in the kernel. */
+		if (sdk_aq_interrupted) {
+			struct usb_fs_stop fsstop;
+			pthread_mutex_lock(&hpriv->lock);
+			memset(&fsstop, 0, sizeof(fsstop));
+			fsstop.ep_index = slot;
+			(void)ioctl(hpriv->fd, USB_FS_STOP, &fsstop);
+			(void)_fs_drain(hpriv);
+			if (hpriv->done[slot] && hpriv->cstatus[slot] == 0) {
+				/* It completed before the stop: keep the data. */
+				itransfer->transferred = (int)hpriv->cactlen[slot];
+				hpriv->done[slot] = 0;
+				pthread_mutex_unlock(&hpriv->lock);
+				return 0;
+			}
+			hpriv->done[slot] = 0;
+			pthread_mutex_unlock(&hpriv->lock);
+			return LIBUSB_ERROR_INTERRUPTED;
+		}
 
 		pthread_mutex_lock(&hpriv->lock);
 		if (_fs_drain(hpriv) < 0) {

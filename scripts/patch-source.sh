@@ -704,6 +704,28 @@ fi
 sed -i 's/std::vector<const std::pair<OverlayableInfo, std::unordered_set<uint32_t>>> overlayable_infos_;/std::vector<std::pair<OverlayableInfo, std::unordered_set<uint32_t>>> overlayable_infos_;/' \
   src/base/libs/androidfw/include/androidfw/LoadedArsc.h
 
+# libusb NetBSD/OpenBSD: their backends finish transfers inside submit and
+# can't cancel, which stalls and deadlocks older adb's async use of libusb.
+# Queue bulk/interrupt transfers on per-endpoint workers instead
+# (patches/sources/libusb_bsd_async.inc; the FreeBSD backend includes it).
+for b in netbsd:netbsd obsd:openbsd; do
+  f="src/libusb/libusb/os/${b#*:}_usb.c"; p="${b%%:*}"
+  [ -f "$f" ] && grep -q "\.submit_transfer = ${p}_submit_transfer," "$f" || continue
+  awk -v inc="$ROOTDIR/patches/sources/libusb_bsd_async.inc" -v p="$p" '
+    { print }
+    /^#include "libusbi.h"$/ { while ((getline l < inc) > 0) print l; close(inc) }
+    END {
+      print "#define SDK_AQ_SYNC_SUBMIT " p "_submit_transfer"
+      print "#define SDK_AQ_SYNC_CANCEL " p "_cancel_transfer"
+      print "#define SDK_AQ_SYNC_HANDLE " p "_handle_transfer_completion"
+      print "#define SDK_AQ_IMPL"
+      while ((getline l < inc) > 0) print l
+    }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+  sed -i -e "s/^\t\.submit_transfer = ${p}_submit_transfer,$/\t.submit_transfer = sdk_aq_submit,/" \
+         -e "s/^\t\.cancel_transfer = ${p}_cancel_transfer,$/\t.cancel_transfer = sdk_aq_cancel,/" \
+         -e "s/^\t\.handle_transfer_completion = ${p}_handle_transfer_completion,$/\t.handle_transfer_completion = sdk_aq_handle_completion,/" "$f"
+done
+
 # libusb threads_posix.c (platform-tools-34 and earlier): OpenBSD's thread id
 # via syscall(SYS_getthrid); OpenBSD no longer exposes syscall(). Newer libusb
 # calls getthrid() directly.
