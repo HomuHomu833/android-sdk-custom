@@ -15,19 +15,15 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 SKIPPED=0
 trap 'SKIPPED=$((SKIPPED + 1)); printf "\033[1;33mwarning:\033[0m patch-source.sh:%s did not apply to these sources\n" "$LINENO" >&2' ERR
 
-# Older releases keep adb and liblog (platform-tools 30.x and earlier),
-# libbase (30.0.1 and earlier) and libziparchive (29.x) in system/core. Alias
-# them at their later paths while patching so every fixup below reaches them;
-# the builder loads projects from repos.json, and the aliases are gone before
-# it runs. (src/logging/liblog is core/liblog there.)
-ALIASES=""
-for a in adb:core/adb libbase:core/base libziparchive:core/libziparchive logging:core; do
-  new="src/${a%%:*}"; old="src/${a#*:}"
-  if [ ! -e "$new" ] && [ -d "$old" ]; then
-    ln -s "${a#*:}" "$new"; ALIASES="$ALIASES $new"
-  fi
-done
-trap 'for l in $ALIASES; do rm -f "$l"; done' EXIT
+# Older releases keep these in system/core: adb and liblog (platform-tools
+# 30.x and earlier), libbase (30.0.1 and earlier), libziparchive (29.x).
+# Fixups name them through these; the Python blocks read them from the env.
+pick() { if [ -d "$1" ]; then echo "$1"; else echo "$2"; fi; }
+ADB="$(pick src/adb src/core/adb)"
+LIBBASE="$(pick src/libbase src/core/base)"
+LIBLOG="$(pick src/logging/liblog src/core/liblog)"
+ZIPARCHIVE="$(pick src/libziparchive src/core/libziparchive)"
+export ADB LIBBASE
 
 # A unified diff against the checkout (paths src/...); forward only, no .rej.
 apply() { patch -p1 -N -s -r - --no-backup-if-mismatch -d "$ROOTDIR" -i "$1"; }
@@ -106,12 +102,12 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' src/fmtlib/include/fmt/for
 
 # fdevent.h names std::vector and adb_mdns.cpp std::atomic without including
 # either. Only llvm-mingw's libc++ declines to drag them in, so spell them out.
-sed -i '/^#include <variant>$/a #include <vector>' src/adb/fdevent/fdevent.h
-sed -i '/^#include <algorithm>$/i #include <atomic>' src/adb/adb_mdns.cpp
+sed -i '/^#include <variant>$/a #include <vector>' $ADB/fdevent/fdevent.h
+sed -i '/^#include <algorithm>$/i #include <atomic>' $ADB/adb_mdns.cpp
 
 # libbase posix_strerror_r.cpp: drop the file's #undef _GNU_SOURCE so the guard
 # below sees the GNU char* strerror_r on glibc/bionic; musl keeps the #else.
-sed -i '/\/\* Undefine _GNU_SOURCE/,/#undef _GNU_SOURCE/d' src/libbase/posix_strerror_r.cpp
+sed -i '/\/\* Undefine _GNU_SOURCE/,/#undef _GNU_SOURCE/d' $LIBBASE/posix_strerror_r.cpp
 sed -i '/return strerror_r(errnum, buf, buflen);/c\
 #if (defined(__GLIBC__) || defined(__BIONIC__)) \&\& defined(_GNU_SOURCE)\
   char* msg = strerror_r(errnum, buf, buflen);\
@@ -122,7 +118,7 @@ sed -i '/return strerror_r(errnum, buf, buflen);/c\
   return 0;\
 #else\
   return strerror_r(errnum, buf, buflen);\
-#endif' src/libbase/posix_strerror_r.cpp
+#endif' $LIBBASE/posix_strerror_r.cpp
 
 # libbuildversion: stamp a build number into soong_build_number, as the release
 # build does after linking. PLACEHOLDER itself stays, or a device (__ANDROID__)
@@ -163,56 +159,56 @@ sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32
 # the libusb backend, the only one the BSDs have. Windows keeps upstream's
 # AdbWinApi default (built from source, see builder/overlay/adbwinapi.bp).
 sed -i '/^bool \(is_libusb_enabled\|should_use_libusb\)() {/,/^}/ s/#if defined(__APPLE__)/#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
-  src/adb/client/transport_usb.cpp
+  $ADB/client/transport_usb.cpp
 # Older still: no platform default at all, only ADB_LIBUSB=1.
 sed -i '/^bool should_use_libusb() {/,/^}/ s/^    static bool enable = getenv("ADB_LIBUSB") && strcmp(getenv("ADB_LIBUSB"), "1") == 0;$/#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n    static bool enable = true;\n#else\n&\n#endif/' \
-  src/adb/client/transport_usb.cpp
+  $ADB/client/transport_usb.cpp
 
 # ADB BSD, platform-tools 31.0.2 and earlier: libusb devices go through the
 # shared usb_handle transport (UsbConnection, register_usb_transport) and
 # client/usb_dispatch.cpp, which picks libusb:: or native:: per call. There is
 # no native backend on the BSDs: send its calls to libusb too, and keep the
 # shared transport (patches/sources/adb_usb_bsd.cpp then defines nothing).
-if [ -f src/adb/client/usb_dispatch.cpp ]; then
+if [ -f $ADB/client/usb_dispatch.cpp ]; then
   sed -i '0,/^#include "\(client\/\)\?usb.h"$/s//&\n\n#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n\/\/ No native USB backend on the BSDs: every call goes to libusb.\n#define native libusb\n#endif/' \
-    src/adb/client/usb_dispatch.cpp
+    $ADB/client/usb_dispatch.cpp
 else
   # ADB BSD: exclude the native BlockingConnection USB path (no native backend,
   # won't link), keeping is_adb_interface()/is_libusb_enabled().
   native_if='#if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path'
-  if grep -q '^#if ADB_HOST$' src/adb/client/transport_usb.cpp; then
+  if grep -q '^#if ADB_HOST$' $ADB/client/transport_usb.cpp; then
     # platform-tools-34 and earlier: the read helpers sit in #if ADB_HOST/#else/
     # #endif and UsbConnection follows unguarded; some releases then open an
     # #ifdef ADB_HOST block at init_usb_transport() that also holds
     # is_adb_interface(). Guard the pieces without crossing either conditional.
     sed -i "0,/^#if ADB_HOST$/{/^#if ADB_HOST$/i ${native_if}
-  }" src/adb/client/transport_usb.cpp
-    grep -q '^#ifdef ADB_HOST$' src/adb/client/transport_usb.cpp && sed -i '0,/^#ifdef ADB_HOST$/{/^#ifdef ADB_HOST$/{i #endif  // native USB path
+  }" $ADB/client/transport_usb.cpp
+    grep -q '^#ifdef ADB_HOST$' $ADB/client/transport_usb.cpp && sed -i '0,/^#ifdef ADB_HOST$/{/^#ifdef ADB_HOST$/{i #endif  // native USB path
   a '"${native_if}"'
-  }}' src/adb/client/transport_usb.cpp
+  }}' $ADB/client/transport_usb.cpp
   else
     sed -i "0,/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/{/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i ${native_if}
-  }" src/adb/client/transport_usb.cpp
+  }" $ADB/client/transport_usb.cpp
   fi
   sed -i '/^\(bool\|int\) is_adb_interface(int usb_class/i #endif  // native USB path\n' \
-    src/adb/client/transport_usb.cpp
+    $ADB/client/transport_usb.cpp
   # ...and the matching native-transport registration helpers in transport.cpp.
   sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
-    src/adb/transport.cpp
+    $ADB/transport.cpp
   # Close it right after unregister_usb_transport(): older adb keeps more host
   # code (atransport's reverse config) before the enclosing #endif.
   sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^}/ { /^}/a #endif  // native USB path
-  }' src/adb/transport.cpp
+  }' $ADB/transport.cpp
 fi
 
 # ADB Windows: make usb_libusb_hotplug.cpp's timeval time_t->long cast explicit.
 sed -i 's/struct timeval timeout{(time_t)libusb_inhouse_hotplug::kScan_rate_s.count(), 0};/struct timeval timeout{static_cast<long>(libusb_inhouse_hotplug::kScan_rate_s.count()), 0};/' \
-  src/adb/client/usb_libusb_hotplug.cpp
+  $ADB/client/usb_libusb_hotplug.cpp
 
 # ADB older releases (platform-tools 35.0.2 and earlier): usb_init() aborts
 # when libusb has no hotplug, which no BSD backend has. Scan for devices instead
 # (patches/sources/adb_libusb_scan.inc), as newer adb's in-house hotplug does.
-for f in src/adb/client/usb_libusb.cpp; do
+for f in $ADB/client/usb_libusb.cpp; do
   grep -q 'LOG(FATAL) << "failed to register libusb hotplug callback";' "$f" 2>/dev/null || continue
   sed -i 's/^#include <atomic>$/#include <algorithm>\n&\n#include <vector>/' "$f"
   awk -v inc="$ROOTDIR/patches/sources/adb_libusb_scan.inc" \
@@ -222,11 +218,11 @@ done
 
 # ADB Windows: reinterpret_cast OSVERSIONINFO* to PRTL_OSVERSIONINFOW in sysdeps_win32.cpp.
 sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVERSIONINFOW>(\&version)/' \
-  src/adb/sysdeps_win32.cpp
+  $ADB/sysdeps_win32.cpp
 
 # ADB Windows: reinterpret_cast adb_stat* to _stat64* for wstat() in stat.cpp.
 sed -i 's/wstat(path_wide\.c_str(), &st)/wstat(path_wide.c_str(), reinterpret_cast<struct _stat64*>(\&st))/' \
-  src/adb/sysdeps/win32/stat.cpp
+  $ADB/sysdeps/win32/stat.cpp
 
 # --- AdbWinApi (Windows) ----------------------------------------------------
 # builder/overlay/adbwinapi.bp links AdbWinApi and AdbWinUsbApi into adb and
@@ -364,19 +360,19 @@ sed -i 's/^#if defined(_WIN32) || defined(__hexagon__)$/#if defined(_WIN32)/' \
 
 # liblog logger_name.cpp: hexagon Clang makes android_LogPriority unsigned char,
 # tripping the uint32_t static_asserts; guard them under !__hexagon__.
-sed -i '/^static_assert(std::is_same<std::underlying_type<log_id_t>::type, uint32_t>::value,$/i #ifndef __hexagon__' src/logging/liblog/logger_name.cpp
-sed -i '/^static_assert(std::is_same<std::underlying_type<android_LogPriority>::type, uint32_t>::value,$/i #ifndef __hexagon__' src/logging/liblog/logger_name.cpp
-sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' src/logging/liblog/logger_name.cpp
+sed -i '/^static_assert(std::is_same<std::underlying_type<log_id_t>::type, uint32_t>::value,$/i #ifndef __hexagon__' $LIBLOG/logger_name.cpp
+sed -i '/^static_assert(std::is_same<std::underlying_type<android_LogPriority>::type, uint32_t>::value,$/i #ifndef __hexagon__' $LIBLOG/logger_name.cpp
+sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' $LIBLOG/logger_name.cpp
 
 # adb sysdeps/errno.cpp: guard out the ERRNO_VALUE static_asserts on MIPS (its
 # errno numbers differ from the ADB wire values); the runtime switch still works.
 sed -i 's@#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")@#if !defined(__mips__)\n#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")\n#else\n#define ERRNO_VALUE(error_name, wire_value) /* mips errno numbers differ from ADB wire values */\n#endif@' \
-    src/adb/sysdeps/errno.cpp
+    $ADB/sysdeps/errno.cpp
 
 # --- bionic below API 29 ------------------------------------------------------
 # The bionic tools target API 24; these guard uses of API 29+ symbols.
-sed -i 's/#if defined(__BIONIC__)/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/g' src/libbase/include/android-base/unique_fd.h src/libziparchive/zip_archive.cc src/art/libartbase/base/unix_file/fd_file.cc
-sed -i 's/__INTRODUCED_IN([0-9]*)//g' src/logging/liblog/include/android/log.h src/adb/pairing_connection/include/adb/pairing/pairing_connection.h src/adb/pairing_auth/include/adb/pairing/pairing_auth.h
+sed -i 's/#if defined(__BIONIC__)/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/g' $LIBBASE/include/android-base/unique_fd.h $ZIPARCHIVE/zip_archive.cc src/art/libartbase/base/unix_file/fd_file.cc
+sed -i 's/__INTRODUCED_IN([0-9]*)//g' $LIBLOG/include/android/log.h $ADB/pairing_connection/include/adb/pairing/pairing_connection.h $ADB/pairing_auth/include/adb/pairing/pairing_auth.h
 sed -i 's/^#if !defined(__BIONIC__)$/#if !defined(__BIONIC__) || __ANDROID_API__ < 29/' src/core/libcutils/native_handle.cpp
 sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/' src/core/libcutils/native_handle.cpp
 
@@ -391,9 +387,9 @@ done
 # libbase GetThreadId() has none, so it falls off a non-void function and
 # clang's trap crashes adb at startup. Add the BSD calls and headers.
 sed -i '/#include <unistd.h>/a\
-#if defined(__FreeBSD__)\n#include <pthread_np.h>\n#elif defined(__NetBSD__)\n#include <lwp.h>\n#endif' src/libbase/threads.cpp
+#if defined(__FreeBSD__)\n#include <pthread_np.h>\n#elif defined(__NetBSD__)\n#include <lwp.h>\n#endif' $LIBBASE/threads.cpp
 sed -i '/return syscall(__NR_gettid);/a\
-#elif defined(__FreeBSD__)\n  return pthread_getthreadid_np();\n#elif defined(__NetBSD__)\n  return _lwp_self();\n#elif defined(__OpenBSD__)\n  return getthrid();' src/libbase/threads.cpp
+#elif defined(__FreeBSD__)\n  return pthread_getthreadid_np();\n#elif defined(__NetBSD__)\n  return _lwp_self();\n#elif defined(__OpenBSD__)\n  return getthrid();' $LIBBASE/threads.cpp
 
 # PosixUtils.cpp: 'stdout'/'stderr' locals are macros on BSD; rename to
 # out_fd/err_fd.
@@ -510,14 +506,14 @@ sed -i '/#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\$/{
 
 # off64_t.h: BSDs don't have a separate off64_t type (off_t is always 64-bit).
 sed -i 's/^#if defined(__APPLE__)$/#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
-  "src/libbase/include/android-base/off64_t.h"
+  "$LIBBASE/include/android-base/off64_t.h"
 
 # libbase file.cpp: GetExecutablePath() has no BSD branch. adb execs it to
 # start the server, so it must be a real path
 # (patches/sources/libbase_bsd_exe_path.inc), not getprogname()'s bare name.
 # (Older releases have no __EMSCRIPTEN__ branch to put it before; use the
 # function's final #else there.)
-for f in src/libbase/file.cpp; do
+for f in $LIBBASE/file.cpp; do
   [ -f "$f" ] || continue
   awk -v inc="$ROOTDIR/patches/sources/libbase_bsd_exe_path.inc" \
     '/^std::string GetExecutablePath\(\) \{$/ { while ((getline l < inc) > 0) print l } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
@@ -533,23 +529,23 @@ done
 # the caller CHECKs recvmsg against it. On the BSDs peek into a buffer as large
 # as any datagram instead.
 sed -i 's/^    upper_bound_bytes = recv(fd.get(), nullptr, 0, MSG_PEEK | MSG_TRUNC);$/#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n    static thread_local char peek_buf[65536];\n    upper_bound_bytes = recv(fd.get(), peek_buf, sizeof(peek_buf), MSG_PEEK);\n#else\n&\n#endif/' \
-  src/adb/sysdeps_unix.cpp 2>/dev/null || true
+  $ADB/sysdeps_unix.cpp 2>/dev/null || true
 
 # adb openscreen udp_socket.cpp: NetBSD's IP_PKTINFO sets a default source
 # (struct); the multicast join's "deliver IP_PKTINFO" switch is IP_RECVPKTINFO.
 sed -i 's/adb_setsockopt(fd_, IPPROTO_IP, IP_PKTINFO, &enable_pktinfo,/adb_setsockopt(fd_, IPPROTO_IP, SDK_IP_PKTINFO_ON, \&enable_pktinfo,/' \
-  src/adb/client/openscreen/platform/udp_socket.cpp 2>/dev/null &&
+  $ADB/client/openscreen/platform/udp_socket.cpp 2>/dev/null &&
 sed -i '0,/^#include /s//#if defined(__NetBSD__)\n#define SDK_IP_PKTINFO_ON IP_RECVPKTINFO\n#else\n#define SDK_IP_PKTINFO_ON IP_PKTINFO\n#endif\n&/' \
-  src/adb/client/openscreen/platform/udp_socket.cpp || true
+  $ADB/client/openscreen/platform/udp_socket.cpp || true
 
 # libbase logging.cpp: the getprogname() fallback uses glibc-only
 # program_invocation_short_name; BSDs have native getprogname().
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
-  "src/libbase/logging.cpp"
+  "$LIBBASE/logging.cpp"
 
 # libbase cmsg.cpp: <sys/user.h> is unused here and does not exist on NetBSD.
 sed -i 's|#include <sys/user.h>|#if !defined(__NetBSD__)\n#include <sys/user.h>\n#endif|' \
-  "src/libbase/cmsg.cpp"
+  "$LIBBASE/cmsg.cpp"
 
 # googletest gtest-port.cc (older releases): FreeBSD aarch64's <sys/user.h>
 # clashes with clang's ptrauth_key. Skip it there and report no thread count,
@@ -560,7 +556,7 @@ sed -i -e 's/^#  include <sys\/user.h>$/#  if !defined(__FreeBSD__) || !defined(
 
 # liblog logger_write.cpp: same getprogname() fallback issue.
 sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
-  "src/logging/liblog/logger_write.cpp"
+  "$LIBLOG/logger_write.cpp"
 
 # protobuf port_def.inc: older releases enable [[clang::musttail]] on every CPU
 # but a denylist, and LLVM's backend can't honour it on mips64 and others
@@ -599,7 +595,7 @@ sed -i 's/^#elif !defined(alloca)$/#elif defined(__FreeBSD__) || defined(__NetBS
 # const, and newer libc++ (zig's) calls the comparator through a const object.
 # Upstream made them const later.
 sed -i -E 's/^(  bool operator\(\)\((const prop_info& lhs|std::string_view lhs), [^)]*\)) \{/\1 const {/' \
-  src/libbase/properties.cpp
+  $LIBBASE/properties.cpp
 
 # e2fsprogs quotaio.h (older releases): quota_write_inode() is declared with an
 # enum quota_type but defined with unsigned int qtype_bits; hexagon's enums are
@@ -686,8 +682,8 @@ sed -i -e 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(
 
 # adb sysdeps/env.cpp (platform-tools-35.0.1 and earlier): calls getenv()
 # without <stdlib.h>, which musl's headers do not pull in. Upstream added it.
-if [ -f src/adb/sysdeps/env.cpp ] && ! grep -q '^#include <stdlib.h>' src/adb/sysdeps/env.cpp; then
-  sed -i '0,/^#include "sysdeps\/env.h"$/s//#include <stdlib.h>\n\n#include "sysdeps\/env.h"/' src/adb/sysdeps/env.cpp
+if [ -f $ADB/sysdeps/env.cpp ] && ! grep -q '^#include <stdlib.h>' $ADB/sysdeps/env.cpp; then
+  sed -i '0,/^#include "sysdeps\/env.h"$/s//#include <stdlib.h>\n\n#include "sysdeps\/env.h"/' $ADB/sysdeps/env.cpp
 fi
 
 # aapt2 util/Files (platform-tools-35.0.1 and earlier): BuildPath() takes a
@@ -725,7 +721,7 @@ fi
 # adb_fwrite macro reaches libc++'s <print> (via logging.h's <ostream>) before
 # it is included, turning std::fwrite into std::adb_fwrite. Include both first,
 # as upstream later did.
-f=src/adb/sysdeps.h
+f=$ADB/sysdeps.h
 if [ -f "$f" ] && ! grep -q '^#include <print>' "$f"; then
   sed -i 's|^#include <android-base/utf8.h>$|#include <android-base/utf8.h>\n#include <android-base/logging.h>\n#if __has_include(<print>)\n#include <print>\n#endif|' "$f"
 fi
@@ -774,7 +770,7 @@ done
 # Cast to the pointer type inline instead, as later releases do.
 sed -i -e '/^typedef HRESULT(WINAPI\* SetThreadDescription)(HANDLE hThread, PCWSTR lpThreadDescription);$/d' \
   -e 's/reinterpret_cast<SetThreadDescription>(/reinterpret_cast<HRESULT(WINAPI *)(HANDLE, PCWSTR)>(/' \
-  src/adb/sysdeps_win32.cpp
+  $ADB/sysdeps_win32.cpp
 
 # Older libcutils declares and defines its own gettid() unless glibc is 2.32+.
 # glibc has had one since 2.30, and zig's glibc headers declare it (noexcept)
@@ -820,7 +816,7 @@ fi
 # Older adb's Windows adb_iovec has a size_t iov_len, but it has to match
 # WSABUF's 32-bit len (sysdeps_win32.cpp static_asserts it; 64-bit Windows
 # fails). Later adb made it unsigned int.
-sed -i 's/^    size_t iov_len;$/    unsigned int iov_len;/' src/adb/sysdeps/uio.h
+sed -i 's/^    size_t iov_len;$/    unsigned int iov_len;/' $ADB/sysdeps/uio.h
 
 # Older e2fsprogs ships a mingw unistd.h with its own getuid/geteuid/getgid/
 # getegid stubs; host_compat.h already provides them on Windows.
@@ -835,8 +831,8 @@ sed -i 's/ : public std::unary_function<KeyedEntry\*, hash_t> {$/ {/' \
 
 # Older headers that use std::function without <functional> (newer libc++
 # no longer pulls it in transitively). Add it ahead of their first #include <>.
-for f in src/adb/adb_mdns.h src/core/fastboot/fastboot.h \
-    src/adb/tls/include/adb/tls/tls_connection.h; do
+for f in $ADB/adb_mdns.h src/core/fastboot/fastboot.h \
+    $ADB/tls/include/adb/tls/tls_connection.h; do
   [ -f "$f" ] && grep -q 'std::function' "$f" && ! grep -q '<functional>' "$f" && \
     sed -i '0,/^#include </s//#include <functional>\n#include </' "$f"
 done
@@ -844,14 +840,15 @@ done
 # Older libziparchive builds a span from an ssize_t size, which narrows on
 # 32-bit hosts.
 sed -i 's/return {buf.first, ssize_t(buf.second)};/return {buf.first, size_t(buf.second)};/' \
-  src/libziparchive/zip_archive.cc
+  $ZIPARCHIVE/zip_archive.cc
 
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
 import sys
 
-path = 'src/libbase/include/android-base/endian.h'
+import os
+path = os.environ['LIBBASE'] + '/include/android-base/endian.h'
 with open(path, 'r') as f:
     content = f.read()
 
@@ -929,7 +926,8 @@ PYEOF
 python3 << 'PYEOF'
 import sys
 
-path = 'src/adb/sysdeps.h'
+import os
+path = os.environ['ADB'] + '/sysdeps.h'
 with open(path, 'r') as f:
     content = f.read()
 
@@ -983,7 +981,7 @@ if [ "$TERMUX_OK" = 1 ]; then
   log "Applying termux-usb shims"
   cp "$ROOTDIR/patches/termux/termux_fastboot.h" "src/core/fastboot/termux_adb.h"
 
-  for ad in src/adb; do
+  for ad in "$ADB"; do
   [ -f "$ad/client/usb_linux.cpp" ] || continue
   cp "$ROOTDIR/patches/termux/termux_adb.h" "$ad/client/termux_adb.h"
 
