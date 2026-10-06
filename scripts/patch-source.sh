@@ -950,11 +950,15 @@ PYEOF
 case "$TARGET" in *-android|*-androideabi) TERMUX_OK=1 ;; *) TERMUX_OK=0 ;; esac
 if [ "$TERMUX_OK" = 1 ]; then
   log "Applying termux-usb shims"
-  cp "$ROOTDIR/patches/termux/termux_adb.h"      "src/adb/client/termux_adb.h"
   cp "$ROOTDIR/patches/termux/termux_fastboot.h" "src/core/fastboot/termux_adb.h"
 
+  # adb lives in src/adb from platform-tools 31, in src/core/adb before.
+  for ad in src/adb src/core/adb; do
+  [ -f "$ad/client/usb_linux.cpp" ] || continue
+  cp "$ROOTDIR/patches/termux/termux_adb.h" "$ad/client/termux_adb.h"
+
   # adb client/usb_linux.cpp: the /dev/bus/usb walk -> termuxadb:: shims.
-  af="src/adb/client/usb_linux.cpp"
+  af="$ad/client/usb_linux.cpp"
   sed -i '/#include "sysdeps.h"/i #include "termux_adb.h"' "$af"
   sed -i \
     -e 's/opendir(base.c_str()), closedir/termuxadb::opendir(base.c_str()), termuxadb::closedir/' \
@@ -962,16 +966,23 @@ if [ "$TERMUX_OK" = 1 ]; then
     -e 's/readdir(bus_dir.get())/termuxadb::readdir(bus_dir.get())/' \
     -e 's/readdir(dev_dir.get())/termuxadb::readdir(dev_dir.get())/' \
     -e 's/unix_open(dev_name,/termuxadb::unix_open(dev_name,/' \
+    -e 's/fd = unix_open(path, flags);/fd = termuxadb::unix_open(path, flags);/' \
     -e 's/unix_open(usb->path,/termuxadb::unix_open(usb->path,/' \
     -e 's/\bunix_close(fd)/termuxadb::unix_close(fd)/g' \
     -e 's/android::base::ReadFileToString(serial_path, &serial)/termuxadb::ReadFileToString(serial_path, \&serial)/' \
     "$af"
 
   # adb client/main.cpp: start the scanner (daemon path) + the sendfd helper mode.
-  am="src/adb/client/main.cpp"
+  am="$ad/client/main.cpp"
   sed -i '/#include "commandline.h"/a #include "termux_adb.h"' "$am"
   sed -i '/setup_daemon_logging();/a\        termuxadb::start();' "$am"
   sed -i '/return adb_commandline/i\    if (termuxadb::sendfd()) { return 0; }' "$am"
+
+  # adb 34.x-35.0.x default to libusb on Linux, which bypasses usb_linux.cpp
+  # and so the shims; keep the native backend when the shim is on.
+  [ ! -f "$ad/client/transport_usb.cpp" ] || sed -i '/^bool is_libusb_enabled() {/,/^}/ s/^    char\* env = getenv("ADB_LIBUSB");$/    if (const char* t = getenv("LIBUSB_TERMUX_IMPL"); t \&\& *t \&\& strcmp(t, "0") != 0) enable = false;\n&/' \
+    "$ad/client/transport_usb.cpp"
+  done
 
   # fastboot main.cpp + fastboot.cpp: sendfd helper mode + scanner start.
   fm="src/core/fastboot/main.cpp"
