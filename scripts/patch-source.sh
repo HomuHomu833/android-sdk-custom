@@ -488,16 +488,28 @@ sed -i '/#elif defined(GTEST_OS_DRAGONFLY) || defined(GTEST_OS_FREEBSD) || \\$/{
 sed -i 's/^#if defined(__APPLE__)$/#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)/' \
   "src/libbase/include/android-base/off64_t.h"
 
-# libbase file.cpp: GetExecutablePath() has no BSD branch.
+# libbase file.cpp: GetExecutablePath() has no BSD branch. adb execs it to
+# start the server, so it must be a real path
+# (patches/sources/libbase_bsd_exe_path.inc), not getprogname()'s bare name.
 # (Older releases have no __EMSCRIPTEN__ branch to put it before; use the
 # function's final #else there.)
-if grep -q '^#elif defined(__EMSCRIPTEN__)' src/libbase/file.cpp; then
-  sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#elif defined(__EMSCRIPTEN__)/' \
-    "src/libbase/file.cpp"
-else
-  sed -i '/^std::string GetExecutablePath() {/,/^}/ s/^#else$/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return getprogname();\n#else/' \
-    "src/libbase/file.cpp"
-fi
+for f in src/libbase/file.cpp src/core/base/file.cpp; do
+  [ -f "$f" ] || continue
+  awk -v inc="$ROOTDIR/patches/sources/libbase_bsd_exe_path.inc" \
+    '/^std::string GetExecutablePath\(\) \{$/ { while ((getline l < inc) > 0) print l } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+  if grep -q '^#elif defined(__EMSCRIPTEN__)' "$f"; then
+    sed -i 's/#elif defined(__EMSCRIPTEN__)/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return sdk_bsd_executable_path();\n#elif defined(__EMSCRIPTEN__)/' "$f"
+  else
+    sed -i '/^std::string GetExecutablePath() {/,/^}/ s/^#else$/#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n  return sdk_bsd_executable_path();\n#else/' "$f"
+  fi
+done
+
+# adb sysdeps_unix.cpp: network_peek() sizes the next UDP datagram (mDNS) with
+# recv(MSG_PEEK | MSG_TRUNC), which only Linux answers with the full length;
+# the caller CHECKs recvmsg against it. On the BSDs peek into a buffer as large
+# as any datagram instead.
+sed -i 's/^    upper_bound_bytes = recv(fd.get(), nullptr, 0, MSG_PEEK | MSG_TRUNC);$/#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n    static thread_local char peek_buf[65536];\n    upper_bound_bytes = recv(fd.get(), peek_buf, sizeof(peek_buf), MSG_PEEK);\n#else\n&\n#endif/' \
+  src/adb/sysdeps_unix.cpp 2>/dev/null || true
 
 # libbase logging.cpp: the getprogname() fallback uses glibc-only
 # program_invocation_short_name; BSDs have native getprogname().
