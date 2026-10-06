@@ -16,7 +16,7 @@
  * libusb_bsd_async.inc queues bulk/interrupt ones on a worker per endpoint
  * so they are asynchronous and cancellable to libusb.
  *
- * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-License-Identifier: MIT
  */
 
 #include <config.h>

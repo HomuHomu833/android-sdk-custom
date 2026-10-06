@@ -20,7 +20,7 @@
  * SDK_AQ_SYNC_HANDLE to its own submit_transfer/handle_transfer_completion,
  * and SDK_AQ_SYNC_CANCEL to its cancel_transfer if it has one.
  *
- * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-License-Identifier: MIT
  */
 #ifndef SDK_AQ_IMPL
 
