@@ -66,9 +66,11 @@ ssize_t LibusbTransport::Write(const void* data, size_t len) {
 ssize_t LibusbTransport::Read(void* data, size_t len) {
     if (handle_ == nullptr) return -1;
     auto* buf = static_cast<unsigned char*>(data);
+    // ReadFully() asks for a whole upload at once; take it in chunks, as the
+    // Linux backend does (callers loop on short reads).
+    int chunk = static_cast<int>(std::min(len, static_cast<size_t>(kBulkChunk)));
     int transferred = 0;
-    int rc = libusb_bulk_transfer(handle_, ep_in_, buf, static_cast<int>(len), &transferred,
-                                  timeout_ms_);
+    int rc = libusb_bulk_transfer(handle_, ep_in_, buf, chunk, &transferred, timeout_ms_);
     if (rc != 0) {
         LOG(ERROR) << "fastboot libusb bulk-in failed: " << libusb_error_name(rc);
         return -1;
