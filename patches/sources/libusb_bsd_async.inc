@@ -8,8 +8,9 @@
  * waiting for an idle device stalls every other device, and the cancel blocks
  * forever on the transfer lock submit holds.
  *
- * patch-source.sh splices this file into each backend twice: after its
- * includes (declarations) and, with SDK_AQ_IMPL defined, at its end. Bulk and
+ * Each backend takes this file twice: after its includes (declarations) and,
+ * with SDK_AQ_IMPL defined, at its end. The FreeBSD backend #includes it;
+ * patch-source.sh splices it into the upstream NetBSD/OpenBSD ones. Bulk and
  * interrupt transfers then run in order on one worker thread per (handle,
  * endpoint); submit only queues. A queued transfer is cancelled in place; a
  * running one is interrupted with SIGURG, which breaks the blocking ugen read

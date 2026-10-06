@@ -12,9 +12,9 @@
  *     ordinary userland buffers; no mmap), modelled on FreeBSD's own libusb20
  *     ugen20 backend.
  *
- * Transfers run synchronously, like the OpenBSD/NetBSD backends;
- * libusb_bsd_async.inc queues bulk/interrupt ones on a worker per endpoint
- * so they are asynchronous and cancellable to libusb.
+ * Transfers run synchronously, as in the OpenBSD/NetBSD backends;
+ * libusb_bsd_async.inc puts bulk/interrupt ones on a worker per endpoint, so
+ * to libusb they are asynchronous and cancellable.
  *
  * SPDX-License-Identifier: MIT
  */
