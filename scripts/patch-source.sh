@@ -185,6 +185,17 @@ sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^}/ { /^}/a #endif
 sed -i 's/struct timeval timeout{(time_t)libusb_inhouse_hotplug::kScan_rate_s.count(), 0};/struct timeval timeout{static_cast<long>(libusb_inhouse_hotplug::kScan_rate_s.count()), 0};/' \
   src/adb/client/usb_libusb_hotplug.cpp
 
+# ADB older releases (platform-tools 35.0.2 and earlier): usb_init() aborts
+# when libusb has no hotplug, which no BSD backend has. Scan for devices instead
+# (patches/sources/adb_libusb_scan.inc), as newer adb's in-house hotplug does.
+for f in src/adb/client/usb_libusb.cpp src/core/adb/client/usb_libusb.cpp; do
+  grep -q 'LOG(FATAL) << "failed to register libusb hotplug callback";' "$f" 2>/dev/null || continue
+  sed -i 's/^#include <atomic>$/#include <algorithm>\n&\n#include <vector>/' "$f"
+  awk -v inc="$ROOTDIR/patches/sources/adb_libusb_scan.inc" \
+    '/^void usb_init\(\) \{$/ { while ((getline l < inc) > 0) print l } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+  sed -i 's/^        LOG(FATAL) << "failed to register libusb hotplug callback";$/        sdk_scan_usb_devices();/' "$f"
+done
+
 # ADB Windows: reinterpret_cast OSVERSIONINFO* to PRTL_OSVERSIONINFOW in sysdeps_win32.cpp.
 sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVERSIONINFOW>(\&version)/' \
   src/adb/sysdeps_win32.cpp
