@@ -112,10 +112,6 @@ cc_defaults {
         // Our toolchains are older or newer than Soong's clang; unknown -W
         // flags from Android.bp must not end the build.
         "-Wno-unknown-warning-option",
-        // AOSP's code is not ours to fix: keep the logs to errors. -w silences
-        // every warning whatever -W/-Werror a module adds after it; real
-        // errors (and -Werror=<x> promotions) still fail the build.
-        "-w",
         // 32-bit hosts need 64-bit off_t for lseek (Soong only has 64-bit hosts)
         "-D_FILE_OFFSET_BITS=64",
     ],
