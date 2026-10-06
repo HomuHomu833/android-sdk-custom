@@ -15,12 +15,13 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 SKIPPED=0
 trap 'SKIPPED=$((SKIPPED + 1)); printf "\033[1;33mwarning:\033[0m patch-source.sh:%s did not apply to these sources\n" "$LINENO" >&2' ERR
 
-# Older releases keep adb (platform-tools 30.x and earlier) and libbase
-# (30.0.1 and earlier) in system/core. Alias them at their later paths while
-# patching so every fixup below reaches them; the builder loads projects from
-# repos.json, and the aliases are gone before it runs.
+# Older releases keep adb and liblog (platform-tools 30.x and earlier),
+# libbase (30.0.1 and earlier) and libziparchive (29.x) in system/core. Alias
+# them at their later paths while patching so every fixup below reaches them;
+# the builder loads projects from repos.json, and the aliases are gone before
+# it runs. (src/logging/liblog is core/liblog there.)
 ALIASES=""
-for a in adb:core/adb libbase:core/base; do
+for a in adb:core/adb libbase:core/base libziparchive:core/libziparchive logging:core; do
   new="src/${a%%:*}"; old="src/${a#*:}"
   if [ ! -e "$new" ] && [ -d "$old" ]; then
     ln -s "${a#*:}" "$new"; ALIASES="$ALIASES $new"
