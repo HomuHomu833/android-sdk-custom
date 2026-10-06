@@ -561,6 +561,11 @@ if grep -q '^#define FMT_VERSION 10' src/fmtlib/include/fmt/core.h 2>/dev/null; 
     sed -i 's/^#ifndef FMT_CONSTEVAL$/#define FMT_CONSTEVAL\n#ifndef FMT_CONSTEVAL/' src/fmtlib/include/fmt/core.h
 fi
 
+# f2fs-tools fsck/main.c (platform-tools 33.0.2 and older): times the run
+# with CLOCK_BOOTTIME unguarded, which NetBSD lacks. Later releases check
+# HAVE_CLOCK_BOOTTIME; fall back to CLOCK_MONOTONIC where it is missing.
+sed -i 's/^\tclock_gettime(CLOCK_BOOTTIME, &t);$/#ifdef CLOCK_BOOTTIME\n\tclock_gettime(CLOCK_BOOTTIME, \&t);\n#else\n\tclock_gettime(CLOCK_MONOTONIC, \&t);\n#endif/' src/f2fs-tools/fsck/main.c
+
 # f2fs-tools f2fs_fs.h (older releases): typedefs bool, a keyword in the C23
 # we build C as. Keep it for older C only; upstream dropped it later.
 sed -i 's/^#ifndef bool$/#if !defined(bool) \&\& (!defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L) \&\& !defined(__cplusplus)/' \
