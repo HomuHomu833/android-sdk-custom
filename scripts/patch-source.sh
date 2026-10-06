@@ -15,6 +15,19 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 SKIPPED=0
 trap 'SKIPPED=$((SKIPPED + 1)); printf "\033[1;33mwarning:\033[0m patch-source.sh:%s did not apply to these sources\n" "$LINENO" >&2' ERR
 
+# Older releases keep adb (platform-tools 30.x and earlier) and libbase
+# (30.0.1 and earlier) in system/core. Alias them at their later paths while
+# patching so every fixup below reaches them; the builder loads projects from
+# repos.json, and the aliases are gone before it runs.
+ALIASES=""
+for a in adb:core/adb libbase:core/base; do
+  new="src/${a%%:*}"; old="src/${a#*:}"
+  if [ ! -e "$new" ] && [ -d "$old" ]; then
+    ln -s "${a#*:}" "$new"; ALIASES="$ALIASES $new"
+  fi
+done
+trap 'for l in $ALIASES; do rm -f "$l"; done' EXIT
+
 # A unified diff against the checkout (paths src/...); forward only, no .rej.
 apply() { patch -p1 -N -s -r - --no-backup-if-mismatch -d "$ROOTDIR" -i "$1"; }
 
@@ -154,32 +167,42 @@ sed -i '/^bool \(is_libusb_enabled\|should_use_libusb\)() {/,/^}/ s/#if defined(
 sed -i '/^bool should_use_libusb() {/,/^}/ s/^    static bool enable = getenv("ADB_LIBUSB") && strcmp(getenv("ADB_LIBUSB"), "1") == 0;$/#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n    static bool enable = true;\n#else\n&\n#endif/' \
   src/adb/client/transport_usb.cpp
 
-# ADB BSD: exclude the native BlockingConnection USB path (no native backend,
-# won't link), keeping is_adb_interface()/is_libusb_enabled().
-native_if='#if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path'
-if grep -q '^#if ADB_HOST$' src/adb/client/transport_usb.cpp; then
-  # platform-tools-34 and earlier: the read helpers sit in #if ADB_HOST/#else/
-  # #endif and UsbConnection follows unguarded; some releases then open an
-  # #ifdef ADB_HOST block at init_usb_transport() that also holds
-  # is_adb_interface(). Guard the pieces without crossing either conditional.
-  sed -i "0,/^#if ADB_HOST$/{/^#if ADB_HOST$/i ${native_if}
-}" src/adb/client/transport_usb.cpp
-  grep -q '^#ifdef ADB_HOST$' src/adb/client/transport_usb.cpp && sed -i '0,/^#ifdef ADB_HOST$/{/^#ifdef ADB_HOST$/{i #endif  // native USB path
-a '"${native_if}"'
-}}' src/adb/client/transport_usb.cpp
+# ADB BSD, platform-tools 31.0.2 and earlier: libusb devices go through the
+# shared usb_handle transport (UsbConnection, register_usb_transport) and
+# client/usb_dispatch.cpp, which picks libusb:: or native:: per call. There is
+# no native backend on the BSDs: send its calls to libusb too, and keep the
+# shared transport (patches/sources/adb_usb_bsd.cpp then defines nothing).
+if [ -f src/adb/client/usb_dispatch.cpp ]; then
+  sed -i '0,/^#include "\(client\/\)\?usb.h"$/s//&\n\n#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)\n\/\/ No native USB backend on the BSDs: every call goes to libusb.\n#define native libusb\n#endif/' \
+    src/adb/client/usb_dispatch.cpp
 else
-  sed -i "0,/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/{/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i ${native_if}
-}" src/adb/client/transport_usb.cpp
+  # ADB BSD: exclude the native BlockingConnection USB path (no native backend,
+  # won't link), keeping is_adb_interface()/is_libusb_enabled().
+  native_if='#if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // legacy native BlockingConnection USB path'
+  if grep -q '^#if ADB_HOST$' src/adb/client/transport_usb.cpp; then
+    # platform-tools-34 and earlier: the read helpers sit in #if ADB_HOST/#else/
+    # #endif and UsbConnection follows unguarded; some releases then open an
+    # #ifdef ADB_HOST block at init_usb_transport() that also holds
+    # is_adb_interface(). Guard the pieces without crossing either conditional.
+    sed -i "0,/^#if ADB_HOST$/{/^#if ADB_HOST$/i ${native_if}
+  }" src/adb/client/transport_usb.cpp
+    grep -q '^#ifdef ADB_HOST$' src/adb/client/transport_usb.cpp && sed -i '0,/^#ifdef ADB_HOST$/{/^#ifdef ADB_HOST$/{i #endif  // native USB path
+  a '"${native_if}"'
+  }}' src/adb/client/transport_usb.cpp
+  else
+    sed -i "0,/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/{/^static int UsbReadMessage(usb_handle\* h, amessage\* msg) {/i ${native_if}
+  }" src/adb/client/transport_usb.cpp
+  fi
+  sed -i '/^\(bool\|int\) is_adb_interface(int usb_class/i #endif  // native USB path\n' \
+    src/adb/client/transport_usb.cpp
+  # ...and the matching native-transport registration helpers in transport.cpp.
+  sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
+    src/adb/transport.cpp
+  # Close it right after unregister_usb_transport(): older adb keeps more host
+  # code (atransport's reverse config) before the enclosing #endif.
+  sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^}/ { /^}/a #endif  // native USB path
+  }' src/adb/transport.cpp
 fi
-sed -i '/^\(bool\|int\) is_adb_interface(int usb_class/i #endif  // native USB path\n' \
-  src/adb/client/transport_usb.cpp
-# ...and the matching native-transport registration helpers in transport.cpp.
-sed -i '/^void register_usb_transport(usb_handle\* usb,/i #if !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)  // native usb_handle transport registration' \
-  src/adb/transport.cpp
-# Close it right after unregister_usb_transport(): older adb keeps more host
-# code (atransport's reverse config) before the enclosing #endif.
-sed -i '/^void unregister_usb_transport(usb_handle\* usb) {/,/^}/ { /^}/a #endif  // native USB path
-}' src/adb/transport.cpp
 
 # ADB Windows: make usb_libusb_hotplug.cpp's timeval time_t->long cast explicit.
 sed -i 's/struct timeval timeout{(time_t)libusb_inhouse_hotplug::kScan_rate_s.count(), 0};/struct timeval timeout{static_cast<long>(libusb_inhouse_hotplug::kScan_rate_s.count()), 0};/' \
@@ -188,7 +211,7 @@ sed -i 's/struct timeval timeout{(time_t)libusb_inhouse_hotplug::kScan_rate_s.co
 # ADB older releases (platform-tools 35.0.2 and earlier): usb_init() aborts
 # when libusb has no hotplug, which no BSD backend has. Scan for devices instead
 # (patches/sources/adb_libusb_scan.inc), as newer adb's in-house hotplug does.
-for f in src/adb/client/usb_libusb.cpp src/core/adb/client/usb_libusb.cpp; do
+for f in src/adb/client/usb_libusb.cpp; do
   grep -q 'LOG(FATAL) << "failed to register libusb hotplug callback";' "$f" 2>/dev/null || continue
   sed -i 's/^#include <atomic>$/#include <algorithm>\n&\n#include <vector>/' "$f"
   awk -v inc="$ROOTDIR/patches/sources/adb_libusb_scan.inc" \
@@ -493,7 +516,7 @@ sed -i 's/^#if defined(__APPLE__)$/#if defined(__APPLE__) || defined(__FreeBSD__
 # (patches/sources/libbase_bsd_exe_path.inc), not getprogname()'s bare name.
 # (Older releases have no __EMSCRIPTEN__ branch to put it before; use the
 # function's final #else there.)
-for f in src/libbase/file.cpp src/core/base/file.cpp; do
+for f in src/libbase/file.cpp; do
   [ -f "$f" ] || continue
   awk -v inc="$ROOTDIR/patches/sources/libbase_bsd_exe_path.inc" \
     '/^std::string GetExecutablePath\(\) \{$/ { while ((getline l < inc) > 0) print l } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
@@ -959,8 +982,7 @@ if [ "$TERMUX_OK" = 1 ]; then
   log "Applying termux-usb shims"
   cp "$ROOTDIR/patches/termux/termux_fastboot.h" "src/core/fastboot/termux_adb.h"
 
-  # adb lives in src/adb from platform-tools 31, in src/core/adb before.
-  for ad in src/adb src/core/adb; do
+  for ad in src/adb; do
   [ -f "$ad/client/usb_linux.cpp" ] || continue
   cp "$ROOTDIR/patches/termux/termux_adb.h" "$ad/client/termux_adb.h"
 

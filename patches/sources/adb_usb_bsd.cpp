@@ -1,6 +1,10 @@
 // adb's USB entry points on the BSDs, where libusb is the only backend
 // (patch-source.sh guards out the native one): usb_init() starts the libusb
-// hotplug scanner, usb_cleanup() closes the open USB transports.
+// hotplug scanner, usb_cleanup() closes the open USB transports. Releases
+// with client/usb_dispatch.cpp (platform-tools 31.0.2 and earlier) define
+// both there, routed to libusb by patch-source.sh, so this file is empty.
+
+#if !__has_include("client/usb_dispatch.cpp")
 
 #include "client/usb.h"
 // Newer adb split the libusb backend; older releases declare
@@ -20,3 +24,5 @@ void usb_cleanup() {
     close_usb_devices();
 #endif
 }
+
+#endif  // !__has_include("client/usb_dispatch.cpp")
