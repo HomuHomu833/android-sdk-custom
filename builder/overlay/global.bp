@@ -115,62 +115,23 @@ cc_defaults {
         // 32-bit hosts need 64-bit off_t for lseek (Soong only has 64-bit hosts)
         "-D_FILE_OFFSET_BITS=64",
     ],
-    // Warnings newer clang raises on AOSP code that are noise for these
-    // builds (deprecations, style, false positives from libc headers), triaged
-    // from the CI logs. The builder puts these after a module's own flags, so
-    // its -Wextra/-W<x> cannot turn them back on; anything unlisted still shows.
+    // Warnings that are noise for these builds, triaged from the CI logs of
+    // every release (deprecations, style, vendored-C patterns, libc-header
+    // false positives; every instance read). The builder appends late_cflags
+    // after a module's own C/C++ flags, so its -Wextra/-W<x> cannot re-enable
+    // them. Those every compiler raises are here; the rest sit under the
+    // target whose compiler raises them. Anything unlisted still shows.
     late_cflags: [
-        // newer clang / libc++ deprecations and C++ style
-        "-Wno-unnecessary-virtual-specifier",
         "-Wno-deprecated-literal-operator",
         "-Wno-deprecated-declarations",
-        "-Wno-deprecated-attributes",
         "-Wno-deprecated-pragma",
         "-Wno-deprecated-redundant-constexpr-static-def",
         "-Wno-defaulted-function-deleted",
-        "-Wno-nontrivial-memcall",
         "-Wno-invalid-offsetof",
         "-Wno-range-loop-construct",
         "-Wno-pessimizing-move",
-        "-Wno-character-conversion",
-        "-Wno-old-style-cast",
-        "-Wno-zero-as-null-pointer-constant",
-        "-Wno-overloaded-virtual",
-        "-Wno-reorder-ctor",
-        // long-standing C patterns in vendored code
-        "-Wno-incompatible-pointer-types-discards-qualifiers",
-        "-Wno-typedef-redefinition",
         "-Wno-macro-redefined",
-        "-Wno-char-subscripts",
-        "-Wno-unterminated-string-initialization",
-        "-Wno-gnu-variable-sized-type-not-at-end",
-        "-Wno-knr-promoted-parameter",
-        "-Wno-expansion-to-defined",
-        "-Wno-array-compare",
         "-Wno-int-in-bool-context",
-        "-Wno-tautological-constant-out-of-range-compare",
-        "-Wno-pragma-pack",
-        "-Wno-ignored-attributes",
-        "-Wno-main",
-        "-Wno-unused-parameter",
-        "-Wno-unused-but-set-variable",
-        "-Wno-used-but-marked-unused",
-        // thread-safety annotations trip on libc headers (FreeBSD) and libutils
-        "-Wno-thread-safety-analysis",
-        "-Wno-thread-safety-reference-return",
-        // driver: zig's MIPS N64 ignores -fno-PIC; -static-libstdc++ on compile lines
-        "-Wno-option-ignored",
-        "-Wno-unused-command-line-argument",
-        // every instance checked and harmless: same-width printf types (LP64,
-        // Windows' 64-bit pid_t/size_t in 8-byte vararg slots), INVALID_SOCKET
-        // as int, int-to-pointer tags, va_start on a promoted enum (hexagon),
-        // packed fields on strict-alignment OpenBSD aarch64
-        "-Wno-format",
-        "-Wformat-security",
-        "-Wno-constant-conversion",
-        "-Wno-int-to-void-pointer-cast",
-        "-Wno-varargs",
-        "-Wno-unaligned-access",
     ],
     cppflags: [
         // commonGlobalCppflags
@@ -190,6 +151,26 @@ cc_defaults {
         // Hardening, as linuxCflags/linuxLdflags and linuxBionicCflags have
         // it (musl ignores _FORTIFY_SOURCE).
         linux: {
+            // zig's clang (glibc, musl; bionic's NDK clang raises a subset)
+            late_cflags: [
+                "-Wno-unnecessary-virtual-specifier",
+                "-Wno-nontrivial-memcall",
+                "-Wno-character-conversion",
+                "-Wno-old-style-cast",
+                "-Wno-incompatible-pointer-types-discards-qualifiers",
+                "-Wno-typedef-redefinition",
+                "-Wno-unterminated-string-initialization",
+                "-Wno-gnu-variable-sized-type-not-at-end",
+                "-Wno-knr-promoted-parameter",
+                "-Wno-array-compare",
+                "-Wno-tautological-constant-out-of-range-compare",
+                "-Wno-unused-parameter",
+                "-Wno-unused-but-set-variable",
+                "-Wno-used-but-marked-unused",
+                "-Wno-thread-safety-reference-return",
+                "-Wno-option-ignored", // MIPS N64 ignores -fno-PIC
+                "-Wno-varargs", // va_start on a promoted enum (hexagon)
+            ],
             cflags: select(soong_config_variable("sdk", "host_protoc"), {
                 true: [],
                 default: [
@@ -232,6 +213,14 @@ cc_defaults {
             ],
         },
         darwin: {
+            // osxcross' clang
+            late_cflags: [
+                "-Wno-old-style-cast",
+                "-Wno-unused-parameter",
+                "-Wno-thread-safety-reference-return",
+                "-Wno-format", // same-width LP64 printf types
+                "-Wformat-security",
+            ],
             // darwinCflags, plus the fortify level the sqlite build asks for
             // (libSystem has the checked functions)
             cflags: [
@@ -246,6 +235,29 @@ cc_defaults {
             ],
         },
         windows: {
+            // llvm-mingw's clang
+            late_cflags: [
+                "-Wno-unnecessary-virtual-specifier",
+                "-Wno-nontrivial-memcall",
+                "-Wno-character-conversion",
+                "-Wno-deprecated-attributes",
+                "-Wno-zero-as-null-pointer-constant",
+                "-Wno-overloaded-virtual",
+                "-Wno-reorder-ctor",
+                "-Wno-unterminated-string-initialization",
+                "-Wno-expansion-to-defined",
+                "-Wno-tautological-constant-out-of-range-compare",
+                "-Wno-pragma-pack",
+                "-Wno-ignored-attributes",
+                "-Wno-main",
+                "-Wno-unused-parameter",
+                "-Wno-unused-but-set-variable",
+                "-Wno-unused-command-line-argument",
+                "-Wno-format", // 64-bit pid_t/size_t in 8-byte vararg slots
+                "-Wformat-security",
+                "-Wno-constant-conversion", // INVALID_SOCKET as int
+                "-Wno-int-to-void-pointer-cast",
+            ],
             // windowsCflags
             cflags: [
                 "-DUSE_MINGW",
@@ -277,6 +289,24 @@ cc_defaults {
             ldflags: ["-Wl,--high-entropy-va"],
         },
         bsd: {
+            // zig's clang, plus FreeBSD's annotated pthread headers
+            late_cflags: [
+                "-Wno-unnecessary-virtual-specifier",
+                "-Wno-nontrivial-memcall",
+                "-Wno-character-conversion",
+                "-Wno-old-style-cast",
+                "-Wno-char-subscripts",
+                "-Wno-unterminated-string-initialization",
+                "-Wno-array-compare",
+                "-Wno-tautological-constant-out-of-range-compare",
+                "-Wno-unused-parameter",
+                "-Wno-unused-but-set-variable",
+                "-Wno-thread-safety-analysis",
+                "-Wno-thread-safety-reference-return",
+                "-Wno-format", // same-width printf types
+                "-Wformat-security",
+                "-Wno-unaligned-access", // packed fields, strict-align OpenBSD aarch64
+            ],
             // The Linux hardening minus fortify, which not every BSD libc
             // implements.
             cflags: ["-fstack-protector-strong"],
