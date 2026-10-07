@@ -32,6 +32,32 @@ EXTERNAL_CFLAGS = [
     "-Wno-deprecated-non-prototype", "-Wno-unused", "-Wno-unused-but-set-variable",
     "-Wno-deprecated", "-Wno-tautological-constant-compare",
 ]
+# Warnings newer clang raises on AOSP code that are noise for these builds
+# (deprecations, style, false positives from libc headers), triaged from the
+# CI logs. They go last, after a module's own c/cpp/conly flags, so its
+# -Wextra/-W<x> cannot turn them back on. Anything not listed still shows.
+QUIET_CFLAGS = [
+    # newer clang / libc++ deprecations and C++ style
+    "-Wno-unnecessary-virtual-specifier", "-Wno-deprecated-literal-operator",
+    "-Wno-deprecated-declarations", "-Wno-deprecated-attributes",
+    "-Wno-deprecated-pragma", "-Wno-deprecated-redundant-constexpr-static-def",
+    "-Wno-defaulted-function-deleted", "-Wno-nontrivial-memcall",
+    "-Wno-invalid-offsetof", "-Wno-range-loop-construct", "-Wno-pessimizing-move",
+    "-Wno-character-conversion", "-Wno-old-style-cast",
+    "-Wno-zero-as-null-pointer-constant", "-Wno-overloaded-virtual", "-Wno-reorder-ctor",
+    # long-standing C patterns in vendored code
+    "-Wno-incompatible-pointer-types-discards-qualifiers", "-Wno-typedef-redefinition",
+    "-Wno-macro-redefined", "-Wno-char-subscripts", "-Wno-unterminated-string-initialization",
+    "-Wno-gnu-variable-sized-type-not-at-end", "-Wno-knr-promoted-parameter",
+    "-Wno-expansion-to-defined", "-Wno-array-compare", "-Wno-int-in-bool-context",
+    "-Wno-tautological-constant-out-of-range-compare", "-Wno-pragma-pack",
+    "-Wno-ignored-attributes", "-Wno-main",
+    "-Wno-unused-parameter", "-Wno-unused-but-set-variable", "-Wno-used-but-marked-unused",
+    # thread-safety annotations trip on libc headers (FreeBSD) and libutils
+    "-Wno-thread-safety-analysis", "-Wno-thread-safety-reference-return",
+    # driver: zig's MIPS N64 ignores -fno-PIC; -static-libstdc++ on compile lines
+    "-Wno-option-ignored", "-Wno-unused-command-line-argument",
+]
 C_STD, CPP_STD = "gnu23", "gnu++20"
 EXPERIMENTAL_C_STD, EXPERIMENTAL_CPP_STD = "gnu2y", "gnu++2b"
 
@@ -502,10 +528,16 @@ class Converter:
             t.cflags = EXTERNAL_CFLAGS + t.cflags
         if not aosp_dir.startswith("external/"):
             t.cflags = ["-DANDROID_STRICT"] + t.cflags
+        # Global hardening defines _FORTIFY_SOURCE, which does nothing (and glibc
+        # warns) without optimization; drop it for modules built at -O0.
+        if "-O0" in t.cflags:
+            t.cflags.append("-U_FORTIFY_SOURCE")
         t.cppflags = _clean_flags(p.get("cppflags", []), drop.get("cppflags"))
         t.conlyflags = _clean_flags(p.get("conlyflags", []), drop.get("conlyflags"))
         t.asflags = _clean_flags(p.get("asflags", []), drop.get("asflags"))
         t.cppflags = (["-frtti"] if p.get("rtti") else ["-fno-rtti"]) + t.cppflags
+        t.conlyflags += QUIET_CFLAGS
+        t.cppflags += QUIET_CFLAGS
         st = self.stds
         t.c_std = self._std(p.get("c_std"), st["CStdVersion"], st["ExperimentalCStdVersion"])
         t.cpp_std = self._std(p.get("cpp_std"), st["CppStdVersion"], st["ExperimentalCppStdVersion"])

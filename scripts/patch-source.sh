@@ -84,6 +84,11 @@ sed "s#/crypto/rand/getrandom_fillin.h#/${fillin}#" patches/misc/boringssl-getra
 apply "$ROOTDIR/.getrandom.patch"
 rm -f "$ROOTDIR/.getrandom.patch"
 
+# BoringSSL HRSS: its NEON path mixes GNU vector syntax with NEON intrinsics,
+# whose lane order disagrees on big-endian ARM; take the portable C path there.
+sed -i 's/^\(#\(el\)\?if (defined(OPENSSL_ARM) || defined(OPENSSL_AARCH64)) && defined(__ARM_NEON)\)$/\1 \&\& !defined(__ARM_BIG_ENDIAN)/' \
+  src/boringssl/src/crypto/hrss/hrss.c
+
 # ART: TwoWordReturn by pointer width, so instruction_set.h compiles on any CPU.
 apply patches/misc/art-two-word-return.patch
 
@@ -215,6 +220,11 @@ if grep -q 'LOG(FATAL) << "failed to register libusb hotplug callback";' "$f" 2>
     '/^void usb_init\(\) \{$/ { while ((getline l < inc) > 0) print l } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
   sed -i 's/^        LOG(FATAL) << "failed to register libusb hotplug callback";$/        sdk_scan_usb_devices();/' "$f"
 fi
+
+# adb client/auth.cpp: adb_auth_sign() returns nullptr as a std::string for a
+# token of the wrong size, which a device controls; return an empty one.
+sed -i '/^static std::string adb_auth_sign(/,/^}/ s/^        return nullptr;$/        return {};/' \
+  $ADB/client/auth.cpp
 
 # ADB Windows: reinterpret_cast OSVERSIONINFO* to PRTL_OSVERSIONINFOW in sysdeps_win32.cpp.
 sed -i 's/static_cast<PRTL_OSVERSIONINFOW>(&version)/reinterpret_cast<PRTL_OSVERSIONINFOW>(\&version)/' \
@@ -376,6 +386,12 @@ sed -i 's/__INTRODUCED_IN([0-9]*)//g' $LIBLOG/include/android/log.h $ADB/pairing
 sed -i 's/^#if !defined(__BIONIC__)$/#if !defined(__BIONIC__) || __ANDROID_API__ < 29/' src/core/libcutils/native_handle.cpp
 sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& __ANDROID_API__ >= 29/' src/core/libcutils/native_handle.cpp
 
+# e2fsprogs ismounted.c: without getmntent/getmntinfo (our BSD, macOS and
+# Windows configs) it reports nothing mounted and #warns about it on every
+# build. That only matters for live disks, not the images these tools write.
+sed -i "s|^ #warning \"Can't use getmntent or getmntinfo to check for mounted filesystems!\"$| /* no getmntent/getmntinfo: nothing is reported as mounted */|" \
+  src/e2fsprogs/lib/ext2fs/ismounted.c
+
 # e2fsprogs error-table sources: rename the 'link' var (collides with POSIX
 # link() on bionic) to 'et_link'.
 for f in lib/support/prof_err.c lib/ext2fs/ext2_err.c; do
@@ -390,6 +406,18 @@ sed -i '/#include <unistd.h>/a\
 #if defined(__FreeBSD__)\n#include <pthread_np.h>\n#elif defined(__NetBSD__)\n#include <lwp.h>\n#endif' $LIBBASE/threads.cpp
 sed -i '/return syscall(__NR_gettid);/a\
 #elif defined(__FreeBSD__)\n  return pthread_getthreadid_np();\n#elif defined(__NetBSD__)\n  return _lwp_self();\n#elif defined(__OpenBSD__)\n  return getthrid();' $LIBBASE/threads.cpp
+
+# libcutils threads.cpp's gettid() fallback and liblog's GetThreadId(), which
+# its stderr logger calls for every line, have no BSD branch either and fall
+# off the end. Give them the same calls.
+bsd_tid_inc='#if defined(__FreeBSD__)\n#include <pthread_np.h>\n#elif defined(__NetBSD__)\n#include <lwp.h>\n#elif defined(__OpenBSD__)\n#include <unistd.h>\n#endif'
+bsd_tid_ret='#elif defined(__FreeBSD__)\n  return pthread_getthreadid_np();\n#elif defined(__NetBSD__)\n  return _lwp_self();\n#elif defined(__OpenBSD__)\n  return getthrid();'
+for f in src/core/libcutils/threads.cpp:'pid_t gettid() {' $LIBLOG/logger_write.cpp:'static uint64_t GetThreadId() {'; do
+  file="${f%%:*}"; fn="${f#*:}"
+  [ -f "$file" ] && grep -qxF "$fn" "$file" || continue
+  sed -i "/^$fn\$/,/^}/ s/^  return syscall(__NR_gettid);\$/&\n$bsd_tid_ret/" "$file"
+  sed -i "0,/^$fn\$/s//$bsd_tid_inc\n\n&/" "$file"
+done
 
 # PosixUtils.cpp: 'stdout'/'stderr' locals are macros on BSD; rename to
 # out_fd/err_fd.
@@ -752,6 +780,11 @@ for b in netbsd:netbsd obsd:openbsd; do
          -e "s/^\t\.cancel_transfer = ${p}_cancel_transfer,$/\t.cancel_transfer = sdk_aq_cancel,/" \
          -e "s/^\t\.handle_transfer_completion = ${p}_handle_transfer_completion,$/\t.handle_transfer_completion = sdk_aq_handle_completion,/" "$f"
 done
+
+# libusb netbsd_usb.c: size the devnode copy by its destination (both are
+# 16 bytes today).
+sed -i 's/strlcpy(dpriv->devnode, devnode, sizeof(devnode));/strlcpy(dpriv->devnode, devnode, sizeof(dpriv->devnode));/' \
+  src/libusb/libusb/os/netbsd_usb.c
 
 # libusb threads_posix.c (platform-tools-34 and earlier): OpenBSD's thread id
 # via syscall(SYS_getthrid); OpenBSD no longer exposes syscall(). Newer libusb
