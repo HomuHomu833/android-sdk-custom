@@ -89,6 +89,12 @@ rm -f "$ROOTDIR/.getrandom.patch"
 sed -i 's/^\(#\(el\)\?if (defined(OPENSSL_ARM) || defined(OPENSSL_AARCH64)) && defined(__ARM_NEON)\)$/\1 \&\& !defined(__ARM_BIG_ENDIAN)/' \
   src/boringssl/src/crypto/hrss/hrss.c
 
+# aidl permission/lexer.ll (platform-tools 32.0.0 and earlier): names the
+# value type PERMSTYPE, which only older bison's glr.cc defined. It is
+# perm::parser::semantic_type, as the grammar's own permlex() declaration says.
+sed -i 's/^#define YYSTYPE PERMSTYPE$/#define YYSTYPE perm::parser::semantic_type/' \
+  src/aidl/permission/lexer.ll
+
 # ART: TwoWordReturn by pointer width, so instruction_set.h compiles on any CPU.
 apply patches/misc/art-two-word-return.patch
 

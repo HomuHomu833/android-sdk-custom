@@ -334,6 +334,28 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
 #endif
 #endif
 
+/* --- musl group_member() -----------------------------------------------------
+ * GNU extension older diagnose_usb.cpp (platform-tools 32.0.0 and earlier)
+ * calls to tell whether the user is in plugdev; musl lacks it. */
+#if defined(__linux__) && !defined(__GLIBC__) && !defined(__BIONIC__)
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+static inline __attribute__((__unused__))
+int group_member(gid_t gid) {
+  int n = getgroups(0, NULL), i, found = 0;
+  gid_t *groups;
+  if (n <= 0) return 0;
+  groups = (gid_t *)malloc((size_t)n * sizeof(gid_t));
+  if (groups == NULL) return 0;
+  n = getgroups(n, groups);
+  for (i = 0; i < n; i++)
+    if (groups[i] == gid) { found = 1; break; }
+  free(groups);
+  return found;
+}
+#endif
+
 /* --- bionic / Android NDK fallbacks -----------------------------------------
  * Keyed on __BIONIC__: the bionic build undefines __ANDROID__, as Soong's
  * linux_bionic toolchains do. Everything below links from the NDK's static

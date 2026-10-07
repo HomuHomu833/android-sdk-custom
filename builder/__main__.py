@@ -164,6 +164,7 @@ def main(argv=None):
         globals_["ldlibs"] = conv._ldlibs(gp.get("host_ldlibs", []))
         conv.drop_flags = {k: set(gp.get("exclude_" + k, []))
                            for k in ("cflags", "cppflags", "conlyflags", "asflags")}
+        conv.late_cflags = _clean_flags(gp.get("late_cflags", []))
 
     if args.tools:
         tools = [t for t in args.tools.split(",") if t]
