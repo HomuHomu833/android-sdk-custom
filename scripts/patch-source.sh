@@ -95,6 +95,15 @@ sed -i 's/^\(#\(el\)\?if (defined(OPENSSL_ARM) || defined(OPENSSL_AARCH64)) && d
 sed -i 's/^#define YYSTYPE PERMSTYPE$/#define YYSTYPE perm::parser::semantic_type/' \
   src/aidl/permission/lexer.ll
 
+# diagnose_usb.cpp (platform-tools 32.0.0 and earlier) calls GNU
+# group_member(), which musl lacks; use patches/sources/diagnose_usb_in_group.inc.
+f=src/core/diagnose_usb/diagnose_usb.cpp
+if grep -q 'group_member(plugdev_group->gr_gid)' "$f" 2>/dev/null; then
+  sed -i 's/group_member(plugdev_group->gr_gid)/sdk_in_group(plugdev_group->gr_gid)/' "$f"
+  awk -v inc="$ROOTDIR/patches/sources/diagnose_usb_in_group.inc" \
+    '/^static const char kPermissionsHelpUrl\[\]/ { while ((getline l < inc) > 0) print l } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+fi
+
 # ART: TwoWordReturn by pointer width, so instruction_set.h compiles on any CPU.
 apply patches/misc/art-two-word-return.patch
 
