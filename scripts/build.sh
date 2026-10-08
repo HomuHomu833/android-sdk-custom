@@ -265,15 +265,6 @@ case "$PLATFORM" in
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
-# zig-as-llvm's strip (zig objcopy -S) fails on these ELF files
-# ("unimplemented") and leaves them unstripped. llvm-mingw's llvm-strip handles
-# ELF for every target CPU.
-case "$PLATFORM" in
-  linux|bsd)
-    if [ -x /opt/llvm-mingw/bin/llvm-strip ]; then
-      CROSS_STRIP=/opt/llvm-mingw/bin/llvm-strip
-    fi ;;
-esac
 export CROSS_CC CROSS_CXX CROSS_LD CROSS_AR CROSS_RANLIB CROSS_STRIP CROSS_OBJCOPY CROSS_LDFLAGS
 
 ADBMDNS_RUST_TARGET=""
