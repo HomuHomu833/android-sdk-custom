@@ -966,6 +966,14 @@ if old in src:
     open(path, 'w').write(src.replace(old, new, 1))
 PYEOF
 
+# libcutils memory.cpp (platform-tools 31.0.0) passes bionic's short-lived
+# M_BIONIC_DISABLE_MEMORY_MITIGATIONS to mallopt(); the NDK never had it (and
+# its old value is M_BIONIC_ZERO_INIT now). Without it the call is skipped and
+# the function reports failure, as it does off bionic.
+[ -f src/core/libcutils/memory.cpp ] &&
+  sed -i 's/^#ifdef __BIONIC__$/#if defined(__BIONIC__) \&\& defined(M_BIONIC_DISABLE_MEMORY_MITIGATIONS)/' \
+    src/core/libcutils/memory.cpp
+
 # Older libziparchive builds a span from an ssize_t size, which narrows on
 # 32-bit hosts.
 sed -i 's/return {buf.first, ssize_t(buf.second)};/return {buf.first, size_t(buf.second)};/' \
