@@ -204,6 +204,10 @@ if [ "$SHIP_CMDLINE_TOOLS_URL" != "$CMDLINE_TOOLS_URL" ]; then
 fi
 
 # --- archive ----------------------------------------------------------------
+# Ad-hoc (re)sign what strip broke; Apple Silicon kills unsigned binaries.
+if [ "$PLATFORM" = macos ]; then
+  "$(dirname -- "$0")/macos-sign.sh" "$ROOTDIR/android-sdk"
+fi
 mkdir -p "$DEST"
 if [ "$PLATFORM" = windows ]; then
   ARCHIVE="$DEST/android-sdk-$TARGET.7z"
