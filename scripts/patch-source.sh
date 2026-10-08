@@ -648,6 +648,35 @@ PYEOF
 grep -q '^#include <vector>' src/core/fastboot/fastboot_driver_interface.h ||
   sed -i 's/^#include <string>$/#include <string>\n#include <vector>/' src/core/fastboot/fastboot_driver_interface.h
 
+# fastboot socket.cpp (older releases) uses select() without <sys/select.h>,
+# which glibc pulls in some other way and musl doesn't.
+grep -q '<sys/select.h>' src/core/fastboot/socket.cpp ||
+  sed -i '0,/^#include "socket.h"$/s//&\n\n#if !defined(_WIN32)\n#include <sys\/select.h>\n#endif/' src/core/fastboot/socket.cpp
+
+# openscreen network_interface_linux.cc (older releases) fills struct msghdr
+# positionally; musl's has padding members on 64-bit hosts. Assign the fields
+# by name, as later releases do.
+python3 << 'PYEOF'
+import re
+path = 'src/openscreen/platform/impl/network_interface_linux.cc'
+try:
+    src = open(path).read()
+except FileNotFoundError:
+    raise SystemExit(0)
+fields = ['msg_name', 'msg_namelen', 'msg_iov', 'msg_iovlen',
+          'msg_control', 'msg_controllen', 'msg_flags']
+def by_name(m):
+    indent, decl, body = m.group(1), m.group(2), m.group(3)
+    args = [re.sub(r'/\*.*?\*/', '', a).strip() for a in body.split(',')]
+    lines = [indent + decl + ' = {};']
+    lines += [f'{indent}msg.{f} = {a};' for f, a in zip(fields, args)]
+    return '\n'.join(lines)
+src, n = re.subn(r'^( *)(struct msghdr msg|msg) = \{([^{}]*/\* msg_flags \*/[^{}]*)\};',
+                 by_name, src, flags=re.M)
+if n:
+    open(path, 'w').write(src)
+PYEOF
+
 # abseil stacktrace.cc (older releases): without <alloca.h> it declares its own
 # static alloca(), which the BSDs' <stdlib.h> already declares (NetBSD fails).
 # Take theirs; a no-op where the fallback is gone.
