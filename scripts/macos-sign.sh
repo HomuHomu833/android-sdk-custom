@@ -22,8 +22,13 @@ RCS="$CACHE/rcodesign"
 if [ ! -x "$RCS" ]; then
   mkdir -p "$CACHE"
   name="apple-codesign-$RCS_VERSION-$RCS_ARCH-unknown-linux-musl"
-  curl -sSfL --retry 5 -o "$CACHE/rcs.tar.gz" \
-    "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F$RCS_VERSION/$name.tar.gz"
+  url="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F$RCS_VERSION/$name.tar.gz"
+  # whichever downloader the builder image has
+  if command -v curl >/dev/null; then curl -sSfL --retry 5 -o "$CACHE/rcs.tar.gz" "$url"
+  elif command -v wget >/dev/null; then wget -q -O "$CACHE/rcs.tar.gz" "$url"
+  elif command -v aria2c >/dev/null; then aria2c -q --max-tries=5 -d "$CACHE" -o rcs.tar.gz "$url"
+  else python3 -c 'import sys,urllib.request; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])' "$url" "$CACHE/rcs.tar.gz"
+  fi
   echo "$RCS_SHA256  $CACHE/rcs.tar.gz" | sha256sum -c --quiet -
   tar -xzf "$CACHE/rcs.tar.gz" -C "$CACHE" --strip-components=1 "$name/rcodesign"
   rm -f "$CACHE/rcs.tar.gz"

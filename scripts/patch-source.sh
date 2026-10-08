@@ -65,7 +65,7 @@ if [ ! -f src/boringssl/src/include/openssl/target.h ]; then
     -e 's/^#elif defined\(__AARCH64EL__\) \|\| defined\(_M_ARM64\)$/#elif defined(__AARCH64EL__) || defined(__AARCH64EB__) || defined(_M_ARM64)/' \
     -e 's/^#elif defined\(__ARMEL__\) \|\| defined\(_M_ARM\)$/#elif defined(__ARMEL__) || defined(__ARMEB__) || defined(_M_ARM)/' \
     -e 's/^#elif defined\(__MIPSEL__\) && (!?)defined\(__LP64__\)$/#elif (defined(__MIPSEL__) || defined(__MIPSEB__)) \&\& \1defined(__LP64__)/' \
-    -e 's/^#error "Unknown target CPU"$/#if defined(__loongarch64) || defined(__s390x__) || defined(__powerpc64__)\n#define OPENSSL_64_BIT\n#elif defined(__powerpc__) || defined(__hexagon__)\n#define OPENSSL_32_BIT\n#else\n#error "Unknown target CPU"\n#endif/' \
+    -e 's/^#error "Unknown target CPU"$/#if defined(__loongarch64) || defined(__s390x__) || defined(__powerpc64__) || (defined(__riscv) \&\& __riscv_xlen == 64)\n#define OPENSSL_64_BIT\n#elif defined(__powerpc__) || defined(__hexagon__) || (defined(__riscv) \&\& __riscv_xlen == 32)\n#define OPENSSL_32_BIT\n#else\n#error "Unknown target CPU"\n#endif/' \
     src/boringssl/src/include/openssl/base.h
   # Some also have a ppc64le branch keyed on _LITTLE_ENDIAN, which FreeBSD
   # defines on big-endian too, and whose CPU detection calls Linux's
@@ -178,6 +178,12 @@ sed -i '/^#include <sys\/uio.h>/a #endif' src/selinux/libselinux/src/setrans_cli
 # sload_f2fs, which link it): FreeBSD and OpenBSD have no <sys/xattr.h>. Its
 # one getxattr() reads restorecon's cached digest; report none stored.
 sed -i 's|^#include <sys/xattr.h>$|#if defined(__FreeBSD__) \|\| defined(__OpenBSD__)\n#include <sys/types.h>\n#define getxattr(path, name, value, size) (errno = ENOTSUP, (ssize_t)-1)\n#else\n#include <sys/xattr.h>\n#endif|' src/selinux/libselinux/src/label_file.h
+
+# e2fsprogs ext2fs.h (older releases) includes <sys/types.h> only under
+# HAVE_SYS_TYPES_H, which e2fsdroid is built without; musl then lacks dev_t
+# and mode_t. Every platform has the header.
+sed -i '/^#ifdef HAVE_SYS_TYPES_H$/{N;N;s/^#ifdef HAVE_SYS_TYPES_H\n\(#include <sys\/types.h>\)\n#endif$/\1/}' \
+  src/e2fsprogs/lib/ext2fs/ext2fs.h
 
 # e2fsprogs config.h: exclude _WIN32/BSD from HAVE_SYS_SYSMACROS_H (no such header).
 sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
@@ -442,8 +448,9 @@ for f in src/core/libcutils/threads.cpp:'pid_t gettid() {' $LIBLOG/logger_write.
   sed -i "0,/^$fn\$/s//$bsd_tid_inc\n\n&/" "$file"
 done
 
-# PosixUtils.cpp: 'stdout'/'stderr' locals are macros on BSD; rename to
-# out_fd/err_fd.
+# PosixUtils: 'stdout'/'stderr' are macros on the BSDs. Rename the .cpp's pipe
+# locals to out_fd/err_fd, and older releases' ProcResult fields (header and
+# .cpp) to the stdout_str/stderr_str newer ones use.
 case "$TARGET" in
   *-freebsd-*|*-netbsd-*|*-openbsd-*)
     sed -i \
@@ -453,7 +460,12 @@ case "$TARGET" in
       -e 's/pipe(stderr)/pipe(err_fd)/g' \
       -e 's/stdout\[/out_fd[/g' \
       -e 's/stderr\[/err_fd[/g' \
+      -e 's/result->stdout =/result->stdout_str =/' \
+      -e 's/result->stderr =/result->stderr_str =/' \
       src/base/libs/androidfw/PosixUtils.cpp
+    sed -i -e 's/^  std::string stdout;$/  std::string stdout_str;/' \
+           -e 's/^  std::string stderr;$/  std::string stderr_str;/' \
+      src/base/libs/androidfw/include/androidfw/PosixUtils.h
 
     # utils.cc: add BSD branches to GetTid() (pthread_self) and SetThreadName()
     # (FreeBSD 2-arg, NetBSD 3-arg, OpenBSD none).
