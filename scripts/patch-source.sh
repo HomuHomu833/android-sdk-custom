@@ -304,6 +304,27 @@ sed -i -e 's@^#if defined(__x86_64__)$@#if defined(__x86_64__) \&\& !defined(__a
     src/abseil-cpp/absl/base/internal/unscaledcycleclock.h \
     src/abseil-cpp/absl/base/internal/unscaledcycleclock.cc
 
+# lzma CpuArch.h (before the 35.x import) takes arm64ec for AMD64 and CpuArch.c
+# then emits x86 cpuid asm. Later lzma counts _M_ARM64EC as ARM64; do the same.
+python3 << 'PYEOF'
+path = 'src/lzma/C/CpuArch.h'
+try:
+    raw = open(path, newline='').read()
+except FileNotFoundError:
+    raise SystemExit(0)
+crlf = '\r\n' in raw
+src = raw.replace('\r\n', '\n')
+amd64 ='#if  defined(_M_X64) \\\n  || defined(_M_AMD64) \\\n  || defined(__x86_64__) \\\n  || defined(__AMD64__) \\\n  || defined(__amd64__)\n'
+arm64 = '#if  defined(_M_ARM64) \\\n'
+if amd64 in src and 'ARM64EC' not in src:
+    src = src.replace(amd64, '#if !defined(_M_ARM64EC) && !defined(__arm64ec__) && ( \\\n'
+                      + amd64[len('#if '):-1] + ')\n', 1)
+    src = src.replace(arm64, arm64 + '  || defined(_M_ARM64EC) \\\n  || defined(__arm64ec__) \\\n', 1)
+    if crlf:
+        src = src.replace('\n', '\r\n')
+    open(path, 'w', newline='').write(src)
+PYEOF
+
 # abseil's random platform.h picks ABSL_ARCH_* by macro, so arm64ec lands on
 # X86_64 and randen_detect.cc reaches for __cpuid that mingw's <intrin.h> has no
 # ARM declaration for. Leave the arch undefined instead: the #else is empty, so
@@ -465,6 +486,24 @@ sed -i -e 's/^  std::string stdout;$/  std::string stdout_str;/' \
        -e 's/^  std::string stderr;$/  std::string stderr_str;/' \
   src/base/libs/androidfw/include/androidfw/PosixUtils.h
 
+# androidfw Idmap.cpp (30.0.4 and older) includes utils/Trace.h, and with it
+# C's <stdatomic.h>, before anything brings in <atomic>; the C atomic macros then
+# break std::atomic_thread_fence in LightRefBase.h. Later releases include
+# ResourceTypes.h first.
+f=src/base/libs/androidfw/Idmap.cpp
+if [ -f "$f" ] && [ "$(grep -n '^#include "utils/Trace.h"$' "$f" | cut -d: -f1)" \
+     -lt "$(grep -n '^#include "androidfw/ResourceTypes.h"$' "$f" | cut -d: -f1)" ] 2>/dev/null; then
+  sed -i -e '/^#include "utils\/Trace.h"$/d' \
+         -e 's/^#include "androidfw\/ResourceTypes.h"$/&\n#include "utils\/Trace.h"/' "$f"
+fi
+
+# liblog event_tag_map.cpp (30.0.4 and older) derives its std::hash
+# specializations from std::unary_function, which C++17 removed; they only
+# need operator().
+sed -i -e 's/^    : public std::unary_function<const MapString&, size_t> {$/    {/' \
+       -e 's/^struct std::hash<TagFmt> : public std::unary_function<const TagFmt&, size_t> {$/struct std::hash<TagFmt> {/' \
+  $LIBLOG/event_tag_map.cpp
+
 case "$TARGET" in
   *-freebsd-*|*-netbsd-*|*-openbsd-*)
     # utils.cc: add BSD branches to GetTid() (pthread_self) and SetThreadName()
@@ -608,6 +647,11 @@ sed -i 's/^#if !defined(__APPLE__) \&\& !defined(__BIONIC__)$/#if !defined(__APP
 
 # libbase cmsg.cpp: <sys/user.h> is unused here and does not exist on NetBSD.
 sed -i 's|#include <sys/user.h>|#if !defined(__NetBSD__)\n#include <sys/user.h>\n#endif|' \
+  "$LIBBASE/cmsg.cpp"
+# Older cmsg.cpp (30.0.4 and earlier) uses the compile-time PAGE_SIZE, which
+# hosts with variable page sizes (newer NDKs for x86_64, arm64) don't define;
+# later releases ask sysconf().
+sed -i 's/^  if (cmsg_space >= PAGE_SIZE) {$/  static const size_t page_size = sysconf(_SC_PAGE_SIZE);\n  if (cmsg_space >= page_size) {/' \
   "$LIBBASE/cmsg.cpp"
 
 # googletest gtest-port.cc (older releases): FreeBSD aarch64's <sys/user.h>
@@ -920,8 +964,9 @@ sed -i 's/^  uint8_t padding\[3\*sizeof(int) + 5\*sizeof(unsigned) + 16 + 8\];$/
 
 # Older aidl's lexer expects bison to define YYSTYPE/YYLTYPE, which the
 # glr.cc skeleton of newer bison doesn't; platform-tools-33.0.2 defines them.
+# (30.0.4 and older include the parser header as aidl_language_y-module.h.)
 if ! grep -q 'define YYSTYPE' src/aidl/aidl_language_l.ll; then
-  sed -i 's/^#include "aidl_language_y.h"$/#include "aidl_language_y.h"\n\n#ifndef YYSTYPE\n#define YYSTYPE yy::parser::semantic_type\n#endif\n\n#ifndef YYLTYPE\n#define YYLTYPE yy::parser::location_type\n#endif/' \
+  sed -i 's/^#include "aidl_language_y\(-module\)\{0,1\}\.h"$/&\n\n#ifndef YYSTYPE\n#define YYSTYPE yy::parser::semantic_type\n#endif\n\n#ifndef YYLTYPE\n#define YYLTYPE yy::parser::location_type\n#endif/' \
     src/aidl/aidl_language_l.ll
 fi
 
