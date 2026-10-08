@@ -934,6 +934,38 @@ for f in $ADB/adb_mdns.h src/core/fastboot/fastboot.h \
     sed -i '0,/^#include </s//#include <functional>\n#include </' "$f"
 done
 
+# Older libbase logging.cpp and liblog logger_write.cpp define their own
+# getprogname() only for glibc and Windows, leaving musl without one. Later
+# releases give it to every host but Apple and bionic (the BSDs have their own),
+# from program_invocation_short_name.
+sed -i -e 's/^#if defined(__GLIBC__) || defined(_WIN32)$/#if !defined(__APPLE__) \&\& !defined(__BIONIC__) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
+       -e '/^static const char\* getprogname() {$/{n;s/^#if defined(__GLIBC__)$/#if !defined(_WIN32)/}' \
+  $LIBBASE/logging.cpp $LIBLOG/logger_write.cpp
+
+# Older mke2fs.c sizes the device on Windows with ext2fs_get_device_size(),
+# which writes a 32-bit count into the low half of its 64-bit dev_size. Use
+# ext2fs_get_device_size2() everywhere, as later releases do.
+python3 << 'PYEOF'
+path = 'src/e2fsprogs/misc/mke2fs.c'
+src = open(path).read()
+old = '''#ifndef _WIN32
+		retval = ext2fs_get_device_size2(device_name,
+						 EXT2_BLOCK_SIZE(&fs_param),
+						 &dev_size);
+#else
+		retval = ext2fs_get_device_size(device_name,
+						EXT2_BLOCK_SIZE(&fs_param),
+						&dev_size);
+#endif
+'''
+new = '''		retval = ext2fs_get_device_size2(device_name,
+						 EXT2_BLOCK_SIZE(&fs_param),
+						 &dev_size);
+'''
+if old in src:
+    open(path, 'w').write(src.replace(old, new, 1))
+PYEOF
+
 # Older libziparchive builds a span from an ssize_t size, which narrows on
 # 32-bit hosts.
 sed -i 's/return {buf.first, ssize_t(buf.second)};/return {buf.first, size_t(buf.second)};/' \
