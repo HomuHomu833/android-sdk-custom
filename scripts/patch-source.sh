@@ -794,6 +794,30 @@ sed -i 's/    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)$/   
 # declaration of it. zlib dropped TARGET_OS_MAC there in 35.0.1.
 sed -i 's/^#if defined(MACOS) || defined(TARGET_OS_MAC)$/#if defined(MACOS)/' src/zlib/zutil.h
 
+# zlib Android.bp (platform-tools 30.x and older), brought in line with 31.0.0:
+# - cpu_features.c is built only with the SIMD sources, but crc32.c and
+#   deflate.c read its flags on every CPU; build it everywhere.
+# - x86 hosts get SSSE3/SSE4.2/PCLMUL code, whose SSE4.2 CRC hash newer clang
+#   rejects ("requires target feature 'crc32'"); 31.0.0 builds x86 hosts with
+#   CPU_NO_SIMD and keeps the SIMD flags for Android devices only.
+python3 << 'PYEOF'
+import re
+path = 'src/zlib/Android.bp'
+src = open(path).read()
+m = re.search(r'^srcs_opt = \[\n(.*?)^\]', src, re.M | re.S)
+if m and '"cpu_features.c"' in m.group(1):
+    body = re.sub(r'^ *"cpu_features\.c",\n', '', m.group(1), flags=re.M)
+    src = src[:m.start(1)] + body + src[m.end(1):]
+    src = src.replace('        "compress.c",\n', '        "compress.c",\n        "cpu_features.c",\n', 1)
+m = re.search(r'^cflags_x86 = \[\n(.*?)^\]', src, re.M | re.S)
+if m and '"-DCPU_NO_SIMD"' not in m.group(1):
+    body = re.sub(r'^ *"(-DADLER32_SIMD_SSSE3|-mssse3|-mpclmul|-DCRC32_SIMD_SSE42_PCLMUL)",\n',
+                  '', m.group(1), flags=re.M)
+    body += '    "-DCPU_NO_SIMD",\n'
+    src = src[:m.start(1)] + body + src[m.end(1):]
+open(path, 'w').write(src)
+PYEOF
+
 # ART globals.h (platform-tools-35.0.1): GetPageSizeSlow() calls sysconf()
 # unconditionally, which Windows lacks. Later releases fall back to 4096.
 f=src/art/libartbase/base/globals.h
