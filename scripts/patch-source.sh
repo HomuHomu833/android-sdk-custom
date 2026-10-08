@@ -910,6 +910,11 @@ done
 sed -i 's/return {buf.first, ssize_t(buf.second)};/return {buf.first, size_t(buf.second)};/' \
   $ZIPARCHIVE/zip_archive.cc
 
+# Older expat_config.h has no entropy source for musl, which expat refuses to
+# build without; later ones use getrandom() there as on bionic.
+sed -i '/^\/\* Define to 1 if you have the `getrandom'"'"' function. \*\/$/{n;s/^#if defined(__BIONIC__)$/#if defined(__BIONIC__) || defined(ANDROID_HOST_MUSL)/}' \
+  src/expat/expat_config.h
+
 # Older android-base/endian.h knows only bionic and glibc on Linux (later ones
 # add ANDROID_HOST_MUSL); musl's <endian.h> serves the same way.
 sed -i 's/^#elif defined(__GLIBC__)$/#elif defined(__GLIBC__) || (defined(__linux__) \&\& !defined(__BIONIC__))/' \
