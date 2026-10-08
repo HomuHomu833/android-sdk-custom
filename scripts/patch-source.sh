@@ -448,25 +448,25 @@ for f in src/core/libcutils/threads.cpp:'pid_t gettid() {' $LIBLOG/logger_write.
   sed -i "0,/^$fn\$/s//$bsd_tid_inc\n\n&/" "$file"
 done
 
-# PosixUtils: 'stdout'/'stderr' are macros on the BSDs. Rename the .cpp's pipe
-# locals to out_fd/err_fd, and older releases' ProcResult fields (header and
-# .cpp) to the stdout_str/stderr_str newer ones use.
+# PosixUtils: 'stdout'/'stderr' are macros on the BSDs and musl. Rename the
+# .cpp's pipe locals to out_fd/err_fd, and older releases' ProcResult fields
+# (header and .cpp) to the stdout_str/stderr_str newer ones use.
+sed -i \
+  -e 's/int stdout\[2\]/int out_fd[2]/g' \
+  -e 's/int stderr\[2\]/int err_fd[2]/g' \
+  -e 's/pipe(stdout)/pipe(out_fd)/g' \
+  -e 's/pipe(stderr)/pipe(err_fd)/g' \
+  -e 's/stdout\[/out_fd[/g' \
+  -e 's/stderr\[/err_fd[/g' \
+  -e 's/result->stdout =/result->stdout_str =/' \
+  -e 's/result->stderr =/result->stderr_str =/' \
+  src/base/libs/androidfw/PosixUtils.cpp
+sed -i -e 's/^  std::string stdout;$/  std::string stdout_str;/' \
+       -e 's/^  std::string stderr;$/  std::string stderr_str;/' \
+  src/base/libs/androidfw/include/androidfw/PosixUtils.h
+
 case "$TARGET" in
   *-freebsd-*|*-netbsd-*|*-openbsd-*)
-    sed -i \
-      -e 's/int stdout\[2\]/int out_fd[2]/g' \
-      -e 's/int stderr\[2\]/int err_fd[2]/g' \
-      -e 's/pipe(stdout)/pipe(out_fd)/g' \
-      -e 's/pipe(stderr)/pipe(err_fd)/g' \
-      -e 's/stdout\[/out_fd[/g' \
-      -e 's/stderr\[/err_fd[/g' \
-      -e 's/result->stdout =/result->stdout_str =/' \
-      -e 's/result->stderr =/result->stderr_str =/' \
-      src/base/libs/androidfw/PosixUtils.cpp
-    sed -i -e 's/^  std::string stdout;$/  std::string stdout_str;/' \
-           -e 's/^  std::string stderr;$/  std::string stderr_str;/' \
-      src/base/libs/androidfw/include/androidfw/PosixUtils.h
-
     # utils.cc: add BSD branches to GetTid() (pthread_self) and SetThreadName()
     # (FreeBSD 2-arg, NetBSD 3-arg, OpenBSD none).
     python3 << 'PYEOF'
