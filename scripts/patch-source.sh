@@ -324,6 +324,10 @@ if amd64 in src and 'ARM64EC' not in src:
         src = src.replace('\n', '\r\n')
     open(path, 'w', newline='').write(src)
 PYEOF
+# clang defines __THUMBEL__ for big-endian Thumb too, so lzma's little-endian
+# test fires on thumbeb alongside the big-endian one (Stop_Compiling_Bad_Endian).
+sed -i 's/^    || defined(__THUMBEL__) \\\(\r\{0,1\}\)$/    || (defined(__THUMBEL__) \&\& !defined(__ARMEB__)) \\\1/' \
+  src/lzma/C/CpuArch.h
 
 # abseil's random platform.h picks ABSL_ARCH_* by macro, so arm64ec lands on
 # X86_64 and randen_detect.cc reaches for __cpuid that mingw's <intrin.h> has no
@@ -691,6 +695,11 @@ PYEOF
 # the include later.
 grep -q '^#include <vector>' src/core/fastboot/fastboot_driver_interface.h ||
   sed -i 's/^#include <string>$/#include <string>\n#include <vector>/' src/core/fastboot/fastboot_driver_interface.h
+
+# fastboot Android.bp (30.0.4 and older) builds libfastboot's usb_linux.cpp for
+# linux_glibc only, leaving musl without usb_open(); 30.0.5 uses linux.
+sed -i '/^        linux_glibc: {$/{N;s/^        linux_glibc: {\n            srcs: \["usb_linux.cpp"\],$/        linux: {\n            srcs: ["usb_linux.cpp"],/}' \
+  src/core/fastboot/Android.bp
 
 # fastboot socket.cpp (older releases) uses select() without <sys/select.h>,
 # which glibc pulls in some other way and musl doesn't.
