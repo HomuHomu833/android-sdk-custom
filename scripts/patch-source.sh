@@ -127,6 +127,11 @@ log "Applying source fixups${TARGET:+ for $TARGET}"
 # fmtlib calls bare malloc()/free(); zig 0.17's libc++ doesn't leak the C names,
 # so pull in <stdlib.h>.
 sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' src/fmtlib/include/fmt/format.h
+# fmt 6 (platform-tools 30.0.3 and older): the deprecated u8string_view sizes a
+# C string with std::char_traits<char8_type>::length, and libc++ no longer has
+# char_traits for types that aren't characters (char8_type is an enum there).
+sed -i 's/^            reinterpret_cast<const internal::char8_type\*>(s)) {}$/            reinterpret_cast<const internal::char8_type*>(s), std::strlen(s)) {}/' \
+  src/fmtlib/include/fmt/format.h
 
 # fdevent.h names std::vector and adb_mdns.cpp std::atomic without including
 # either. Only llvm-mingw's libc++ declines to drag them in, so spell them out.
@@ -869,6 +874,25 @@ if m and '"-DCPU_NO_SIMD"' not in m.group(1):
     body += '    "-DCPU_NO_SIMD",\n'
     src = src[:m.start(1)] + body + src[m.end(1):]
 open(path, 'w').write(src)
+PYEOF
+
+# zlib cpu_features.c (30.0.3 and older) predates ARMV8_OS_MACOS, which the
+# overlay sets for macOS arm64, and so has no cpu_check_features() there.
+# Backport 30.0.4's: nothing to probe, and crc32 (baseline on every Apple arm64
+# CPU) is on.
+python3 << 'PYEOF'
+path = 'src/zlib/cpu_features.c'
+try:
+    src = open(path).read()
+except FileNotFoundError:
+    raise SystemExit(0)
+var = 'int ZLIB_INTERNAL arm_cpu_enable_crc32 = 0;\n'
+end = '                        NULL, NULL);\n}\n#endif\n'
+if 'ARMV8_OS_MACOS' not in src and var in src and end in src:
+    src = src.replace(var, '#if defined(ARMV8_OS_MACOS)\nint ZLIB_INTERNAL arm_cpu_enable_crc32 = 1;\n#else\n' + var + '#endif\n', 1)
+    src = src.replace(end, end[:-len('#endif\n')]
+                      + '#elif defined(ARMV8_OS_MACOS)\nvoid ZLIB_INTERNAL cpu_check_features(void)\n{\n}\n#endif\n', 1)
+    open(path, 'w').write(src)
 PYEOF
 
 # ART globals.h (platform-tools-35.0.1): GetPageSizeSlow() calls sysconf()
