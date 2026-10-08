@@ -56,6 +56,12 @@ amend {
             exclude_cflags: ["-DX86_WINDOWS"],
             cflags: ["-DCPU_NO_SIMD"],
         },
+        // Before platform-tools 32.0.0 zlib claims Linux for every arm64 host,
+        // which macOS has no <asm/hwcap.h> for.
+        darwin_arm64: {
+            exclude_cflags: ["-DARMV8_OS_LINUX"],
+            cflags: ["-DARMV8_OS_MACOS"],
+        },
         // cpuid works the same on the BSDs as on Linux
         bsd_x86: {
             cflags: ["-DX86_NOT_WINDOWS"],

@@ -910,6 +910,11 @@ done
 sed -i 's/return {buf.first, ssize_t(buf.second)};/return {buf.first, size_t(buf.second)};/' \
   $ZIPARCHIVE/zip_archive.cc
 
+# Older android-base/endian.h knows only bionic and glibc on Linux (later ones
+# add ANDROID_HOST_MUSL); musl's <endian.h> serves the same way.
+sed -i 's/^#elif defined(__GLIBC__)$/#elif defined(__GLIBC__) || (defined(__linux__) \&\& !defined(__BIONIC__))/' \
+  $LIBBASE/include/android-base/endian.h
+
 # android-base/endian.h: insert a BSD branch (native <sys/endian.h>) so BSD
 # doesn't fall into the macOS/Windows #else (<winsock2.h>, hard-coded LE).
 python3 << 'PYEOF'
