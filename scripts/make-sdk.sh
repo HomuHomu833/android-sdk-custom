@@ -129,7 +129,14 @@ fi
 [ -n "$BUILD_TOOLS_VERSION" ] || { echo "no build-tools revision to install" >&2; exit 1; }
 
 log "Setting up the official SDK: build-tools $BUILD_TOOLS_VERSION, platform-tools $PT_DESC"
-"$SDKMANAGER" --sdk_root="$HOST_SDK" "build-tools;$BUILD_TOOLS_VERSION" $PT_LATEST
+# A download cut short leaves sdkmanager an unreadable zip ("unknown archive");
+# try again a few times.
+for n in 1 2 3 4; do
+  "$SDKMANAGER" --sdk_root="$HOST_SDK" "build-tools;$BUILD_TOOLS_VERSION" $PT_LATEST && break
+  [ "$n" = 4 ] && exit 1
+  log "sdkmanager failed; retry $n/3"
+  sleep $((n * 15))
+done
 [ -n "$PT_LATEST" ] || fetch_unpack "$PT_URL" "$HOST_SDK/platform-tools.zip" "$HOST_SDK"
 
 # --- splice our ELF host tools over the official ones -----------------------
