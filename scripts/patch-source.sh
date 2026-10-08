@@ -12,8 +12,9 @@ cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
-SKIPPED=0
-trap 'SKIPPED=$((SKIPPED + 1)); printf "\033[1;33mwarning:\033[0m patch-source.sh:%s did not apply to these sources\n" "$LINENO" >&2' ERR
+# Fixups a release doesn't need are expected; note their lines for one summary.
+SKIPPED=""
+trap 'SKIPPED="$SKIPPED $LINENO"' ERR
 
 # Older releases keep these in system/core: adb and liblog (platform-tools
 # 30.x and earlier), libbase (30.0.1 and earlier), libziparchive (29.x).
@@ -26,7 +27,7 @@ ZIPARCHIVE="$(pick src/libziparchive src/core/libziparchive)"
 export ADB LIBBASE
 
 # A unified diff against the checkout (paths src/...); forward only, no .rej.
-apply() { patch -p1 -N -s -r - --no-backup-if-mismatch -d "$ROOTDIR" -i "$1"; }
+apply() { patch -p1 -N -s -t -r - --no-backup-if-mismatch -d "$ROOTDIR" -i "$1" >/dev/null 2>&1; }
 
 # --- platform-tools revision ---------------------------------------------------
 # plat_tools_source.prop_template is what adb/fastboot --version, the builder's
@@ -1185,8 +1186,8 @@ print('termux fastboot: find_usb_device_termux added + dispatch')
 PYEOF
 fi
 
-if [ "$SKIPPED" -eq 0 ]; then
+if [ -z "$SKIPPED" ]; then
   log "Source fixups applied"
 else
-  log "Source fixups applied; $SKIPPED step(s) did not match these sources (see warnings)"
+  log "Source fixups applied; not needed for this release (patch-source.sh lines):$SKIPPED"
 fi

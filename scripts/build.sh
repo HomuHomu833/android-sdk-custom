@@ -223,6 +223,10 @@ case "$PLATFORM" in
     SYSTEM_NAME=Darwin
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -D_LIBCPP_DISABLE_AVAILABILITY"
     CROSS_LDFLAGS=""
+    # osxcross' LLVM leaves arm64e objects without a pointer-auth ABI version,
+    # which ld64 notes for every object it links against the SDK's versioned
+    # libraries; the result is the same unversioned binary either way.
+    [ "$OSX_ARCH" = arm64e ] && CROSS_LDFLAGS="-Wl,-w"
     # Point CMake's Apple support at the osxcross SDK + pin arch/deployment target.
     SDKROOT="$(ls -d "$TC/SDK/MacOSX"*.sdk 2>/dev/null | head -n1 || true)"
     CROSS_CMAKE_EXTRA=(-DCMAKE_OSX_ARCHITECTURES="$OSX_ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
@@ -397,7 +401,9 @@ ninja -C "$BUILD_DIR/cmake" -j"$JOBS"
 # where make-sdk.sh looks for them.
 log "Stripping host tools"
 for f in "$BUILD_DIR/cmake/bin"/*; do
-  [ -f "$f" ] && "$CROSS_STRIP" "$f" || true
+  # cctools strip notes that stripping invalidates the (ad-hoc) code signature
+  # of every Mach-O it touches; drop just that line.
+  [ -f "$f" ] && "$CROSS_STRIP" "$f" 2> >(grep -v 'invalidate the code signature' >&2) || true
 done
 
 mkdir -p "$OUT"
