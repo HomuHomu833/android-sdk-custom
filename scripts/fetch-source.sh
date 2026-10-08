@@ -12,12 +12,48 @@ cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
+# googlesource.com drops a connection now and then (curl 92, early EOF). Run
+# "$@" up to 5 times, removing the half-made <dir> before each retry. Steps in
+# the functions passed here are chained with && (set -e is off inside them).
+with_retry() {
+  local dir="$1" n
+  shift
+  for n in 1 2 3 4 5; do
+    "$@" && return 0
+    [ "$n" = 5 ] && break
+    log "retry $n/4: $dir"
+    rm -rf "$dir"
+    sleep $((n * 10))
+  done
+  return 1
+}
+
+# clone_shallow <dir> <project> <branch>
+clone_shallow() {
+  git clone -q -c advice.detachedHead=false --depth 1 --branch "$3" "$AOSP/$2" "$1"
+}
+
+# clone_sparse <dir> <project> <patterns>: blobless, so only the checked-out
+# paths' contents come down. One pattern per word, left unglobbed (they are
+# git's, not the shell's).
+clone_sparse() {
+  local rc
+  git clone -q -c advice.detachedHead=false --depth 1 --branch "$TAG" \
+    --filter=blob:none --no-checkout "$AOSP/$2" "$1" || return
+  set -f
+  # shellcheck disable=SC2086
+  git -C "$1" sparse-checkout set --no-cone $3 && git -C "$1" checkout -q
+  rc=$?
+  set +f
+  return $rc
+}
+
 # --- the release's manifest ---------------------------------------------------
 MANIFEST="$ROOTDIR/.manifest"
 if [ ! -f "$MANIFEST/default.xml" ] || [ "$(cat "$MANIFEST/.tag" 2>/dev/null)" != "$TAG" ]; then
   log "Fetching the $TAG manifest"
   rm -rf "$MANIFEST"
-  git clone -q -c advice.detachedHead=false --depth 1 --branch "$TAG" "$AOSP/platform/manifest" "$MANIFEST"
+  with_retry "$MANIFEST" clone_shallow "$MANIFEST" platform/manifest "$TAG"
   echo "$TAG" > "$MANIFEST/.tag"
 fi
 
@@ -45,19 +81,11 @@ printf '%s\n' "$PLAN" | while IFS="$(printf '\t')" read -r path name sparse; do
   if [ -d "$path" ]; then
     log "exists: $path"
   elif [ -n "$sparse" ]; then
-    # Blobless, so only the checked-out paths' contents come down.
     log "clone:  $path ($name, sparse)"
-    git clone -q -c advice.detachedHead=false --depth 1 --branch "$TAG" \
-      --filter=blob:none --no-checkout "$AOSP/$name" "$path"
-    # One pattern per word, left unglobbed (they are git's, not the shell's).
-    set -f
-    # shellcheck disable=SC2086
-    git -C "$path" sparse-checkout set --no-cone $sparse
-    set +f
-    git -C "$path" checkout -q
+    with_retry "$path" clone_sparse "$path" "$name" "$sparse"
   else
     log "clone:  $path ($name)"
-    git clone -q -c advice.detachedHead=false --depth 1 --branch "$TAG" "$AOSP/$name" "$path"
+    with_retry "$path" clone_shallow "$path" "$name" "$TAG"
   fi
 done
 
@@ -71,8 +99,7 @@ case "${TARGET:-}" in
     if [ -d src/libusb ] && [ ! -f src/libusb/libusb/os/events_posix.c ]; then
       log "BSD: libusb from platform-tools-31.0.0 (this release's predates 1.0.24)"
       rm -rf src/libusb
-      git clone -q -c advice.detachedHead=false --depth 1 --branch platform-tools-31.0.0 \
-        "$AOSP/platform/external/libusb" src/libusb
+      with_retry src/libusb clone_shallow src/libusb platform/external/libusb platform-tools-31.0.0
     fi ;;
 esac
 
