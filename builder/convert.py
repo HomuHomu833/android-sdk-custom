@@ -505,15 +505,20 @@ class Converter:
             t.cflags = ["-DANDROID_STRICT"] + t.cflags
         # Global hardening defines _FORTIFY_SOURCE, which does nothing (and glibc
         # warns) without optimization; drop it for modules built at -O0.
+        # (with -O0 in the same option: a lone -U would be de-duplicated
+        # against the global one, which precedes the define)
         if "-O0" in t.cflags:
-            t.cflags.append("-U_FORTIFY_SOURCE")
+            t.cflags.append("-O0 -U_FORTIFY_SOURCE")
         t.cppflags = _clean_flags(p.get("cppflags", []), drop.get("cppflags"))
         t.conlyflags = _clean_flags(p.get("conlyflags", []), drop.get("conlyflags"))
         t.asflags = _clean_flags(p.get("asflags", []), drop.get("asflags"))
         t.cppflags = (["-frtti"] if p.get("rtti") else ["-fno-rtti"]) + t.cppflags
-        # builder_defaults' late_cflags go last, past the module's own flags
-        t.conlyflags += self.late_cflags
-        t.cppflags += self.late_cflags
+        # builder_defaults' late_cflags go last, past the module's own flags, as
+        # one space-joined (SHELL:) option: CMake de-duplicates single options
+        # against the global ones and keeps the first, which would drop them.
+        if self.late_cflags:
+            t.conlyflags.append(" ".join(self.late_cflags))
+            t.cppflags.append(" ".join(self.late_cflags))
         st = self.stds
         t.c_std = self._std(p.get("c_std"), st["CStdVersion"], st["ExperimentalCStdVersion"])
         t.cpp_std = self._std(p.get("cpp_std"), st["CppStdVersion"], st["ExperimentalCppStdVersion"])

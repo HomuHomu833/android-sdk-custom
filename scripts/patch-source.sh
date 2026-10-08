@@ -84,10 +84,17 @@ sed "s#/crypto/rand/getrandom_fillin.h#/${fillin}#" patches/misc/boringssl-getra
 apply "$ROOTDIR/.getrandom.patch"
 rm -f "$ROOTDIR/.getrandom.patch"
 
-# BoringSSL HRSS: its NEON path mixes GNU vector syntax with NEON intrinsics,
-# whose lane order disagrees on big-endian ARM; take the portable C path there.
-sed -i 's/^\(#\(el\)\?if (defined(OPENSSL_ARM) || defined(OPENSSL_AARCH64)) && defined(__ARM_NEON)\)$/\1 \&\& !defined(__ARM_BIG_ENDIAN)/' \
-  src/boringssl/src/crypto/hrss/hrss.c
+# BoringSSL HRSS (hrss.c, hrss.cc from 16) and protobuf's utf8_range: their
+# NEON paths mix GNU vector syntax with NEON intrinsics, whose lane order
+# disagrees on big-endian ARM; take the portable C paths there. (Older HRSS
+# splits its condition over two lines.)
+for f in src/boringssl/src/crypto/hrss/hrss.c src/boringssl/src/crypto/hrss/hrss.cc; do
+  [ -f "$f" ] || continue
+  sed -i -e 's/^\(#\(el\)\?if (defined(OPENSSL_ARM) || defined(OPENSSL_AARCH64)) && defined(__ARM_NEON)\)$/\1 \&\& !defined(__ARM_BIG_ENDIAN)/' \
+         -e 's/^\(    (defined(__ARM_NEON__) || defined(__ARM_NEON))\)$/\1 \&\& !defined(__ARM_BIG_ENDIAN)/' "$f"
+done
+sed -i 's/defined(__ARM_NEON) && defined(__ARM_64BIT_STATE)/& \&\& !defined(__ARM_BIG_ENDIAN)/g' \
+  src/protobuf/third_party/utf8_range/utf8_range.c 2>/dev/null || true
 
 # aidl permission/lexer.ll (platform-tools 32.0.0 and earlier): names the
 # value type PERMSTYPE, which only older bison's glr.cc defined. It is

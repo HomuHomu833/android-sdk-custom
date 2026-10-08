@@ -168,7 +168,6 @@ cc_defaults {
                 "-Wno-unused-but-set-variable",
                 "-Wno-used-but-marked-unused",
                 "-Wno-thread-safety-reference-return",
-                "-Wno-option-ignored", // MIPS N64 ignores -fno-PIC
                 "-Wno-varargs", // va_start on a promoted enum (hexagon)
             ],
             cflags: select(soong_config_variable("sdk", "host_protoc"), {
