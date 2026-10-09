@@ -895,6 +895,17 @@ if 'ARMV8_OS_MACOS' not in src and var in src and end in src:
     open(path, 'w').write(src)
 PYEOF
 
+# zlib 30.0.1 and older build crc_folding.c and fill_window_sse.c whole and call
+# them under ADLER32_SIMD_SSSE3. With x86 hosts on CPU_NO_SIMD (above) they then
+# lack -mpclmul. 30.0.2 guards them on CRC32_SIMD_SSE42_PCLMUL and (never set)
+# DEFLATE_FILL_WINDOW_SSE2; do the same.
+if [ -f src/zlib/crc_folding.c ] && ! grep -q '^#ifdef CRC32_SIMD_SSE42_PCLMUL' src/zlib/crc_folding.c; then
+  sed -i 's/^#ifdef ADLER32_SIMD_SSSE3$/#ifdef DEFLATE_FILL_WINDOW_SSE2/' src/zlib/deflate.c
+  sed -i 's/^#ifdef ADLER32_SIMD_SSSE3$/#ifdef CRC32_SIMD_SSE42_PCLMUL/' src/zlib/crc32.c
+  sed -i -e '1i #ifdef CRC32_SIMD_SSE42_PCLMUL' -e '$a #endif  /* CRC32_SIMD_SSE42_PCLMUL */' src/zlib/crc_folding.c
+  sed -i -e '1i #ifdef DEFLATE_FILL_WINDOW_SSE2' -e '$a #endif  /* DEFLATE_FILL_WINDOW_SSE2 */' src/zlib/fill_window_sse.c
+fi
+
 # ART globals.h (platform-tools-35.0.1): GetPageSizeSlow() calls sysconf()
 # unconditionally, which Windows lacks. Later releases fall back to 4096.
 f=src/art/libartbase/base/globals.h
