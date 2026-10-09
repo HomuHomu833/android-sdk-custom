@@ -828,6 +828,15 @@ if first and '#if defined(__arm64ec__)\n#define GOOGLE_PROTOBUF_ARCH_64_BIT' not
     print('protobuf platform_macros: arm64ec uses generic atomics')
 PYEOF
 
+# protobuf stubs/atomicops.h (same releases): AtomicWord is intptr_t, which
+# on 32-bit NetBSD (arm, powerpc) and OpenBSD is long rather than Atomic32's
+# int, so no Atomic32 op accepts it. Off Apple (which has overloads for this)
+# make the 32-bit AtomicWord Atomic32 itself, the same width either way.
+_ao=src/protobuf/src/google/protobuf/stubs/atomicops.h
+if [ -f "$_ao" ] && ! grep -q '^typedef Atomic32 AtomicWord;$' "$_ao"; then
+  sed -i 's/^typedef intptr_t AtomicWord;$/#if defined(GOOGLE_PROTOBUF_ARCH_64_BIT) || defined(GOOGLE_PROTOBUF_OS_APPLE)\n&\n#else\ntypedef Atomic32 AtomicWord;\n#endif/' "$_ao"
+fi
+
 # BoringSSL (29.0.4 and older): the prebuilt x86 assembly records dispatch hits
 # in BORINGSSL_function_hit unless NDEBUG, which only reaches the C flags, so
 # crypto.c (built with NDEBUG) never defines the array the asm references.
