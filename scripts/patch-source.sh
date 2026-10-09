@@ -316,6 +316,12 @@ sed -i -e 's@^#if defined(__x86_64__)$@#if defined(__x86_64__) \&\& !defined(__a
     src/abseil-cpp/absl/base/internal/unscaledcycleclock.h \
     src/abseil-cpp/absl/base/internal/unscaledcycleclock.cc
 
+# zlib deflate.c (29.0.5 and older) emits x86 crc32 asm for __amd64__, which
+# arm64ec defines. The SIMD path never runs there (simd_stub.c fixes
+# x86_cpu_enable_simd at 0); it only has to compile.
+sed -i 's/^#elif defined(__i386__) || defined(__amd64__)$/#elif (defined(__i386__) || defined(__amd64__)) \&\& !defined(__arm64ec__)/' \
+  src/zlib/deflate.c
+
 # lzma CpuArch.h (before the 35.x import) takes arm64ec for AMD64 and CpuArch.c
 # then emits x86 cpuid asm. Later lzma counts _M_ARM64EC as ARM64; do the same.
 python3 << 'PYEOF'
@@ -436,6 +442,26 @@ sed -i 's/^#if defined(_WIN32) || defined(__hexagon__)$/#if defined(_WIN32)/' \
 
 # liblog logger_name.cpp: hexagon Clang makes android_LogPriority unsigned char,
 # tripping the uint32_t static_asserts; guard them under !__hexagon__.
+# adb types.h (29.0.5 and older): IOVector::coalesced() spells its return type
+# with std::result_of, which C++20 removed; std::invoke_result_t replaces it.
+sed -i 's/typename std::result_of<FunctionType(const char\*, size_t)>::type {$/std::invoke_result_t<FunctionType, const char*, size_t> {/' \
+  $ADB/types.h
+
+# libcutils sockets_unix.cpp (29.0.5 and older) uses timeval without
+# <sys/time.h>, which glibc pulls in by other routes and musl does not.
+f=src/core/libcutils/sockets_unix.cpp
+[ -f "$f" ] && grep -q 'timeval tv;' "$f" && ! grep -q '<sys/time.h>' "$f" &&
+  sed -i 's/^#include <sys\/socket.h>$/&\n#include <sys\/time.h>/' "$f"
+
+# liblog (29.0.5 and older) uses C11 <stdatomic.h> in its C++ sources, which
+# libc++ refuses alongside <atomic> before C++23. Give those files <atomic> and
+# the std:: names they use instead, as libc++'s C++23 <stdatomic.h> does.
+if grep -q '^#include <stdatomic.h>$' "$LIBLOG/logger_write.cpp" 2>/dev/null; then
+  for f in $(grep -l '^#include <stdatomic.h>$' "$LIBLOG"/*.cpp "$LIBLOG"/*.h); do
+    sed -i 's/^#include <stdatomic.h>$/#include <atomic>\nusing std::atomic_int;\nusing std::atomic_uintptr_t;\nusing std::atomic_exchange;\nusing std::atomic_exchange_explicit;\nusing std::atomic_fetch_add_explicit;\nusing std::atomic_load;\nusing std::atomic_store;\nusing std::memory_order_relaxed;/' "$f"
+  done
+fi
+
 # liblog log_read.h (29.x) #undefs __unused around <fcntl.h>, which the NDK's
 # fortified fcntl.h now uses itself (unknown type name '__unused'). 30.0.0
 # dropped the dance; keep the include, drop the #undef and restore.
@@ -1037,6 +1063,12 @@ sed -i '/^        linux_glibc: {$/{N;s/^        linux_glibc: {\n\(            he
 # Leave room; everything is linked statically, so the layout is private.
 sed -i 's/^  uint8_t padding\[3\*sizeof(int) + 5\*sizeof(unsigned) + 16 + 8\];$/  uint8_t padding[3*sizeof(int) + 5*sizeof(unsigned) + 16 + 8 + 64];/' \
   src/boringssl/src/include/openssl/thread.h
+
+# aidl's grammar (29.0.5 and older) asks for %pure-parser, which bison 3.8
+# rejects for a C++ parser (always pure; "api.pure is not used"). 29.0.6
+# dropped it and spells %error-verbose as %define parse.error verbose.
+sed -i -e '/^%pure-parser$/d' -e 's/^%error-verbose$/%define parse.error verbose/' \
+  src/aidl/aidl_language_y.yy
 
 # Older aidl's lexer expects bison to define YYSTYPE/YYLTYPE, which the
 # glr.cc skeleton of newer bison doesn't; platform-tools-33.0.2 defines them.
