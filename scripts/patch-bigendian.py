@@ -924,7 +924,12 @@ def dexfile():
     t = read(loader)
     m = re.search(r'^namespace art \{\n', t, re.M)
     t = t[:m.end()] + '\nvoid SdkSwapDexToHostIfNeeded(const uint8_t* begin, size_t size);\n' + t[m.end():]
-    if 'const size_t size = container->End() - base;\n' in t:
+    if 'const uint8_t* base = container->Begin();\n  size_t size = container->Size();\n' in t:  # 34.0.x
+        need(True, 'dex: hooked into OpenCommon')
+        t = t.replace('const uint8_t* base = container->Begin();\n  size_t size = container->Size();\n',
+                      'const uint8_t* base = container->Begin();\n  size_t size = container->Size();\n'
+                      '  SdkSwapDexToHostIfNeeded(base, size);\n', 1)
+    elif 'const size_t size = container->End() - base;\n' in t:
         need(True, 'dex: hooked into OpenCommon')
         t = t.replace('const size_t size = container->End() - base;\n',
                       'const size_t size = container->End() - base;\n'
