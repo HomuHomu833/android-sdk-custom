@@ -188,6 +188,27 @@ drop_unreplaced() {
 drop_unreplaced "$BT"
 drop_unreplaced "$HOST_SDK/platform-tools"
 
+# --- windows: every DLL a binary imports must be Windows' own or shipped ----
+# The tools are meant to need no mingw runtime DLLs (libc++, libunwind,
+# winpthread are linked statically); one that slips through as an import makes
+# the .exe fail to start, so stop the build instead of shipping it.
+if [ "$PLATFORM" = windows ]; then
+  objdump=/opt/llvm-mingw/bin/llvm-objdump
+  missing=$(find "$HOST_SDK" -type f \( -iname '*.exe' -o -iname '*.dll' \) | while IFS= read -r bin; do
+    "$objdump" -p "$bin" 2>/dev/null | awk '/DLL Name:/ {print tolower($3)}' | while read -r dll; do
+      case $dll in
+        api-ms-win-*|ext-ms-*|kernel32.dll|kernelbase.dll|ntdll.dll|ucrtbase.dll|msvcrt.dll|advapi32.dll|user32.dll|gdi32.dll|shell32.dll|ole32.dll|oleaut32.dll|ws2_32.dll|wsock32.dll|mswsock.dll|setupapi.dll|cfgmgr32.dll|winusb.dll|userenv.dll|iphlpapi.dll|bcrypt.dll|bcryptprimitives.dll|crypt32.dll|secur32.dll|shlwapi.dll|psapi.dll|dbghelp.dll|imagehlp.dll|version.dll|wlanapi.dll|dnsapi.dll|rpcrt4.dll|netapi32.dll|powrprof.dll|winmm.dll|comdlg32.dll|normaliz.dll|synchronization.dll|uuid.dll|windowscodecs.dll|opengl32.dll) ;;
+        *) find "$(dirname "$bin")" -maxdepth 1 -iname "$dll" | grep -q . || echo "$(basename "$bin") needs $dll" ;;
+      esac
+    done
+  done)
+  if [ -n "$missing" ]; then
+    echo "Windows binaries import DLLs the package does not ship:" >&2
+    echo "$missing" >&2
+    exit 1
+  fi
+fi
+
 # --- convert the bash launcher scripts to POSIX sh --------------------------
 # Unix-host SDKs ship bash launchers; windows ships .bat, so skip there.
 if [ "$PLATFORM" != windows ]; then
