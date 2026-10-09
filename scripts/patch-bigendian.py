@@ -85,6 +85,8 @@ struct LeA { SDK_LE_BODY(LeA) };
 #undef SDK_LE_BODY
 template <typename T> constexpr T value(const Le<T>& v) { return v; }
 template <typename T> constexpr T value(const LeA<T>& v) { return v; }
+// Anything else as is (used where a field may or may not be wrapped).
+template <typename T> constexpr T value(const T& v) { return v; }
 template <typename T> constexpr bool operator==(const LeA<T>& a, Raw<T> b) { return a.raw_ == b.raw; }
 template <typename T> constexpr bool operator!=(const LeA<T>& a, Raw<T> b) { return a.raw_ != b.raw; }
 template <typename T> constexpr bool operator==(Raw<T> b, const LeA<T>& a) { return a.raw_ == b.raw; }
@@ -315,7 +317,11 @@ def resourcetypes():
         out.append(line)
         depth += line.count('{') - line.count('}')
     need(n >= 60, 'androidfw: %d on-disk struct fields wrapped' % n)
-    write(path, '\n'.join(out))
+    t = '\n'.join(out)
+    # Older headers get dtohl() and friends only from their includers.
+    if '#include <utils/ByteOrder.h>' not in t:
+        t = after_includes(t, '#include <utils/ByteOrder.h>\n')
+    write(path, t)
 
 
 
@@ -493,6 +499,76 @@ def dumpmanifest():
     if n and '#include <unordered_map>' not in t:
         t = after_includes(t, '#include <unordered_map>\n')
     write(path, t)
+
+
+
+def optional_returns():
+    """`return x.field;` from a function returning Maybe<T>/std::optional<T>
+    needs two user conversions with a wrapped field; return its value."""
+    header = os.path.join(SRC, 'base', 'libs', 'androidfw', 'include', 'androidfw', 'ResourceTypes.h')
+    if not os.path.exists(header):
+        return
+    fields = set(re.findall(r'sdk_le::LeA<\w+> (\w+);', read(header)))
+    ret = re.compile(r'\breturn (\w+(?:(?:->|\.)\w+)*(?:->|\.)(?:%s));' %
+                     '|'.join(sorted(fields, key=len, reverse=True)))
+    sig = re.compile(r'(?:Maybe|std::optional)<[^;{}()]*>\s+[\w:~]+\s*\([^;{}]*\)\s*(?:const\s*)?\{')
+    changed = 0
+    for root in (os.path.join(SRC, 'base', 'libs', 'androidfw'), os.path.join(SRC, 'base', 'tools')):
+        for dirpath, _, names in os.walk(root):
+            for name in names:
+                if not name.endswith(('.cpp', '.h')) or name.endswith(('_test.cpp', 'Test.cpp')):
+                    continue
+                path = os.path.join(dirpath, name)
+                t = read(path)
+                out, pos = [], 0
+                for m in sig.finditer(t):
+                    if m.start() < pos:
+                        continue
+                    depth, i = 1, m.end()
+                    while i < len(t) and depth:
+                        depth += {'{': 1, '}': -1}.get(t[i], 0)
+                        i += 1
+                    body = ret.sub(r'return ::sdk_le::value(\1);', t[m.end():i])
+                    out.append(t[pos:m.end()] + body)
+                    pos = i
+                u = ''.join(out) + t[pos:]
+                if u != t:
+                    write(path, u)
+                    changed += 1
+    DONE.append('aapt2: %d files return field values from Maybe/optional functions' % changed)
+
+
+
+def f2fs_sizes():
+    """Older f2fs-tools (sload_f2fs, until upstream fixed it) store an inode's
+    64-bit i_size/i_blocks with a 32-bit swap, which on big-endian lands the
+    value in the high word."""
+    path = os.path.join(SRC, 'f2fs-tools', 'fsck', 'dir.c')
+    if not os.path.exists(path):
+        return
+    t = read(path)
+    t, n = re.subn(r'(\bnode_blk->i\.i_(?:size|blocks) = )cpu_to_le32\(', r'\1cpu_to_le64(', t)
+    if n:
+        write(path, t)
+        DONE.append('f2fs: %d 64-bit inode fields stored with cpu_to_le64' % n)
+
+
+
+def liblog_priority():
+    """Older liblog passes the priority to the host logger as the first byte
+    of an int (vec[0].iov_base = (unsigned char*)&prio); on big-endian that
+    byte is 0 and every message falls below the minimum priority."""
+    for rel in (('logging', 'liblog', 'logger_write.cpp'), ('core', 'liblog', 'logger_write.cpp')):
+        path = os.path.join(SRC, *rel)
+        if not os.path.exists(path):
+            continue
+        t = read(path)
+        t, n = re.subn(r'^(\s*)vec\[0\]\.iov_base = \(unsigned char\*\)&prio;',
+                       r'\1unsigned char sdk_prio = static_cast<unsigned char>(prio);\n'
+                       r'\1vec[0].iov_base = &sdk_prio;', t, flags=re.M)
+        if n:
+            write(path, t)
+            DONE.append('liblog: priority byte passed on its own')
 
 
 def helpers():
@@ -888,6 +964,9 @@ typespecflags()
 stringencoders()
 resource_varargs()
 dumpmanifest()
+optional_returns()
+f2fs_sizes()
+liblog_priority()
 helpers()
 writers()
 dexfile()
