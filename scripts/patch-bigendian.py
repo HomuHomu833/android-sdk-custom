@@ -373,6 +373,128 @@ def punning():
     DONE.append('androidfw/aapt2: %d float/address uses of Res_value::data converted' % total)
 
 
+
+def typespecflags():
+    """LoadedArsc's GetFlagsForEntryIndex() returns a type spec's per-entry
+    flag word (SPEC_PUBLIC, ...) straight from the file; convert it."""
+    path = os.path.join(SRC, 'base', 'libs', 'androidfw', 'include', 'androidfw', 'LoadedArsc.h')
+    if not os.path.exists(path):
+        return
+    t = read(path)
+    t, n = re.subn(r'return entry_flags_ptr\.value\(\);', 'return dtohl(entry_flags_ptr.value());', t)
+    t, m = re.subn(r'return flags\[entry_index\];', 'return dtohl(flags[entry_index]);', t)
+    done = 'dtohl(entry_flags_ptr.value())' in t or 'dtohl(flags[entry_index])' in t
+    need(done, 'androidfw: type spec entry flags converted')
+    write(path, t)
+
+
+
+def stringencoders():
+    """String pool encoders write UTF-16 lengths (and aapt2 its characters)
+    as host-order units; on disk they are little-endian like the rest of the
+    pool. UTF-8 units are bytes, which the swap leaves alone."""
+    count = 0
+    for rel in (('base', 'libs', 'androidfw', 'StringPool.cpp'), ('base', 'tools', 'aapt2', 'StringPool.cpp')):
+        path = os.path.join(SRC, *rel)
+        if not os.path.exists(path):
+            continue
+        t = read(path)
+        if 'sdk_le::swap(static_cast<T>' in t:
+            count += 1
+            continue
+        t, a = re.subn(r'\*data\+\+ = (kMask \| \(kMaxSize & \(length >> \(sizeof\(T\) \* 8\)\)\));',
+                       r'*data++ = ::sdk_le::swap(static_cast<T>(\1));', t)
+        t, b = re.subn(r'\*data\+\+ = length;', r'*data++ = ::sdk_le::swap(static_cast<T>(length));', t)
+        t, c = re.subn(r'memcpy\(data, encoded\.data\(\), byte_length\);',
+                       r'for (size_t sdk_i = 0; sdk_i < encoded.size(); sdk_i++) {\n'
+                       r'      data[sdk_i] = ::sdk_le::swap(static_cast<char16_t>(encoded[sdk_i]));\n'
+                       r'    }\n    (void)byte_length;', t)
+        need(a == 1 and b == 1 and c == 1, 'aapt2: %s length/UTF-16 encoding (%d %d %d)' % ('/'.join(rel[1:]), a, b, c))
+        if 'utils/ByteOrder.h' not in t and 'androidfw/ResourceTypes.h' not in t:
+            t = after_includes(t, '#include <utils/ByteOrder.h>\n')
+        write(path, t)
+        count += 1
+    path = os.path.join(SRC, 'base', 'tools', 'aapt', 'StringPool.cpp')
+    if os.path.exists(path):
+        t = read(path)
+        if 'sdk_le::swap' not in t:
+            unit = r'std::remove_reference_t<decltype(*(str))>'
+            t, a = re.subn(r'\*\(str\)\+\+ = maxMask \| \(\(\(strSize\)>>\(\(chrsz\)\*8\)\)&maxSize\);',
+                           r'*(str)++ = ::sdk_le::swap(static_cast<%s>(maxMask | (((strSize)>>((chrsz)*8))&maxSize)));' % unit, t)
+            t, b = re.subn(r'\*\(str\)\+\+ = strSize; \\', r'*(str)++ = ::sdk_le::swap(static_cast<%s>(strSize)); \\' % unit, t)
+            need(a == 1 and b == 1, 'aapt: ENCODE_LENGTH little-endian (%d %d)' % (a, b))
+            write(path, t)
+        count += 1
+    if count:
+        DONE.append('string pool encoders: %d' % count)
+
+
+
+FORMAT_CALL = (r'\b(?:ALOG[VDIWE]|printf|fprintf|snprintf|StringPrintf|String8::format|appendFormat)'
+               r'\s*\((?:[^;]|;(?!\s*$))*?\);')
+# Never inside a conversion: dtohl(+x) would swap the value a second time.
+NOT_CONVERTED = ''.join(r'(?<!%s\()' % c for c in (
+    'dtohl', 'dtohs', 'htodl', 'htods', 'DeviceToHost32', 'DeviceToHost16', 'HostToDevice32',
+    'HostToDevice16', 'dtohl\(', 'dtohs\('))
+
+
+def plus_fields(text, fields):
+    """Inside printf-style calls, `+field` so a wrapped field is passed as its
+    value (varargs would otherwise take the wrapper's stored bytes)."""
+    field_re = re.compile(NOT_CONVERTED + r'(?<![\w.>+])(\w+(?:(?:->|\.)\w+)*(?:->|\.)(?:%s))\b(?!\s*(?:[(=\[]|\.|->))' %
+                          '|'.join(sorted(fields, key=len, reverse=True)))
+    return re.sub(FORMAT_CALL, lambda m: field_re.sub(r'+\1', m.group(0)), text, flags=re.M)
+
+
+def resource_varargs():
+    """Resource-table code: printf-style calls get wrapped fields' values, and
+    a field read written as htodl()/htods() (harmless when both were the same
+    swap) reads with dtohl()/dtohs()."""
+    header = os.path.join(SRC, 'base', 'libs', 'androidfw', 'include', 'androidfw', 'ResourceTypes.h')
+    if not os.path.exists(header):
+        return
+    fields = set(re.findall(r'sdk_le::LeA<\w+> (\w+);', read(header)))
+    if not fields:
+        return
+    changed = 0
+    for root in (os.path.join(SRC, 'base', 'libs', 'androidfw'), os.path.join(SRC, 'base', 'tools')):
+        for dirpath, _, names in os.walk(root):
+            for name in names:
+                if not name.endswith(('.cpp', '.h')) or name.endswith(('_test.cpp', 'Test.cpp')):
+                    continue
+                path = os.path.join(dirpath, name)
+                t = read(path)
+                u = plus_fields(t, fields)
+                u = re.sub(r'\b((?:const\s+)?(?:uint32_t|uint16_t|size_t|int|auto|status_t)\s+\w+\s*=\s*)'
+                           r'htod([ls])\((\w+(?:->|\.)[\w.>-]+)\)', r'\1dtoh\2(\3)', u)
+                if u != t:
+                    write(path, u)
+                    changed += 1
+    DONE.append('androidfw/aapt/aapt2: %d files pass field values to printf-style calls' % changed)
+
+
+
+def dumpmanifest():
+    """aapt2 dump badging hands out int32_t pointers straight into an
+    attribute's Res_value::data; on big-endian hosts point them at a value
+    copy instead (one per field, so stored pointers stay valid)."""
+    path = os.path.join(SRC, 'base', 'tools', 'aapt2', 'dump', 'DumpManifest.cpp')
+    if not os.path.exists(path):
+        return
+    t = read(path)
+    t, n = re.subn(r'^(\s*)return \(int32_t\*\) &(\w+)->value\.data;',
+                   r'#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__\n'
+                   r'\1static std::unordered_map<const void*, int32_t> sdk_values;\n'
+                   r'\1auto& sdk_value = sdk_values[&\2->value.data];\n'
+                   r'\1sdk_value = static_cast<int32_t>(\2->value.data);\n'
+                   r'\1return &sdk_value;\n#else\n\g<0>\n#endif', t, flags=re.M)
+    done = 'sdk_values[&' in t
+    need(done, 'aapt2: dump badging integer attributes')
+    if n and '#include <unordered_map>' not in t:
+        t = after_includes(t, '#include <unordered_map>\n')
+    write(path, t)
+
+
 def helpers():
     """util::HostToDevice32() and friends wrap htodl()/dtohl() but return a
     plain integer, losing whether the value is already little-endian; make
@@ -762,6 +884,10 @@ byteorder()
 resourcetypes()
 stringpool()
 punning()
+typespecflags()
+stringencoders()
+resource_varargs()
+dumpmanifest()
 helpers()
 writers()
 dexfile()
