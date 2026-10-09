@@ -115,6 +115,10 @@ cc_defaults {
         // 32-bit hosts need 64-bit off_t for lseek (Soong only has 64-bit hosts)
         "-D_FILE_OFFSET_BITS=64",
     ],
+    // Module flags our compilers no longer accept: -fno-experimental-new-pass-
+    // manager (sqlite in 30.0.1 and older, against b/131854833) went with the
+    // legacy pass manager in clang 15.
+    exclude_cflags: ["-fno-experimental-new-pass-manager"],
     // Warnings that are noise for these builds, triaged from the CI logs of
     // every release (deprecations, style, vendored-C patterns, libc-header
     // false positives; every instance read). The builder appends late_cflags
