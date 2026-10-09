@@ -101,6 +101,14 @@ case "${TARGET:-}" in
       rm -rf src/libusb
       with_retry src/libusb clone_shallow src/libusb platform/external/libusb platform-tools-31.0.0
     fi ;;
+  # Termux's adb (patches/termux, through rusb) opens USB fds Termux hands it
+  # with libusb_wrap_sys_device(), new in libusb 1.0.23; 29.x ships 1.0.21.
+  *-linux-android*)
+    if [ -f src/libusb/libusb/libusb.h ] && ! grep -q libusb_wrap_sys_device src/libusb/libusb/libusb.h; then
+      log "bionic: libusb from platform-tools-31.0.0 (this release's predates 1.0.23)"
+      rm -rf src/libusb
+      with_retry src/libusb clone_shallow src/libusb platform/external/libusb platform-tools-31.0.0
+    fi ;;
 esac
 
 # --- in-place source fixups -------------------------------------------------

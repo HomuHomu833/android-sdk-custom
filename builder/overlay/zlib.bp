@@ -62,12 +62,19 @@ amend {
             exclude_cflags: ["-DARMV8_OS_LINUX"],
             cflags: ["-DARMV8_OS_MACOS"],
         },
-        // cpuid works the same on the BSDs as on Linux
+        // cpuid works the same on the BSDs as on Linux. zlib before 30.0.0 has
+        // no x86 configuration at all, so it needs none.
         bsd_x86: {
-            cflags: ["-DX86_NOT_WINDOWS"],
+            cflags: select(platform_tools_version_at_least("30.0.0"), {
+                true: ["-DX86_NOT_WINDOWS"],
+                default: [],
+            }),
         },
         bsd_x86_64: {
-            cflags: ["-DX86_NOT_WINDOWS"],
+            cflags: select(platform_tools_version_at_least("30.0.0"), {
+                true: ["-DX86_NOT_WINDOWS"],
+                default: [],
+            }),
         },
         bsd_arm: {
             exclude_cflags: zlib_neon,
