@@ -1069,6 +1069,11 @@ sed -i 's/^  uint8_t padding\[3\*sizeof(int) + 5\*sizeof(unsigned) + 16 + 8\];$/
 # dropped it and spells %error-verbose as %define parse.error verbose.
 sed -i -e '/^%pure-parser$/d' -e 's/^%error-verbose$/%define parse.error verbose/' \
   src/aidl/aidl_language_y.yy
+# bison 3.8 counts location lines/columns in int; 29.0.5 and older brace-init
+# AidlLocation::Point's unsigned fields from them (narrowing). Cast to the
+# field's own type, a no-op where they already match.
+sed -i 's/^\(    \.\(line\|column\) = \)\([a-z_]*\.[a-z]*\.\(line\|column\)\),$/\1static_cast<decltype(AidlLocation::Point::\2)>(\3),/' \
+  src/aidl/aidl_language_y.yy
 
 # Older aidl's lexer expects bison to define YYSTYPE/YYLTYPE, which the
 # glr.cc skeleton of newer bison doesn't; platform-tools-33.0.2 defines them.
