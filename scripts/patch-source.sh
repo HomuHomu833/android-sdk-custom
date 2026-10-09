@@ -97,6 +97,11 @@ done
 sed -i 's/defined(__ARM_NEON) && defined(__ARM_64BIT_STATE)/& \&\& !defined(__ARM_BIG_ENDIAN)/g' \
   src/protobuf/third_party/utf8_range/utf8_range.c 2>/dev/null || true
 
+# BoringSSL urandom.c (29.x) checks __NR_getrandom against x86_64's 318, but
+# x32 numbers its system calls from __X32_SYSCALL_BIT.
+f=src/boringssl/src/crypto/fipsmodule/rand/urandom.c
+[ -f "$f" ] && sed -i '/^#if defined(OPENSSL_X86_64)$/{N;s/^#if defined(OPENSSL_X86_64)\n#define EXPECTED_NR_getrandom 318$/#if defined(OPENSSL_X86_64) \&\& defined(__ILP32__)\n#define EXPECTED_NR_getrandom (0x40000000 + 318)\n#elif defined(OPENSSL_X86_64)\n#define EXPECTED_NR_getrandom 318/}' "$f"
+
 # aidl permission/lexer.ll (platform-tools 32.0.0 and earlier): names the
 # value type PERMSTYPE, which only older bison's glr.cc defined. It is
 # perm::parser::semantic_type, as the grammar's own permlex() declaration says.
@@ -129,8 +134,10 @@ log "Applying source fixups${TARGET:+ for $TARGET}"
 sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' src/fmtlib/include/fmt/format.h
 # fmt 6 (platform-tools 30.0.3 and older): the deprecated u8string_view sizes a
 # C string with std::char_traits<char8_type>::length, and libc++ no longer has
-# char_traits for types that aren't characters (char8_type is an enum there).
-sed -i 's/^            reinterpret_cast<const internal::char8_type\*>(s)) {}$/            reinterpret_cast<const internal::char8_type*>(s), std::strlen(s)) {}/' \
+# char_traits for types that aren't characters (char8_type is an enum there;
+# fmt 6.1 in 29.x spells it fmt::char8_t).
+sed -i -e 's/^            reinterpret_cast<const internal::char8_type\*>(s)) {}$/            reinterpret_cast<const internal::char8_type*>(s), std::strlen(s)) {}/' \
+       -e 's/: basic_string_view<char8_t>(reinterpret_cast<const char8_t\*>(s)) {}$/: basic_string_view<char8_t>(reinterpret_cast<const char8_t*>(s), std::strlen(s)) {}/' \
   src/fmtlib/include/fmt/format.h
 
 # fdevent.h names std::vector and adb_mdns.cpp std::atomic without including
@@ -429,9 +436,33 @@ sed -i 's/^#if defined(_WIN32) || defined(__hexagon__)$/#if defined(_WIN32)/' \
 
 # liblog logger_name.cpp: hexagon Clang makes android_LogPriority unsigned char,
 # tripping the uint32_t static_asserts; guard them under !__hexagon__.
-sed -i '/^static_assert(std::is_same<std::underlying_type<log_id_t>::type, uint32_t>::value,$/i #ifndef __hexagon__' $LIBLOG/logger_name.cpp
-sed -i '/^static_assert(std::is_same<std::underlying_type<android_LogPriority>::type, uint32_t>::value,$/i #ifndef __hexagon__' $LIBLOG/logger_name.cpp
-sed -i '/^              "log_id_t must be an uint32_t");$/a #endif' $LIBLOG/logger_name.cpp
+# liblog log_read.h (29.x) #undefs __unused around <fcntl.h>, which the NDK's
+# fortified fcntl.h now uses itself (unknown type name '__unused'). 30.0.0
+# dropped the dance; keep the include, drop the #undef and restore.
+python3 - "$LIBLOG/include/log/log_read.h" << 'PYEOF'
+import sys
+path = sys.argv[1]
+try:
+    src = open(path).read()
+except FileNotFoundError:
+    raise SystemExit(0)
+for block in ('/* deal with possible sys/cdefs.h conflict with fcntl.h */\n'
+              '#ifdef __unused\n#define __unused_defined __unused\n#undef __unused\n#endif\n',
+              '/* restore definitions from above */\n'
+              '#ifdef __unused_defined\n#define __unused __attribute__((__unused__))\n#endif\n'):
+    src = src.replace(block, '')
+open(path, 'w').write(src)
+PYEOF
+
+python3 - "$LIBLOG/logger_name.cpp" << 'PYEOF'
+import re, sys
+path = sys.argv[1]
+src = open(path).read()
+if '#ifndef __hexagon__' not in src:
+    src = re.sub(r'^static_assert\(std::is_same<std::underlying_type<\w+>::type, uint32_t>::value,\n.*?\);\n',
+                 lambda m: '#ifndef __hexagon__\n' + m.group(0) + '#endif\n', src, flags=re.M | re.S)
+    open(path, 'w').write(src)
+PYEOF
 
 # adb sysdeps/errno.cpp: guard out the ERRNO_VALUE static_asserts on MIPS (its
 # errno numbers differ from the ADB wire values); the runtime switch still works.
