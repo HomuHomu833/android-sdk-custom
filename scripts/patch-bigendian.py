@@ -438,18 +438,16 @@ def stringencoders():
 
 FORMAT_CALL = (r'\b(?:ALOG[VDIWE]|printf|fprintf|snprintf|StringPrintf|String8::format|appendFormat)'
                r'\s*\((?:[^;]|;(?!\s*$))*?\);')
-# Never inside a conversion: dtohl(+x) would swap the value a second time.
-NOT_CONVERTED = ''.join(r'(?<!%s\()' % c for c in (
-    'dtohl', 'dtohs', 'htodl', 'htods', 'DeviceToHost32', 'DeviceToHost16', 'HostToDevice32',
-    'HostToDevice16', 'dtohl\(', 'dtohs\('))
 
 
 def plus_fields(text, fields):
     """Inside printf-style calls, `+field` so a wrapped field is passed as its
     value (varargs would otherwise take the wrapper's stored bytes)."""
-    field_re = re.compile(NOT_CONVERTED + r'(?<![\w.>+])(\w+(?:(?:->|\.)\w+)*(?:->|\.)(?:%s))\b(?!\s*(?:[(=\[]|\.|->))' %
+    # Whole top-level arguments only (after a comma, up to the next one): a
+    # field inside a nested call such as to_string(x.type) is not a vararg.
+    field_re = re.compile(r'(,\s*)(\w+(?:(?:->|\.)\w+)*(?:->|\.)(?:%s))(?=\s*[,)])' %
                           '|'.join(sorted(fields, key=len, reverse=True)))
-    return re.sub(FORMAT_CALL, lambda m: field_re.sub(r'+\1', m.group(0)), text, flags=re.M)
+    return re.sub(FORMAT_CALL, lambda m: field_re.sub(r'\1+\2', m.group(0)), text, flags=re.M)
 
 
 def resource_varargs():
@@ -552,6 +550,41 @@ def f2fs_sizes():
         write(path, t)
         DONE.append('f2fs: %d 64-bit inode fields stored with cpu_to_le64' % n)
 
+
+
+
+def f2fs_quota_inodes():
+    """__le32 on-disk numbers used as host numbers: the superblock's qf_ino[]
+    (an array index in older mkfs, copies into host variables and a comparison
+    in the fsck quota code), a SIT journal entry's segno and an inode's
+    i_namelen (sload)."""
+    root = os.path.join(SRC, 'f2fs-tools')
+    if not os.path.isdir(root):
+        return
+    n = 0
+    for sub in ('mkfs', 'fsck', 'include', 'lib'):
+        d = os.path.join(root, sub)
+        if not os.path.isdir(d):
+            continue
+        for name in os.listdir(d):
+            if not name.endswith(('.c', '.h')):
+                continue
+            path = os.path.join(d, name)
+            t = u = read(path)
+            q = r'(sb)->qf_ino\[(\w+)\]'
+            u = re.sub(r'\[' + q + r'\]', r'[le32_to_cpu(\1->qf_ino[\2])]', u)
+            u = re.sub(r'((?<![.>\w])(?:f2fs_ino_t\s+|nid_t\s+|u32\s+)?(?:qf_ino|qf_inum|ino)\s*=\s*)' + q + ';',
+                       r'\1le32_to_cpu(\2->qf_ino[\3]);', u)
+            u = re.sub(q + r'(\s*==\s*ino\b)', r'le32_to_cpu(\1->qf_ino[\2])\3', u)
+            # Journal entries' segno/nid are __le32 as well (flush_sit_journal_entries).
+            u = re.sub(r'(\b(?:segno|nid)\s*=\s*)((?:segno|nid)_in_journal\([^;]*\));', r'\1le32_to_cpu(\2);', u)
+            # ...and an inode's i_namelen as a memcpy length (older fsck_chk_inode_blk).
+            u = re.sub(r'(memcpy\([^;]*?,\s*)(node_blk->i\.i_namelen)\);', r'\1le32_to_cpu(\2));', u)
+            if u != t:
+                n += sum(1 for a_, b_ in zip(t.splitlines(), u.splitlines()) if a_ != b_)
+                write(path, u)
+    if n:
+        DONE.append('f2fs: %d host uses of on-disk qf_ino/segno converted' % n)
 
 
 def liblog_priority():
@@ -966,6 +999,7 @@ resource_varargs()
 dumpmanifest()
 optional_returns()
 f2fs_sizes()
+f2fs_quota_inodes()
 liblog_priority()
 helpers()
 writers()
