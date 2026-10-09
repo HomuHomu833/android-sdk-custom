@@ -70,12 +70,13 @@ amend {
             ],
         },
         // The BSDs have no Soong target: poll()-based fdevent plus libusb
-        // hotplug via patches/sources/adb_usb_bsd.cpp.
+        // hotplug via patches/sources/adb_usb_bsd.cpp. (Before 29.0.2 the one
+        // fdevent.cpp in the common sources is the poll() one.)
         bsd: {
-            srcs: [
-                "fdevent/fdevent_poll.cpp",
-                ":sdk_adb_usb_bsd",
-            ],
+            srcs: [":sdk_adb_usb_bsd"] + select(platform_tools_version_at_least("29.0.2"), {
+                true: ["fdevent/fdevent_poll.cpp"],
+                default: [],
+            }),
         },
     },
 }

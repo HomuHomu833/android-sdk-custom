@@ -964,10 +964,11 @@ grep -q 'DIOCGMEDIASIZE' src/f2fs-tools/lib/libf2fs.c ||
 
 # ICU's double-conversion #errors on CPUs outside its list of those with exact
 # IEEE doubles. Hexagon's (hardware or soft-float) are, as are LoongArch's and
-# RISC-V's, which older releases' copies do not list yet.
+# RISC-V's, which older releases' copies do not list yet, nor (29.0.1)
+# big-endian ARM's.
 dc=src/icu/icu4c/source/i18n/double-conversion-utils.h
 grep -q '__hexagon__' "$dc" || {
-  sed -i 's/^#if defined(_M_X64) || defined(__x86_64__) || \\$/#if defined(_M_X64) || defined(__x86_64__) || defined(__hexagon__) || defined(__loongarch__) || defined(__riscv) || \\/' "$dc"
+  sed -i 's/^#if defined(_M_X64) || defined(__x86_64__) || \\$/#if defined(_M_X64) || defined(__x86_64__) || defined(__hexagon__) || defined(__loongarch__) || defined(__riscv) || defined(__ARMEB__) || \\/' "$dc"
   grep -q '__hexagon__' "$dc"
 }
 
@@ -999,8 +1000,9 @@ sed -i 's/    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)$/   
 
 # zlib zutil.h (platform-tools 34.0.5 and older): the same classic Mac OS
 # check, which #defines fdopen() to NULL and breaks the SDK's stdio.h
-# declaration of it. zlib dropped TARGET_OS_MAC there in 35.0.1.
-sed -i 's/^#if defined(MACOS) || defined(TARGET_OS_MAC)$/#if defined(MACOS)/' src/zlib/zutil.h
+# declaration of it. zlib dropped TARGET_OS_MAC there in 35.0.1. (29.0.1 keeps
+# zlib's sources under src/.)
+sed -i 's/^#if defined(MACOS) || defined(TARGET_OS_MAC)$/#if defined(MACOS)/' src/zlib/zutil.h src/zlib/src/zutil.h 2>/dev/null || true
 
 # zlib Android.bp (platform-tools 30.x): cpu_features.c is built only with the
 # SIMD sources, but crc32.c and deflate.c read its flags on every CPU (undefined

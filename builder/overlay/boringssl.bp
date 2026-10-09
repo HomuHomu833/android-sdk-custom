@@ -17,3 +17,16 @@ amend {
         bsd: "linux",
     },
 }
+
+// Older releases (29.0.1) assemble two 32-bit ARM files in a separate
+// libcrypto_no_clang, which misses libcrypto_defaults' Windows OPENSSL_NO_ASM
+// and so feeds ELF assembly to armv7 Windows. Give it the same switch, which
+// empties both files.
+amend {
+    name: "libcrypto_no_clang",
+    target: {
+        windows: {
+            asflags: ["-DOPENSSL_NO_ASM"],
+        },
+    },
+}
