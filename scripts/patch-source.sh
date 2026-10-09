@@ -201,6 +201,14 @@ sed -i '/^#ifdef HAVE_SYS_TYPES_H$/{N;N;s/^#ifdef HAVE_SYS_TYPES_H\n\(#include <
 sed -i 's/^#if !defined(__APPLE__)$/#if !defined(__APPLE__) \&\& !defined(_WIN32) \&\& !defined(__FreeBSD__) \&\& !defined(__NetBSD__) \&\& !defined(__OpenBSD__)/' \
   src/e2fsprogs/lib/config.h
 
+# e2fsprogs config.h: Android only targets little-endian CPUs, so its config
+# never sets WORDS_BIGENDIAN and the on-disk byte swaps (ext2fs_swap_*) are
+# compiled out; big-endian hosts then write superblocks no kernel or e2fsck
+# can read. Set it from the compiler, as configure would.
+grep -q WORDS_BIGENDIAN src/e2fsprogs/lib/config.h || printf '%s\n' '' \
+  '#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__' \
+  '#define WORDS_BIGENDIAN 1' '#endif' >> src/e2fsprogs/lib/config.h
+
 # ADB BSD: default is_libusb_enabled() (should_use_libusb() in older adb) to
 # the libusb backend, the only one the BSDs have. Windows keeps upstream's
 # AdbWinApi default (built from source, see builder/overlay/adbwinapi.bp).
@@ -981,6 +989,14 @@ sed -i -e 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(
   -e 's/(defined(__aarch64__) || defined(__mips__) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
   src/art/libartbase/base/mem_map.h
 
+# ART globals.h (page-size-agnostic releases): kMaxPageSize is 16K, and
+# MemMap::Init() CHECKs the running page size against it, so dexdump aborts on
+# 64K-page hosts (ppc64le and some arm64 distributions, qemu-hexagon). Off
+# Android allow 64K; the only other use is OAT image alignment, which no SDK
+# tool writes.
+sed -i 's/^static constexpr size_t kMaxPageSize = 16384;$/#if defined(__ANDROID__)\n&\n#else\nstatic constexpr size_t kMaxPageSize = 65536;\n#endif/' \
+  src/art/libartbase/base/globals.h
+
 # adb sysdeps/env.cpp (platform-tools-35.0.1 and earlier): calls getenv()
 # without <stdlib.h>, which musl's headers do not pull in. Upstream added it.
 if [ -f $ADB/sysdeps/env.cpp ] && ! grep -q '^#include <stdlib.h>' $ADB/sysdeps/env.cpp; then
@@ -1539,6 +1555,12 @@ with open(path, 'w') as f: f.write(content)
 print('termux fastboot: find_usb_device_termux added + dispatch')
 PYEOF
 fi
+
+# Big-endian hosts: zip, resource-table and dex formats are little-endian on
+# disk; see scripts/patch-bigendian.py.
+# Not under the ERR trap's skip-and-continue: an edit that no longer applies
+# must stop the build, not ship a tool that misreads its files.
+python3 "$ROOTDIR/scripts/patch-bigendian.py" src "$ZIPARCHIVE" src/core/libutils || exit 1
 
 if [ -z "$SKIPPED" ]; then
   log "Source fixups applied"
