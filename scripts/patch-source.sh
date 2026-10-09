@@ -755,6 +755,86 @@ if m:
     print('protobuf musttail: limited to aarch64/x86_64')
 PYEOF
 
+# protobuf stubs/atomicops (29.0.4 and older): arm64ec matches the x86 arch
+# test and gets x86 inline asm; send it to the generic __atomic implementation
+# instead. That generic header only has half of the Atomic64 ops, and only
+# under __LP64__, so 64-bit CPUs without a dedicated header (riscv64, s390x,
+# loongarch64, big-endian mips64) and LLP64 arm64ec fail to link; fill it in.
+python3 << 'PYEOF'
+stubs = 'src/protobuf/src/google/protobuf/stubs/'
+try:
+    with open(stubs + 'atomicops_internals_generic_gcc.h') as f:
+        content = f.read()
+except FileNotFoundError:
+    raise SystemExit(0)
+if 'NoBarrier_Store(volatile Atomic64' not in content and '#ifdef __LP64__\n' in content:
+    extra = '''
+inline Atomic64 NoBarrier_AtomicExchange(volatile Atomic64* ptr,
+                                         Atomic64 new_value) {
+  return __atomic_exchange_n(ptr, new_value, __ATOMIC_RELAXED);
+}
+
+inline Atomic64 NoBarrier_AtomicIncrement(volatile Atomic64* ptr,
+                                          Atomic64 increment) {
+  return __atomic_add_fetch(ptr, increment, __ATOMIC_RELAXED);
+}
+
+inline Atomic64 Barrier_AtomicIncrement(volatile Atomic64* ptr,
+                                        Atomic64 increment) {
+  return __atomic_add_fetch(ptr, increment, __ATOMIC_SEQ_CST);
+}
+
+inline Atomic64 Release_CompareAndSwap(volatile Atomic64* ptr,
+                                       Atomic64 old_value,
+                                       Atomic64 new_value) {
+  __atomic_compare_exchange_n(ptr, &old_value, new_value, true,
+                              __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
+  return old_value;
+}
+
+inline void NoBarrier_Store(volatile Atomic64* ptr, Atomic64 value) {
+  __atomic_store_n(ptr, value, __ATOMIC_RELAXED);
+}
+
+inline void Acquire_Store(volatile Atomic64* ptr, Atomic64 value) {
+  __atomic_store_n(ptr, value, __ATOMIC_SEQ_CST);
+}
+
+inline Atomic64 NoBarrier_Load(volatile const Atomic64* ptr) {
+  return __atomic_load_n(ptr, __ATOMIC_RELAXED);
+}
+
+inline Atomic64 Release_Load(volatile const Atomic64* ptr) {
+  return __atomic_load_n(ptr, __ATOMIC_SEQ_CST);
+}
+
+#endif // GOOGLE_PROTOBUF_ARCH_64_BIT
+'''
+    content = content.replace('#ifdef __LP64__\n', '#ifdef GOOGLE_PROTOBUF_ARCH_64_BIT\n', 1)
+    content = content.replace('#endif // defined(__LP64__)\n', extra.lstrip('\n'), 1)
+    with open(stubs + 'atomicops_internals_generic_gcc.h', 'w') as f:
+        f.write(content)
+    print('protobuf atomicops: completed generic Atomic64 ops')
+
+path = stubs + 'platform_macros.h'
+with open(path) as f:
+    content = f.read()
+first = content.find('\n#if defined(_M_X64)') + 1
+if first and '#if defined(__arm64ec__)\n#define GOOGLE_PROTOBUF_ARCH_64_BIT' not in content:
+    content = (content[:first] + '#if defined(__arm64ec__)\n#define GOOGLE_PROTOBUF_ARCH_64_BIT 1\n#el'
+               + content[first + 1:])
+    with open(path, 'w') as f:
+        f.write(content)
+    print('protobuf platform_macros: arm64ec uses generic atomics')
+PYEOF
+
+# BoringSSL (29.0.4 and older): the prebuilt x86 assembly records dispatch hits
+# in BORINGSSL_function_hit unless NDEBUG, which only reaches the C flags, so
+# crypto.c (built with NDEBUG) never defines the array the asm references.
+# Define it whatever NDEBUG says.
+sed -i '/^#if !defined(NDEBUG) && !defined(BORINGSSL_FIPS)$/{N;/\n\/\/ This value must be explicitly initialised/s/^#if !defined(NDEBUG) && /#if /}' \
+  src/boringssl/src/crypto/crypto.c
+
 # fastboot_driver_interface.h: older releases use std::vector without <vector>,
 # which only llvm-mingw's libc++ doesn't pull in some other way. Upstream added
 # the include later.
