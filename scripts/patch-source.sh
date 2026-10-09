@@ -135,9 +135,9 @@ sed -i '/#define FMT_FORMAT_H_/a #include <stdlib.h>' src/fmtlib/include/fmt/for
 # fmt 6 (platform-tools 30.0.3 and older): the deprecated u8string_view sizes a
 # C string with std::char_traits<char8_type>::length, and libc++ no longer has
 # char_traits for types that aren't characters (char8_type is an enum there;
-# fmt 6.1 in 29.x spells it fmt::char8_t).
+# fmt 5.3/6.1 in 29.x spell it fmt::char8_t).
 sed -i -e 's/^            reinterpret_cast<const internal::char8_type\*>(s)) {}$/            reinterpret_cast<const internal::char8_type*>(s), std::strlen(s)) {}/' \
-       -e 's/: basic_string_view<char8_t>(reinterpret_cast<const char8_t\*>(s)) {}$/: basic_string_view<char8_t>(reinterpret_cast<const char8_t*>(s), std::strlen(s)) {}/' \
+       -e 's/basic_string_view<char8_t>(reinterpret_cast<const char8_t\*>(s)) {}$/basic_string_view<char8_t>(reinterpret_cast<const char8_t*>(s), std::strlen(s)) {}/' \
   src/fmtlib/include/fmt/format.h
 
 # fdevent.h names std::vector and adb_mdns.cpp std::atomic without including
@@ -913,12 +913,10 @@ sed -i 's/    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)$/   
 # declaration of it. zlib dropped TARGET_OS_MAC there in 35.0.1.
 sed -i 's/^#if defined(MACOS) || defined(TARGET_OS_MAC)$/#if defined(MACOS)/' src/zlib/zutil.h
 
-# zlib Android.bp (platform-tools 30.x and older), brought in line with 31.0.0:
-# - cpu_features.c is built only with the SIMD sources, but crc32.c and
-#   deflate.c read its flags on every CPU; build it everywhere.
-# - x86 hosts get SSSE3/SSE4.2/PCLMUL code, whose SSE4.2 CRC hash newer clang
-#   rejects ("requires target feature 'crc32'"); 31.0.0 builds x86 hosts with
-#   CPU_NO_SIMD and keeps the SIMD flags for Android devices only.
+# zlib Android.bp (platform-tools 30.x): cpu_features.c is built only with the
+# SIMD sources, but crc32.c and deflate.c read its flags on every CPU (undefined
+# x86_cpu_enable_simd on mips, ppc, riscv, ...). Build it everywhere, as 31.0.0
+# does.
 python3 << 'PYEOF'
 import re
 path = 'src/zlib/Android.bp'
@@ -928,14 +926,14 @@ if m and '"cpu_features.c"' in m.group(1):
     body = re.sub(r'^ *"cpu_features\.c",\n', '', m.group(1), flags=re.M)
     src = src[:m.start(1)] + body + src[m.end(1):]
     src = src.replace('        "compress.c",\n', '        "compress.c",\n        "cpu_features.c",\n', 1)
-m = re.search(r'^cflags_x86 = \[\n(.*?)^\]', src, re.M | re.S)
-if m and '"-DCPU_NO_SIMD"' not in m.group(1):
-    body = re.sub(r'^ *"(-DADLER32_SIMD_SSSE3|-mssse3|-mpclmul|-DCRC32_SIMD_SSE42_PCLMUL)",\n',
-                  '', m.group(1), flags=re.M)
-    body += '    "-DCPU_NO_SIMD",\n'
-    src = src[:m.start(1)] + body + src[m.end(1):]
-open(path, 'w').write(src)
+    open(path, 'w').write(src)
 PYEOF
+
+# zlib insert_string.h: the SSE4.2 CRC hash is marked target("sse4.2"), but
+# clang 22 wants the crc32 feature named too ("'_mm_crc32_u32' requires target
+# feature 'crc32'"). Older clang accepts the pair as well.
+sed -i 's/__attribute__((target("sse4.2")))/__attribute__((target("sse4.2,crc32")))/' \
+  src/zlib/contrib/optimizations/insert_string.h 2>/dev/null || true
 
 # zlib cpu_features.c (30.0.3 and older) predates ARMV8_OS_MACOS, which the
 # overlay sets for macOS arm64, and so has no cpu_check_features() there.
@@ -955,17 +953,6 @@ if 'ARMV8_OS_MACOS' not in src and var in src and end in src:
                       + '#elif defined(ARMV8_OS_MACOS)\nvoid ZLIB_INTERNAL cpu_check_features(void)\n{\n}\n#endif\n', 1)
     open(path, 'w').write(src)
 PYEOF
-
-# zlib 30.0.1 and older build crc_folding.c and fill_window_sse.c whole and call
-# them under ADLER32_SIMD_SSSE3. With x86 hosts on CPU_NO_SIMD (above) they then
-# lack -mpclmul. 30.0.2 guards them on CRC32_SIMD_SSE42_PCLMUL and (never set)
-# DEFLATE_FILL_WINDOW_SSE2; do the same.
-if [ -f src/zlib/crc_folding.c ] && ! grep -q '^#ifdef CRC32_SIMD_SSE42_PCLMUL' src/zlib/crc_folding.c; then
-  sed -i 's/^#ifdef ADLER32_SIMD_SSSE3$/#ifdef DEFLATE_FILL_WINDOW_SSE2/' src/zlib/deflate.c
-  sed -i 's/^#ifdef ADLER32_SIMD_SSSE3$/#ifdef CRC32_SIMD_SSE42_PCLMUL/' src/zlib/crc32.c
-  sed -i -e '1i #ifdef CRC32_SIMD_SSE42_PCLMUL' -e '$a #endif  /* CRC32_SIMD_SSE42_PCLMUL */' src/zlib/crc_folding.c
-  sed -i -e '1i #ifdef DEFLATE_FILL_WINDOW_SSE2' -e '$a #endif  /* DEFLATE_FILL_WINDOW_SSE2 */' src/zlib/fill_window_sse.c
-fi
 
 # ART globals.h (platform-tools-35.0.1): GetPageSizeSlow() calls sysconf()
 # unconditionally, which Windows lacks. Later releases fall back to 4096.
