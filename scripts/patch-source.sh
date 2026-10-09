@@ -739,8 +739,11 @@ python3 << 'PYEOF'
 import re
 
 path = 'src/protobuf/src/google/protobuf/port_def.inc'
-with open(path) as f:
-    content = f.read()
+try:
+    with open(path) as f:
+        content = f.read()
+except FileNotFoundError:  # protobuf before port_def.inc (29.0.4 and older)
+    raise SystemExit(0)
 old = re.compile(r'#if (ABSL_HAVE_CPP_ATTRIBUTE|__has_cpp_attribute)\(clang::musttail\) && !defined\(__arm__\)(?:[^\n]*\\\n)*[^\n]*\n')
 m = old.search(content)
 if m:
