@@ -859,6 +859,7 @@ grep -q '__hexagon__' "$dc" || {
 # keeps its MAP_32BIT path.
 sed -i -e 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
   -e 's/(defined(__aarch64__) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
+  -e 's/(defined(__aarch64__) || defined(__mips__) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
   src/art/libartbase/base/mem_map.h
 
 # adb sysdeps/env.cpp (platform-tools-35.0.1 and earlier): calls getenv()

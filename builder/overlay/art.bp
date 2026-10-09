@@ -38,6 +38,9 @@ cc_library_headers {
 // Google's build machines); our dexdump has to run on any x86 CPU.
 amend {
     name: "art_defaults",
+    // ART before 30.0.0 gets <jni.h> from Soong's global include list
+    // (libnativehelper/include_jni) instead of jni_headers.
+    header_libs: ["jni_headers"],
     exclude_cflags: [
         "-msse4.2",
         "-mpopcnt",

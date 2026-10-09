@@ -15,6 +15,10 @@ cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
+# cargo fetches crates for the Rust parts; its default 2 retries give up on a
+# brief crates.io outage.
+export CARGO_NET_RETRY="${CARGO_NET_RETRY:-10}"
+
 # Re-run aria2c on any failure so transient GitHub 5xx recover (older aria2 lacks
 # --retry-on-unknown). Args pass through, e.g. fetch --dir=/tmp -o f.zip URL.
 fetch() {
