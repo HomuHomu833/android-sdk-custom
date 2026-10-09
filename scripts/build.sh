@@ -262,9 +262,13 @@ case "$PLATFORM" in
     # aarch64/arm64ec drop only --whole-archive: llvm-mingw builds that winpthreads
     # -marm64x and lld rejects the ARM64X members it force-loads. -Bstatic stays, or
     # -lwinpthread would pick libwinpthread.dll.a and make-sdk.sh deletes that DLL.
+    # It also stays on to the end: modules linked with -static (mke2fs, make_f2fs,
+    # newer aapt2) make clang drop its own -Bstatic around -lc++, which under a
+    # trailing -Bdynamic picked libc++.dll.a. Windows' own libraries are .a
+    # import archives, so they link the same either way.
     case "$TARGET" in
-      aarch64-*|arm64ec-*) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic" ;;
-      *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic" ;;
+      aarch64-*|arm64ec-*) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic -lwinpthread" ;;
+      *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive" ;;
     esac
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
