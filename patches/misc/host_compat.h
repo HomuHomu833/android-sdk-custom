@@ -1,18 +1,13 @@
-/* Host-tool build compatibility shim (force-included via build.sh).
- *
- * AOSP host-tool code expects glibc/musl GNU extensions and newer POSIX/libc APIs
- * the target libc (bionic, macOS, MinGW, BSD) may not ship; this header fills the
- * gaps so the cross-build compiles without source patches. Each section is guarded
- * by its platform define. */
+/* Force-included by build.sh: the glibc/GNU extensions and newer libc APIs
+ * AOSP host code expects but bionic, macOS, MinGW or the BSDs may lack, each
+ * section guarded by its platform. */
 #ifndef HOST_COMPAT_H
 #define HOST_COMPAT_H
 
-/* --- BSD feature-test macros (MUST precede all #includes) -------------------
- * The opening #include <stdint.h> pulls in <sys/cdefs.h>, which evaluates these
- * then, so set them first. NetBSD: _NETBSD_SOURCE enables the extension API
- * (locale_t, _l-functions) libcxx needs, which liblog's -D_XOPEN_SOURCE=700 would
- * otherwise suppress. FreeBSD/OpenBSD: __BSD_VISIBLE enables BSD APIs (vasprintf,
- * getprogname); OpenBSD also needs _BSD_SOURCE so cdefs.h keeps __BSD_VISIBLE. */
+/* --- BSD feature-test macros (before any #include: <sys/cdefs.h> reads them)
+ * NetBSD: _NETBSD_SOURCE, for the locale_t API libc++ needs despite liblog's
+ * _XOPEN_SOURCE=700. FreeBSD/OpenBSD: __BSD_VISIBLE (vasprintf, getprogname);
+ * OpenBSD also _BSD_SOURCE so cdefs.h keeps it. */
 #if defined(__NetBSD__)
 # ifndef _NETBSD_SOURCE
 #  define _NETBSD_SOURCE 1
@@ -57,11 +52,16 @@
 # endif
 #endif
 
+/* FreeBSD/OpenBSD report a missing xattr as ENOATTR and have no ENODATA
+ * (f2fs-tools' xattr.c). */
+#if (defined(__FreeBSD__) || defined(__OpenBSD__)) && !defined(ENODATA)
+# define ENODATA ENOATTR
+#endif
+
 /* --- BSD pthread process-shared stubs ---------------------------------------
- * AOSP's Mutex/Condition/RWLock SHARED ctors call pthread_*attr_setpshared() —
- * dead code on host but must compile. NetBSD guards all three behind
- * _PTHREAD_PSHARED (never defined); OpenBSD lacks mutex/cond (rwlock is present);
- * FreeBSD declares all three. */
+ * Mutex/Condition/RWLock SHARED ctors call pthread_*attr_setpshared() (dead on
+ * host). NetBSD hides all three behind _PTHREAD_PSHARED; OpenBSD lacks the
+ * mutex/cond ones. */
 #if defined(__NetBSD__) && !defined(_PTHREAD_PSHARED)
 # define pthread_rwlockattr_setpshared(attr, val) (0)
 # define pthread_mutexattr_setpshared(attr, val)  (0)
@@ -75,9 +75,9 @@
 #include <stdint.h>
 
 /* --- BSD sys/socket.h + netinet/in.h ----------------------------------------
- * BSD zig sysroots' <netinet/in.h> doesn't pull in <sys/socket.h> (unlike glibc),
- * but AOSP (libsepol kernel_to_cil/conf.c) uses AF_INET* after only including it.
- * FreeBSD also needs netinet/in.h for `struct in6_addr` (cil_internal.h). */
+ * BSD zig sysroots' <netinet/in.h> doesn't pull in <sys/socket.h> as glibc's
+ * does, and AOSP code written against glibc leans on that for AF_INET* and
+ * struct in6_addr. The in_pktinfo/ip_mreqn fallbacks below need it too. */
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 # include <sys/socket.h>
 # include <sys/time.h>
@@ -103,21 +103,19 @@ struct ip_mreqn {
 #endif
 
 /* --- FreeBSD/OpenBSD in_pktinfo / IP_PKTINFO --------------------------------
- * Added in FreeBSD 14.0 / OpenBSD 7.3; older zig sysroots lack them while adb's
- * openscreen udp_socket.cpp uses them unconditionally. Define them so it compiles;
- * at runtime older kernels just return ENOPROTOOPT and the code falls back. */
+ * Neither kernel has IP_PKTINFO; adb's openscreen udp_socket.cpp enables it to
+ * learn a datagram's destination address (and fails the multicast join if the
+ * option is refused). IP_RECVDSTADDR is their equivalent: it delivers that
+ * address as an IP_RECVDSTADDR control message holding a struct in_addr, which
+ * is read here through ipi_addr, the first member. */
 #if (defined(__FreeBSD__) || defined(__OpenBSD__)) && !defined(IP_PKTINFO)
 #include <netinet/in.h>
 struct in_pktinfo {
     struct in_addr  ipi_addr;      /* Header destination address */
-    struct in_addr  ipi_spec_dst;  /* Local source address */
-    unsigned int    ipi_ifindex;   /* Interface index */
+    struct in_addr  ipi_spec_dst;  /* Unused */
+    unsigned int    ipi_ifindex;   /* Unused */
 };
-#if defined(__FreeBSD__)
-#define IP_PKTINFO 19  /* FreeBSD 14+ */
-#else
-#define IP_PKTINFO 26  /* OpenBSD 7.3+ */
-#endif
+#define IP_PKTINFO IP_RECVDSTADDR
 #endif
 
 /* --- BSD mempcpy ------------------------------------------------------------
@@ -155,7 +153,7 @@ int rand_s(unsigned int *_Value);
 #endif
 
 /* --- Windows POSIX types ----------------------------------------------------
- * MinGW omits uid_t/gid_t; provide them for libpackagelistparser, libprocessgroup. */
+ * MinGW omits uid_t/gid_t; the identity stubs below return them. */
 #if defined(_WIN32)
 #ifndef uid_t_defined
 typedef unsigned int uid_t;
@@ -168,10 +166,8 @@ typedef unsigned int gid_t;
 #endif
 
 /* --- macOS BSD extensions ---------------------------------------------------
- * macOS Clang with -std=gnu* doesn't auto-define _DARWIN_C_SOURCE, and AOSP code
- * with _XOPEN_SOURCE=700 hides BSD extensions (flock, getprogname); define it to
- * restore them. Valueless to match e2fsprogs' bare #define (cdefs.h only tests
- * defined()), avoiding -Wmacro-redefined. */
+ * _XOPEN_SOURCE=700 hides flock/getprogname unless _DARWIN_C_SOURCE is set.
+ * Defined valueless like e2fsprogs' own, avoiding -Wmacro-redefined. */
 #if defined(__APPLE__)
 #ifndef _DARWIN_C_SOURCE
 #define _DARWIN_C_SOURCE
@@ -224,12 +220,11 @@ const char *getprogname(void) {
 #endif
 
 /* --- stdio *_unlocked extensions --------------------------------------------
- * bionic/macOS/MinGW lack the glibc GNU *_unlocked stdio funcs (used by libselinux
- * as a single-threaded perf hint); map them to the locked equivalents. FreeBSD
- * ships them, so it's excluded. fgets_unlocked matches libselinux
- * label_internal.h's exact spelling (it redefines unconditionally) to stay
- * token-identical and avoid -Wmacro-redefined. */
-#if (defined(__APPLE__) || defined(_WIN32) || defined(__ANDROID__) || \
+ * bionic < 28, macOS and MinGW lack glibc's *_unlocked stdio (libselinux uses
+ * them); map to the locked ones. fgets_unlocked is spelled exactly as
+ * libselinux redefines it, avoiding -Wmacro-redefined. FreeBSD has them. */
+#if (defined(__APPLE__) || defined(_WIN32) || \
+     (defined(__BIONIC__) && __ANDROID_API__ < 28) || \
      defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(__FreeBSD__)
 #ifndef fgets_unlocked
 #define fgets_unlocked(buf, size, fp) fgets(buf, size, fp)
@@ -254,26 +249,6 @@ const char *getprogname(void) {
 #endif
 #endif
 
-/* --- macOS POSIX scheduling -------------------------------------------------
- * macOS lacks SCHED_BATCH/SCHED_IDLE and sched_setscheduler(); stub them for
- * libprocessgroup task_profiles.cpp (the calls are inert on macOS). */
-#if defined(__APPLE__)
-#include <sched.h>
-
-#ifndef SCHED_BATCH
-#define SCHED_BATCH 3
-#endif
-#ifndef SCHED_IDLE
-#define SCHED_IDLE 5
-#endif
-
-static inline __attribute__((__unused__))
-int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
-  (void)pid; (void)policy; (void)param;
-  return 0;
-}
-#endif
-
 /* --- Windows socket constants -----------------------------------------------
  * SHUT_RD/WR/RDWR don't exist in MinGW's <sys/socket.h>; adb and others use them. */
 #if defined(_WIN32)
@@ -289,10 +264,8 @@ int sched_setscheduler(int pid, int policy, const struct sched_param *param) {
 #endif
 
 /* --- Windows stat() macros --------------------------------------------------
- * MinGW omits S_ISLNK/S_ISSOCK; provide them for libselinux (stringrep.c,
- * label_file.h). ADB TUs (ADB_HOST) are excluded for S_IFLNK/S_ISLNK/lstat —
- * adb/sysdeps/stat.h owns those, and pre-defining here would trip
- * -Wmacro-redefined when it redefines them bare. */
+ * MinGW lacks S_ISLNK/S_ISSOCK (libselinux). Not for adb (ADB_HOST): its
+ * sysdeps/stat.h defines them bare, which would trip -Wmacro-redefined. */
 #if defined(_WIN32)
 /* S_IFSOCK is not defined by adb's stat.h, so always provide it */
 #ifndef S_IFSOCK
@@ -355,36 +328,72 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream) {
  * it only on macOS/MinGW/musl/BSD. (errno resolves at the expansion site.) */
 #if defined(__APPLE__) || defined(_WIN32) || \
     defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
-    (defined(__linux__) && !defined(__GLIBC__) && !defined(__ANDROID__))
+    (defined(__linux__) && !defined(__GLIBC__) && !defined(__BIONIC__))
 #ifndef TEMP_FAILURE_RETRY
 #define TEMP_FAILURE_RETRY(expression) (({ long int __result; do __result = (long int)(expression); while (__result == -1 && errno == EINTR); __result; }))
 #endif
 #endif
 
-/* --- reallocarray() ---------------------------------------------------------
- * libsepol builds -DHAVE_REALLOCARRAY (skips its own decl), but macOS/MinGW may
- * lack a libc one; provide a fallback there (bionic gates on API 29). glibc, musl
- * and all BSDs declare it themselves, so they're excluded to avoid a clash. */
-#if (!defined(__ANDROID_API__) || __ANDROID_API__ < 29) \
-    && !defined(__GLIBC__) \
-    && !(defined(__linux__) && !defined(__ANDROID__)) \
-    && !defined(__FreeBSD__) && !defined(__NetBSD__) && !defined(__OpenBSD__)
-#include <errno.h>
+/* --- bionic / Android NDK fallbacks -----------------------------------------
+ * Keyed on __BIONIC__: the bionic build undefines __ANDROID__, as Soong's
+ * linux_bionic toolchains do. Everything below links from the NDK's static
+ * libc.a, which carries every API level. */
+#if defined(__BIONIC__)
+
+/* __system_property_read_callback()/__system_property_wait(): bionic API 26+,
+ * but libbase, libcutils and libbuildversion read properties through them. The
+ * headers hide them below that, so declare them. */
+#if __ANDROID_API__ < 26
+#include <stdbool.h>
+#include <stdint.h>
+#include <sys/system_properties.h>
+#include <time.h>
+
+__BEGIN_DECLS
+void __system_property_read_callback(const prop_info *pi,
+    void (*callback)(void *cookie, const char *name, const char *value, uint32_t serial),
+    void *cookie);
+bool __system_property_wait(const prop_info *pi, uint32_t old_serial,
+    uint32_t *new_serial_ptr, const struct timespec *relative_timeout);
+__END_DECLS
+#endif /* API < 26 */
+
+/* backtrace(): bionic API 33+; abseil's stacktrace falls back to it through
+ * <execinfo.h> on Linux CPUs it has no unwinder for (arm). A strong declaration,
+ * so the static link pulls it from libc.a rather than leaving it null. */
+#if __ANDROID_API__ < 33
+__BEGIN_DECLS
+int backtrace(void **buffer, int size);
+__END_DECLS
+#endif /* API < 33 */
+
+/* qsort_r(): bionic API 36+; zstd's dictBuilder (cover.c) takes its glibc path
+ * on any __linux__ without __ANDROID__. qsort() with the comparator and its
+ * argument in thread-locals, restored afterwards for nested calls. */
+#if __ANDROID_API__ < 36
 #include <stdlib.h>
 
-static inline __attribute__((__unused__))
-void *reallocarray(void *ptr, size_t nmemb, size_t size) {
-  size_t bytes;
-  if (__builtin_mul_overflow(nmemb, size, &bytes)) {
-    errno = ENOMEM;
-    return NULL;
-  }
-  return realloc(ptr, bytes);
-}
-#endif
+static __thread __attribute__((__unused__))
+int (*__host_compat_qsort_r_cmp)(const void *, const void *, void *);
+static __thread __attribute__((__unused__)) void *__host_compat_qsort_r_arg;
 
-/* --- bionic / Android NDK fallbacks ----------------------------------------- */
-#if defined(__ANDROID__)
+static inline __attribute__((__unused__))
+int __host_compat_qsort_r_thunk(const void *a, const void *b) {
+  return __host_compat_qsort_r_cmp(a, b, __host_compat_qsort_r_arg);
+}
+
+static inline __attribute__((__unused__))
+void qsort_r(void *base, size_t nmemb, size_t size,
+             int (*cmp)(const void *, const void *, void *), void *arg) {
+  int (*saved_cmp)(const void *, const void *, void *) = __host_compat_qsort_r_cmp;
+  void *saved_arg = __host_compat_qsort_r_arg;
+  __host_compat_qsort_r_cmp = cmp;
+  __host_compat_qsort_r_arg = arg;
+  qsort(base, nmemb, size, __host_compat_qsort_r_thunk);
+  __host_compat_qsort_r_cmp = saved_cmp;
+  __host_compat_qsort_r_arg = saved_arg;
+}
+#endif /* API < 36 */
 
 /* hasmntopt(): bionic API 26+; e2fsprogs ismounted.c uses it. */
 #if !defined(__ANDROID_API__) || __ANDROID_API__ < 26
@@ -421,7 +430,7 @@ int getlogin_r(char *buf, size_t bufsize) {
 }
 #endif /* API < 28 */
 
-#endif /* __ANDROID__ */
+#endif /* __BIONIC__ */
 
 /* --- Windows POSIX identity stubs -------------------------------------------
  * e2fsprogs blkid/cache.c safe_getenv() calls getuid/geteuid/getgid/getegid;
@@ -449,23 +458,30 @@ static inline gid_t getegid(void) { return 0; }
 #endif
 #endif
 
-/* --- Windows malloc_usable_size ---------------------------------------------
- * sqlite3 builds -DHAVE_MALLOC_USABLE_SIZE everywhere; the Windows CRT's
- * equivalent is _msize(). Wrap it (a forward decl would leave an unresolved
- * symbol); _msize(NULL) is UB, so return 0 like glibc. */
-#if defined(_WIN32) && !defined(malloc_usable_size)
-#include <malloc.h>
-static inline __attribute__((__unused__))
-size_t malloc_usable_size(void *ptr) { return ptr ? _msize(ptr) : 0; }
+/* --- Windows C++: headers older AOSP gets transitively ----------------------
+ * llvm-mingw's libc++ dropped most transitive includes that older AOSP relies
+ * on (std::sort, back_inserter, vector, unique_ptr...); include them up front,
+ * before adb's function-renaming macros exist. */
+#if defined(_WIN32) && defined(__cplusplus)
+/* These pull in <time.h> first, and MinGW only declares localtime_r/gmtime_r
+ * when this is set by then (aapt's ZipEntry.cpp and others rely on them). */
+#ifndef _POSIX_THREAD_SAFE_FUNCTIONS
+#define _POSIX_THREAD_SAFE_FUNCTIONS 1
 #endif
-
-/* --- OpenBSD malloc_usable_size stub ----------------------------------------
- * OpenBSD's malloc has no malloc_usable_size(); sqlite3 calls it for accounting,
- * so return 0 (just disables an oversized-block optimization). */
-#if defined(__OpenBSD__) && !defined(malloc_usable_size)
-#include <stddef.h>
-static inline __attribute__((__unused__))
-size_t malloc_usable_size(void *ptr) { (void)ptr; return 0; }
+#include <algorithm>
+#include <atomic>
+#include <functional>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 #endif
 
 #endif /* HOST_COMPAT_H */

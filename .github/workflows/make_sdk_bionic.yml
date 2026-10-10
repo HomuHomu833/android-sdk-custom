@@ -1,14 +1,10 @@
 name: Make SDK (Bionic)
-run-name: Make SDK ${{ inputs.version }}
+run-name: Make SDK ${{ inputs.tag }}
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Platform Tools Version (release tag)"
-        required: true
-        default: "37.0.0"
       tag:
-        description: "Android Source Tag"
+        description: "AOSP source tag (android-* or platform-tools-*)"
         required: true
         default: "android-17.0.0_r1"
       ndk_version:
@@ -19,6 +15,10 @@ on:
         description: "Official NDK revision letter (optional)"
         required: false
         default: ""
+      only:
+        description: "Only these targets (JSON array), default all"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -30,9 +30,9 @@ jobs:
     secrets: inherit
     with:
       platform: bionic
-      version: ${{ inputs.version }}
       tag: ${{ inputs.tag }}
       ndk_version: ${{ inputs.ndk_version }}
       ndk_revision: ${{ inputs.ndk_revision }}
+      only: ${{ inputs.only }}
       # riscv64-linux-android
       targets: '["aarch64-linux-android", "armv7a-linux-androideabi", "i686-linux-android", "x86_64-linux-android"]'

@@ -1,0 +1,105 @@
+// art
+
+// aconfig-generated flag accessors (see base.bp); include/ holds the
+// com_android_art_*flags.h headers with the flags' default values.
+cc_library_headers {
+    name: "art-aconfig-flags-lib",
+    export_include_dirs: ["include"],
+}
+
+cc_library_headers {
+    name: "art-aconfig-rw-flags-lib",
+    export_include_dirs: ["include"],
+}
+
+// Backs the aconfig flag libraries above on device; with those replaced by
+// fixed values there is nothing to read, and it needs the Rust cxx bridge.
+amend {
+    name: "libartbase",
+    exclude_static_libs: ["libaconfig_storage_read_api_cc"],
+    exclude_whole_static_libs: ["libaconfig_storage_read_api_cc"],
+    target: {
+        // upstream only wires the flag headers for linux and darwin, but
+        // base/flags.cc includes them everywhere except _WIN32
+        bsd: {
+            static_libs: ["art-aconfig-rw-flags-lib"],
+        },
+    },
+}
+
+// libcore's flag accessors; nothing outside the tests reads them.
+cc_library_headers {
+    name: "libcore-aconfig-flags-native-lib",
+}
+
+// art/build/art.go adds these from Go load hooks (globalFlags/hostFlags), so
+// no Android.bp carries them; these are the values of a plain host build.
+// art_defaults also assumes every x86 host has SSE4.2 and POPCNT (true of
+// Google's build machines); our dexdump has to run on any x86 CPU.
+amend {
+    name: "art_defaults",
+    // ART before 30.0.0 gets <jni.h> from Soong's global include list
+    // (libnativehelper/include_jni) instead of jni_headers.
+    header_libs: ["jni_headers"],
+    exclude_cflags: [
+        "-msse4.2",
+        "-mpopcnt",
+    ],
+    cflags: [
+        "-DART_DEFAULT_GC_TYPE_IS_CMC",
+        "-DART_USE_GENERATIONAL_GC=1",
+        "-DART_USE_TLAB=1",
+        "-DART_STACK_OVERFLOW_GAP_arm=8192",
+        "-DART_STACK_OVERFLOW_GAP_arm64=8192",
+        // ART before 30.0.0 still lists MIPS
+        "-DART_STACK_OVERFLOW_GAP_mips=16384",
+        "-DART_STACK_OVERFLOW_GAP_mips64=16384",
+        "-DART_STACK_OVERFLOW_GAP_riscv64=8192",
+        "-DART_STACK_OVERFLOW_GAP_x86=8192",
+        "-DART_STACK_OVERFLOW_GAP_x86_64=8192",
+        "-DART_PAGE_SIZE_AGNOSTIC=1",
+        "-DUSE_D8_DESUGAR=1",
+    ],
+    target: {
+        host: {
+            cflags: [
+                "-DART_FRAME_SIZE_LIMIT=1744",
+                "-DART_BASE_ADDRESS=0x70000000",
+                "-DART_BASE_ADDRESS_MIN_DELTA=(-0x1000000)",
+                "-DART_BASE_ADDRESS_MAX_DELTA=0x1000000",
+            ],
+        },
+    },
+}
+
+// palette_fake.cc is listed for host_linux, darwin and windows only. The BSDs
+// take darwin's variant: the static one for hosts that don't dlopen the system
+// palette library.
+amend {
+    name: "libartpalette",
+    target_alias: {
+        bsd: "darwin",
+    },
+}
+
+// zig's cc driver, which the Linux and BSD builds link with, rejects --exclude-libs,
+// and so does Apple's ld (older releases pass it for every not_windows host).
+// ART passes it only to keep libziparchive's symbols out of what its gtests
+// export (b/264235288).
+amend {
+    name: "art_defaults",
+    target: {
+        linux_glibc: {
+            exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
+        },
+        linux_musl: {
+            exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
+        },
+        darwin: {
+            exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
+        },
+        bsd: {
+            exclude_ldflags: ["-Wl,--exclude-libs=libziparchive.a"],
+        },
+    },
+}

@@ -1,16 +1,8 @@
 #!/usr/bin/env bash
-# Cross-build the Android SDK host tools for one target. All inputs are env vars
-# so CI and `docker run` behave identically. Run fetch-source.sh first.
-#
-#   PLATFORM   linux | bionic | macos | windows | bsd
-#   TARGET     target triple (e.g. x86_64-linux-musl, aarch64-linux-android,
-#              aarch64-freebsd-none, arm-openbsd-eabi)
-#   ARCH       CMAKE_SYSTEM_PROCESSOR (default: triple's arch field)
-#   ROOTDIR    checkout root (default: cwd)
-#   OUT        stripped host tools land here (default: $ROOTDIR/out)
-#   JOBS       parallelism (default: nproc)
-#   NDK_VERSION/NDK_REVISION  official NDK for the bionic clang (bionic only)
-#   ANDROID_PLATFORM  bionic API level (default 24, riscv64 forced 35; bionic only)
+# Cross-build the SDK host tools for one target from the project builder/
+# generates out of the sources' Android.bp. Run fetch-source.sh first.
+# Env: PLATFORM (linux|bionic|macos|windows|bsd), TARGET, ARCH, ROOTDIR, OUT,
+# JOBS, NDK_VERSION/NDK_REVISION, ANDROID_PLATFORM, PLATFORM_TOOLS_VERSION.
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -19,10 +11,13 @@ ARCH="${ARCH:-${TARGET%%-*}}"
 OUT="${OUT:-$ROOTDIR/out}"
 JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
 BUILD_DIR="${BUILD_DIR:-$ROOTDIR/build}"
-EXTRA_PREFIX="${EXTRA_PREFIX:-$ROOTDIR/extrabuild}"
 cd "$ROOTDIR"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+
+# cargo fetches crates for the Rust parts; its default 2 retries give up on a
+# brief crates.io outage.
+export CARGO_NET_RETRY="${CARGO_NET_RETRY:-10}"
 
 # Re-run aria2c on any failure so transient GitHub 5xx recover (older aria2 lacks
 # --retry-on-unknown). Args pass through, e.g. fetch --dir=/tmp -o f.zip URL.
@@ -47,18 +42,9 @@ unpack() {
   esac
 }
 
-# Download URL to ARCHIVE and unpack it into DEST (default: the current
-# directory), re-downloading when the unpack fails. ARCHIVE is removed on the
-# way out. Usage: fetch_unpack URL ARCHIVE [DEST]
-#
-# aria2c's own retries cannot see a truncated download. Endpoints that generate
-# archives on the fly, such as codeload, stream them chunked with
-# no Content-Length (aria2 logs the size as "0B/0B"), so when the far end cuts
-# the stream short there is no expected size to compare against: aria2 prints
-# "(OK):download completed" and exits 0 on a 600KiB truncation of a 200MiB
-# archive, and the damage only surfaces further down as "gzip: stdin:
-# unexpected end of file". Unpacking is the only integrity check available, so
-# the retry has to wrap the download and the unpack together.
+# Download URL to ARCHIVE and unpack it into DEST (default: .). aria2c can't
+# spot a truncated chunked download (it exits 0), and unpacking is the only
+# integrity check, so the retry wraps both. Usage: fetch_unpack URL ARCHIVE [DEST]
 fetch_unpack() {
   local url="$1" archive="$2" dest="${3:-.}" i=0
   mkdir -p "$dest"
@@ -79,7 +65,9 @@ fetch_unpack() {
 # --- toolchain selection (linux/bsd zig, bionic NDK clang, macos osxcross,
 # windows llvm-mingw) --------------------------------------------------------
 CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
+SOONG_VARS=()          # --var flags for the builder's select()s
 EXE_LDFLAGS_EXTRA=""   # appended to CMAKE_EXE_LINKER_FLAGS only (not shared libs)
+CROSS_ASMFLAGS=""      # CMAKE_ASM_FLAGS (the C flags force-include C headers)
 case "$PLATFORM" in
   linux)
     TC=/opt/zig-as-llvm
@@ -89,6 +77,17 @@ case "$PLATFORM" in
     case "$TARGET" in powerpc64le-*-gnu*) export ZIG_TARGET="$TARGET.2.32" ;; esac
     # overlay the musl libc source fixes onto zig's bundled musl (lib is a+w)
     [ -d "$ROOTDIR/patches/musl/zig" ] && cp -R "$ROOTDIR/patches/musl/zig/." /opt/zig/ || true
+    # hexagon: in a static executable, thread-locals compiled with a dynamic
+    # TLS model crash, and zig builds libc++abi as PIC. Its exception state
+    # (__cxa_get_globals) is one, so every throw, std::uncaught_exceptions()
+    # and std::cerr write (unitbuf) died. Give libc++abi's thread-locals the
+    # initial-exec model there, which is what a static link resolves them to.
+    for f in /opt/zig/lib/libcxxabi/src/cxa_exception_storage.cpp /opt/zig/lib/libcxxabi/src/cxa_thread_atexit.cpp; do
+      [ -f "$f" ] && ! grep -q _SDK_TLS_IE "$f" || continue
+      sed -i -e 's/^\(\s*\)static thread_local __cxa_eh_globals eh_globals;/\1_SDK_TLS_IE static thread_local __cxa_eh_globals eh_globals;/' \
+             -e 's/^\(\s*\)__thread \(DtorList\* dtors = nullptr;\|bool dtors_alive = false;\)/\1_SDK_TLS_IE __thread \2/' \
+             -e '0,/^#include/s//#if defined(__hexagon__)\n#define _SDK_TLS_IE __attribute__((tls_model("initial-exec")))\n#else\n#define _SDK_TLS_IE\n#endif\n#include/' "$f"
+    done
     CROSS_CC="$TC/bin/cc"; CROSS_CXX="$TC/bin/c++"; CROSS_LD="$TC/bin/ld"
     CROSS_AR="$TC/bin/ar"; CROSS_RANLIB="$TC/bin/ranlib"
     CROSS_STRIP="$TC/bin/strip"; CROSS_OBJCOPY="$TC/bin/objcopy"
@@ -97,8 +96,9 @@ case "$PLATFORM" in
     # native, dynamic.
     case "$TARGET" in
       *musl*)
-        # host_compat.h supplies GNU/bionic-isms musl omits (e.g. TEMP_FAILURE_RETRY).
-        CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -DANDROID_HOST_MUSL -static"
+        # host_compat.h supplies GNU/bionic-isms musl omits (e.g. TEMP_FAILURE_RETRY);
+        # patches/compat/musl has the <sys/cdefs.h> musl doesn't ship.
+        CROSS_CFLAGS="-Wno-error=date-time -isystem $ROOTDIR/patches/compat/musl -include $ROOTDIR/patches/misc/host_compat.h -Doff64_t=off_t -Dmmap64=mmap -Dlseek64=lseek -Dpread64=pread -Dpwrite64=pwrite -Dftruncate64=ftruncate -Dfseeko64=fseeko -Dftello64=ftello -DANDROID_HOST_MUSL -static"
         CROSS_LDFLAGS="-static" ;;
       *)
         # strlcpy/strlcat: glibc declares them only from 2.38; force-include a shim
@@ -106,19 +106,19 @@ case "$PLATFORM" in
         CROSS_CFLAGS="-Wno-error=date-time -D_GNU_SOURCE=1 -DHAVE_STRLCPY -DHAVE_STRLCAT -include $ROOTDIR/patches/misc/strl_compat.h"
         CROSS_LDFLAGS="-static-libstdc++ -static-libgcc" ;;
     esac
-    # libpng SIMD: Thumb lacks Neon asm, 32-bit/BE PowerPC lacks VSX; fall back to
-    # C. PowerPC uses PNG_POWERPC_VSX=off (a global -D would clash with libpng's own).
+    # Thumb is converted as Soong's arm but has no Neon and takes no assembly;
+    # the assembler needs the same defines, or BoringSSL's ARM-mode .S files
+    # assemble as Thumb. (The CPUs Soong lacks altogether are handled in
+    # builder/overlay/global.bp.)
     case "$TARGET" in
       thumb-*|thumbeb-*)
         CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
-        CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
-      powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
+        CROSS_ASMFLAGS="-DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
     esac
     # mips64 n64 and powerpc64 pick asm-generic/int-l64.h, typing __s64/__u64 as
-    # 'long' and clashing with e2fsprogs; glibc only. See
-    # patches/misc/force-int-ll64.h.
+    # 'long' and clashing with e2fsprogs. See patches/misc/force-int-ll64.h.
     case "$TARGET" in
-      mips64-*gnuabi64|mips64el-*gnuabi64|powerpc64-*-gnu*|powerpc64le-*-gnu*)
+      mips64-*abi64|mips64el-*abi64|powerpc64-*|powerpc64le-*)
         CROSS_CFLAGS="$CROSS_CFLAGS -include $ROOTDIR/patches/misc/force-int-ll64.h" ;;
     esac
     # x32: force local-exec TLS (lld can't relax R_X86_64_GOTTPOFF here; static so it fits).
@@ -147,7 +147,7 @@ case "$PLATFORM" in
     CROSS_LD="$TC/bin/ld"; CROSS_AR="$TC/bin/llvm-ar"; CROSS_RANLIB="$TC/bin/llvm-ranlib"
     CROSS_STRIP="$TC/bin/llvm-strip"; CROSS_OBJCOPY="$TC/bin/llvm-objcopy"
     SYSTEM_NAME=Linux
-    # reallocarray is API 29+ in bionic; host_compat.h shims it on lower APIs.
+    # host_compat.h fills in what bionic below the newest API level lacks.
     CROSS_CFLAGS="-Wno-error=date-time -fno-sanitize=undefined -include $ROOTDIR/patches/misc/host_compat.h -static"
     # r30's libc.a carries Rust's libstd, so rust_eh_personality arrives both
     # from there and from our own Rust shim in libtermuxadb.a. Both are the same
@@ -177,7 +177,8 @@ case "$PLATFORM" in
       ( cd "$ROOTDIR/patches/termux/libtermuxadb" && cargo build --release --target "$RUST_TARGET" )
       TERMUXADB_A="$ROOTDIR/patches/termux/libtermuxadb/target/$RUST_TARGET/release/libtermuxadb.a"
       [ -f "$TERMUXADB_A" ] || { echo "termux shim: $TERMUXADB_A not built" >&2; exit 1; }
-      CROSS_CMAKE_EXTRA+=(-DTERMUX_USB_SHIM=ON "-DTERMUXADB_LIB=$TERMUXADB_A")
+      SOONG_VARS+=(--var sdk:termux_usb=true)
+      CROSS_CMAKE_EXTRA+=("-DTERMUXADB_LIB=$TERMUXADB_A")
     fi
     ;;
   bsd)
@@ -198,7 +199,7 @@ case "$PLATFORM" in
     esac
     # host_compat.h supplies glibc/bionic-isms BSDs omit. XML_DEV_URANDOM: expat
     # can't link-test arc4random_buf under the zig BSD sysroots, so use /dev/urandom.
-    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat -DXML_DEV_URANDOM"
+    CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -isystem $ROOTDIR/patches/bsd-compat -DXML_DEV_URANDOM -Dfseeko64=fseeko -Dftello64=ftello"
     CROSS_LDFLAGS="-static-libstdc++ -static-libgcc"
     # OpenBSD's zig sysroot lacks <dev/usb/*>, so libusb's openbsd_usb.c needs the
     # vendored usb.h -- scoped, or it would shadow FreeBSD's/NetBSD's real one.
@@ -209,8 +210,7 @@ case "$PLATFORM" in
     case "$TARGET" in
       thumb-*|thumbeb-*)
         CROSS_CFLAGS="$CROSS_CFLAGS -DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM"
-        CROSS_CMAKE_EXTRA+=(-DOPENSSL_NO_ASM=ON) ;;
-      powerpc-*|powerpc64-*)    CROSS_CMAKE_EXTRA+=(-DPNG_POWERPC_VSX=off) ;;
+        CROSS_ASMFLAGS="-DPNG_ARM_NEON_OPT=0 -DOPENSSL_NO_ASM" ;;
     esac
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
@@ -238,6 +238,10 @@ case "$PLATFORM" in
     SYSTEM_NAME=Darwin
     CROSS_CFLAGS="-Wno-error=date-time -include $ROOTDIR/patches/misc/host_compat.h -D_LIBCPP_DISABLE_AVAILABILITY"
     CROSS_LDFLAGS=""
+    # osxcross' LLVM leaves arm64e objects without a pointer-auth ABI version,
+    # which ld64 notes for every object it links against the SDK's versioned
+    # libraries; the result is the same unversioned binary either way.
+    [ "$OSX_ARCH" = arm64e ] && CROSS_LDFLAGS="-Wl,-w"
     # Point CMake's Apple support at the osxcross SDK + pin arch/deployment target.
     SDKROOT="$(ls -d "$TC/SDK/MacOSX"*.sdk 2>/dev/null | head -n1 || true)"
     CROSS_CMAKE_EXTRA=(-DCMAKE_OSX_ARCHITECTURES="$OSX_ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
@@ -269,9 +273,13 @@ case "$PLATFORM" in
     # aarch64/arm64ec drop only --whole-archive: llvm-mingw builds that winpthreads
     # -marm64x and lld rejects the ARM64X members it force-loads. -Bstatic stays, or
     # -lwinpthread would pick libwinpthread.dll.a and make-sdk.sh deletes that DLL.
+    # It also stays on to the end: modules linked with -static (mke2fs, make_f2fs,
+    # newer aapt2) make clang drop its own -Bstatic around -lc++, which under a
+    # trailing -Bdynamic picked libc++.dll.a. Windows' own libraries are .a
+    # import archives, so they link the same either way.
     case "$TARGET" in
-      aarch64-*|arm64ec-*) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic" ;;
-      *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive,-Bdynamic" ;;
+      aarch64-*|arm64ec-*) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic -lwinpthread" ;;
+      *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive" ;;
     esac
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
@@ -320,6 +328,13 @@ case "$PLATFORM" in
     esac ;;
 esac
 
+# Older adb releases predate the Rust bridge.
+MDNS_CRATE="$ROOTDIR/src/adb/client/adbmdns"
+if [ -n "$ADBMDNS_RUST_TARGET" ] && [ ! -f "$MDNS_CRATE/Cargo.toml" ]; then
+  log "adb mDNS: no Rust bridge in these sources -> openscreen"
+  ADBMDNS_RUST_TARGET=""
+fi
+
 if [ -n "$ADBMDNS_RUST_TARGET" ]; then
   RUST_SYSROOT="$(rustc --print sysroot 2>/dev/null || echo /opt/rust)"
   if [ ! -d "$RUST_SYSROOT/lib/rustlib/$ADBMDNS_RUST_TARGET" ]; then
@@ -331,7 +346,6 @@ fi
 if [ -n "$ADBMDNS_RUST_TARGET" ]; then
   export CARGO_HOME="${CARGO_HOME:-$ROOTDIR/.cargo}"
   export "CARGO_TARGET_$(echo "$ADBMDNS_RUST_TARGET" | tr 'a-z-' 'A-Z_')_LINKER=$CROSS_CC"
-  MDNS_CRATE="$ROOTDIR/src/adb/client/adbmdns"
   log "Building adb mDNS bridge / libzeroconf ($ADBMDNS_RUST_TARGET)"
   # *-pc-windows-gnu needs <triple>-dlltool on PATH. Only prepend for windows:
   # zig-as-llvm's bare cc/c++ would otherwise shadow the host compiler cargo uses
@@ -340,117 +354,78 @@ if [ -n "$ADBMDNS_RUST_TARGET" ]; then
   ( cd "$MDNS_CRATE" && PATH="$MDNS_PATH" cargo rustc --release --target "$ADBMDNS_RUST_TARGET" --crate-type staticlib )
   ADBMDNS_A="$MDNS_CRATE/target/$ADBMDNS_RUST_TARGET/release/libzeroconf.a"
   [ -f "$ADBMDNS_A" ] || { echo "adb mDNS bridge: $ADBMDNS_A not built" >&2; exit 1; }
-  CROSS_CMAKE_EXTRA+=(-DHAVE_RUST_MDNS=ON "-DADBMDNS_LIB=$ADBMDNS_A")
+  SOONG_VARS+=(--var sdk:rust_mdns=true)
+  CROSS_CMAKE_EXTRA+=("-DADBMDNS_LIB=$ADBMDNS_A")
 else
   log "adb mDNS: no Rust std for $TARGET -> openscreen fallback"
-  CROSS_CMAKE_EXTRA+=(-DHAVE_RUST_MDNS=OFF)
 fi
 
-# --- native protoc: host-compiler build (invoked at codegen time) -----------
-PROTOC="$ROOTDIR/src/protobuf/build/protoc"
-if [ ! -f "$PROTOC" ]; then
-  log "Building native protoc"
-  ( cd "$ROOTDIR/src/protobuf/third_party"
-    [ -d abseil-cpp ] || git clone https://android.googlesource.com/platform/external/abseil-cpp.git -b "${TAG:-master}" --recursive
-    [ -d jsoncpp ]    || git clone https://android.googlesource.com/platform/external/jsoncpp.git    -b "${TAG:-master}" --recursive )
-  patch -up1 -d "$ROOTDIR" < "$ROOTDIR/patches/protobuf_CMakeLists.txt.patch" || true
-  rm -rf "$ROOTDIR/src/protobuf/build"
-  cmake -S "$ROOTDIR/src/protobuf" -B "$ROOTDIR/src/protobuf/build" -GNinja -Dprotobuf_BUILD_TESTS=OFF
-  ninja -C "$ROOTDIR/src/protobuf/build" -j"$JOBS"
-fi
-
-# --- extra deps: zlib + bzip2 static archives, cross-compiled. -static (musl
-# only; zig won't statically link glibc/bsd libc) affects only test binaries ---
-case "$TARGET" in
-  *musl*) DEP_STATIC="-static" ;;
-  *)      DEP_STATIC="" ;;
-esac
-mkdir -p "$EXTRA_PREFIX"
-if [ ! -f "$EXTRA_PREFIX/lib/libz.a" ]; then
-  log "Building zlib (static, $TARGET)"
-  # MIPS -mabicalls needs -fPIC (else a clang warning trips zlib's configure).
-  # -fno-sanitize=undefined: libz.a is prebuilt, so the ubsan runtime isn't linked
-  # in, leaving __ubsan_handle_* undefined.
-  case "$TARGET" in
-    mips*|mipsel*) ZLIB_CFLAGS="-fPIC -fno-sanitize=undefined" ;;
-    *)             ZLIB_CFLAGS="-fno-sanitize=undefined" ;;
+# --- host protoc: AOSP's own aprotoc from the same protobuf tree -------------
+# Generated code must match the libprotobuf it links against, so build the
+# protoc of these very sources, with the build machine's clang.
+HOST_BUILD="$BUILD_DIR/host"
+PROTOC="$HOST_BUILD/cmake/bin/aprotoc"
+if [ ! -x "$PROTOC" ]; then
+  log "Building host protoc (aprotoc)"
+  case "$(uname -m)" in
+    x86_64)        HOST_ARCH=x86_64 ;;
+    aarch64|arm64) HOST_ARCH=arm64 ;;
+    *)             HOST_ARCH="$(uname -m)" ;;
   esac
-  ( cd "$ROOTDIR"
-    fetch_unpack https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.xz /tmp/zlib-1.3.1.tar.xz
-    cd zlib-1.3.1
-    CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$ZLIB_CFLAGS" ./configure --prefix="$EXTRA_PREFIX" --static
-    make -j"$JOBS" install )
-fi
-if [ ! -f "$EXTRA_PREFIX/lib/libbz2.a" ]; then
-  log "Building bzip2 (static, $TARGET)"
-  ( cd "$ROOTDIR"
-    fetch_unpack https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz /tmp/bzip2-1.0.8.tar.gz
-    cd bzip2-1.0.8
-    make CC="$CROSS_CC" AR="$CROSS_AR" RANLIB="$CROSS_RANLIB" CFLAGS="$DEP_STATIC" LDFLAGS="$DEP_STATIC" libbz2.a
-    cp -f libbz2.a "$EXTRA_PREFIX/lib/"
-    cp -f bzlib.h "$EXTRA_PREFIX/include/" )
+  python3 -m builder --root "$ROOTDIR" --os linux_glibc --arch "$HOST_ARCH" \
+    --tools aprotoc --var sdk:host_protoc=true --out "$HOST_BUILD/generated"
+  cmake -GNinja -S "$HOST_BUILD/generated" -B "$HOST_BUILD/cmake" \
+    -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_ASM_COMPILER=clang
+  ninja -C "$HOST_BUILD/cmake" -j"$JOBS" aprotoc
 fi
 
 # --- the SDK host tools -----------------------------------------------------
-# TARGET_OS maps PLATFORM to the AOSP Android.bp os axis (the only way CMake
-# tells android from a Linux host, since bionic sets CMAKE_SYSTEM_NAME=Linux).
-case "$PLATFORM" in
-  bionic)  TARGET_OS=android ;;
-  macos)   TARGET_OS=darwin ;;
-  windows) TARGET_OS=windows ;;
-  bsd)     TARGET_OS=bsd ;;
-  *)       TARGET_OS=linux ;;
-esac
+[ -n "${PLATFORM_TOOLS_VERSION:-}" ] && SOONG_VARS+=(--var "sdk:platform_tools_version=$PLATFORM_TOOLS_VERSION")
+
+log "Generating CMake from Android.bp ($PLATFORM / $TARGET)"
+python3 -m builder --root "$ROOTDIR" --platform "$PLATFORM" --triple "$TARGET" \
+  "${SOONG_VARS[@]}" --out "$BUILD_DIR/generated"
 
 log "Configuring SDK ($PLATFORM / $TARGET)"
+# No CMAKE_BUILD_TYPE: the generated project carries Soong's -O2 and
+# hardening flags (builder/overlay/global.bp).
 cmake -GNinja \
-  -B "$BUILD_DIR" \
+  -S "$BUILD_DIR/generated" \
+  -B "$BUILD_DIR/cmake" \
   -DCMAKE_SYSTEM_NAME="$SYSTEM_NAME" \
-  -DTARGET_OS="$TARGET_OS" \
   -DCMAKE_CROSSCOMPILING=True \
   -DCMAKE_SYSTEM_PROCESSOR="$ARCH" \
-  -DCMAKE_PREFIX_PATH="$EXTRA_PREFIX" \
   -DCMAKE_C_COMPILER="$CROSS_CC" \
   -DCMAKE_CXX_COMPILER="$CROSS_CXX" \
   -DCMAKE_ASM_COMPILER="$CROSS_CC" \
   -DCMAKE_LINKER="$CROSS_LD" \
   -DCMAKE_OBJCOPY="$CROSS_OBJCOPY" \
   -DCMAKE_AR="$CROSS_AR" \
+  -DCMAKE_RANLIB="$CROSS_RANLIB" \
   -DCMAKE_STRIP="$CROSS_STRIP" \
   -DCMAKE_C_FLAGS="$CROSS_CFLAGS" \
   -DCMAKE_CXX_FLAGS="$CROSS_CFLAGS" \
+  -DCMAKE_ASM_FLAGS="$CROSS_ASMFLAGS" \
   -DCMAKE_EXE_LINKER_FLAGS="$CROSS_LDFLAGS $EXE_LDFLAGS_EXTRA" \
   -DCMAKE_SHARED_LINKER_FLAGS="$CROSS_LDFLAGS" \
-  -Dprotobuf_BUILD_TESTS=OFF \
-  -DABSL_PROPAGATE_CXX_STD=ON \
-  -DCMAKE_BUILD_TYPE=MinSizeRel \
-  -DPROTOC_PATH="$PROTOC" \
+  -DPROTOC="$PROTOC" \
   "${CROSS_CMAKE_EXTRA[@]}"
 
-# Vendored subprojects (protobuf/boringssl/...) define codegen commands with no
-# COMMENT, so their ninja edges render as blank "[n/m]" lines (empty $DESC).
-# Relabel the CUSTOM_COMMAND rule to fall back to the output path so the build
-# log has no empty descriptions.
-find "$BUILD_DIR" \( -name build.ninja -o -name rules.ninja \) -type f -print0 \
-  | xargs -0 -r sed -i 's/^  description = \$DESC$/  description = Generating $out/'
-
 log "Building"
-ninja -C "$BUILD_DIR" -j"$JOBS"
+ninja -C "$BUILD_DIR/cmake" -j"$JOBS"
 
 # --- strip + stage ----------------------------------------------------------
+# Every executable lands flat in bin/ (aapt2, adb, adb.exe, ...), which is
+# where make-sdk.sh looks for them.
 log "Stripping host tools"
-tools="aapt aapt2 aidl zipalign dexdump split-select \
-       adb fastboot sqlite3 etc1tool hprof-conv e2fsdroid sload_f2fs mke2fs \
-       make_f2fs make_f2fs_casefold dmtracedump \
-       veridex"
-for t in $tools; do
-  # windows tools are $t.exe; everything else is bare $t
-  for f in "$BUILD_DIR/bin/$t" "$BUILD_DIR/bin/$t.exe"; do
-    [ -f "$f" ] && "$CROSS_STRIP" "$f" || true
-  done
+for f in "$BUILD_DIR/cmake/bin"/*; do
+  # cctools strip notes that stripping invalidates the (ad-hoc) code signature
+  # of every Mach-O it touches; drop just that line.
+  [ -f "$f" ] && "$CROSS_STRIP" "$f" 2> >(grep -v 'invalidate the code signature' >&2) || true
 done
 
 mkdir -p "$OUT"
 rm -rf "$OUT/bin-$TARGET"
-cp -R "$BUILD_DIR/bin" "$OUT/bin-$TARGET"
+cp -R "$BUILD_DIR/cmake/bin" "$OUT/bin-$TARGET"
 log "Done -> $OUT/bin-$TARGET"

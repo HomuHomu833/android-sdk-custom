@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
-# Splice the freshly cross-built host tools into Google's official Android SDK
-# (build-tools + platform-tools) and archive the result.
-#
-#   TARGET               target triple (names the artifact, locates the binaries)
-#   BUILT_BIN            dir of built host tools (default: $OUT/bin-$TARGET)
-#   BUILD_TOOLS_VERSION  sdkmanager build-tools package (default: 37.0.0)
-#   CMDLINE_TOOLS_URL    commandline-tools zip (default: linux 13114758)
-#   ROOTDIR              work dir (default: cwd)
-#   DEST                 where the archive is written (default: $ROOTDIR)
-#                        windows -> .7z, everything else -> .tar.xz
+# Splice the built tools into Google's platform-tools of the sources' revision
+# and the newest build-tools of its major, then archive (.7z on windows).
+# Env: TARGET, PLATFORM, BUILT_BIN, PLATFORM_TOOLS_VERSION, BUILD_TOOLS_VERSION,
+# CMDLINE_TOOLS_URL, ROOTDIR, DEST.
 set -euo pipefail
 
 ROOTDIR="${ROOTDIR:-$PWD}"
@@ -16,7 +10,8 @@ ROOTDIR="${ROOTDIR:-$PWD}"
 PLATFORM="${PLATFORM:-linux}"
 OUT="${OUT:-$ROOTDIR/out}"
 BUILT_BIN="${BUILT_BIN:-$OUT/bin-$TARGET}"
-BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-37.0.0}"
+PLATFORM_TOOLS_VERSION="${PLATFORM_TOOLS_VERSION:-}"
+BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION:-}"
 CMDLINE_TOOLS_URL="${CMDLINE_TOOLS_URL:-https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip}"
 DEST="${DEST:-$ROOTDIR}"
 cd "$ROOTDIR"
@@ -46,18 +41,9 @@ unpack() {
   esac
 }
 
-# Download URL to ARCHIVE and unpack it into DEST (default: the current
-# directory), re-downloading when the unpack fails. ARCHIVE is removed on the
-# way out. Usage: fetch_unpack URL ARCHIVE [DEST]
-#
-# aria2c's own retries cannot see a truncated download. Endpoints that generate
-# archives on the fly, such as codeload, stream them chunked with
-# no Content-Length (aria2 logs the size as "0B/0B"), so when the far end cuts
-# the stream short there is no expected size to compare against: aria2 prints
-# "(OK):download completed" and exits 0 on a 600KiB truncation of a 200MiB
-# archive, and the damage only surfaces further down as "gzip: stdin:
-# unexpected end of file". Unpacking is the only integrity check available, so
-# the retry has to wrap the download and the unpack together.
+# Download URL to ARCHIVE and unpack it into DEST (default: .). aria2c can't
+# spot a truncated chunked download (it exits 0), and unpacking is the only
+# integrity check, so the retry wraps both. Usage: fetch_unpack URL ARCHIVE [DEST]
 fetch_unpack() {
   local url="$1" archive="$2" dest="${3:-.}" i=0
   mkdir -p "$dest"
@@ -79,12 +65,20 @@ fetch_unpack() {
 
 # REPO_OS_OVERRIDE makes sdkmanager fetch a specific OS's packages so each
 # platform gets the matching SDK to splice into. bionic/BSD reuse the Linux SDK.
+# PT_OS: how Google's platform-tools zips name the OS (win from 35.0.1 on).
 case "$PLATFORM" in
-  windows) REPO_OS_OVERRIDE=windows ;;
-  macos)   REPO_OS_OVERRIDE=macosx ;;
-  *)       REPO_OS_OVERRIDE=linux ;;
+  windows) REPO_OS_OVERRIDE=windows; PT_OS="win windows" ;;
+  macos)   REPO_OS_OVERRIDE=macosx;  PT_OS=darwin ;;
+  *)       REPO_OS_OVERRIDE=linux;   PT_OS=linux ;;
 esac
 export REPO_OS_OVERRIDE
+
+# The platform-tools revision the sources declare: what adb/fastboot --version
+# report, and the official package the tools go into.
+PT_TEMPLATE="$ROOTDIR/src/development/sdk/plat_tools_source.prop_template"
+if [ -z "$PLATFORM_TOOLS_VERSION" ] && [ -f "$PT_TEMPLATE" ]; then
+  PLATFORM_TOOLS_VERSION="$(sed -n 's/^Pkg\.Revision=//p' "$PT_TEMPLATE" | tr -d '\r')"
+fi
 
 # sdkmanager runs on the linux cmdline-tools, but the copy we *ship* must match
 # $PLATFORM. Derive that zip from CMDLINE_TOOLS_URL; SHIP_CMDLINE_TOOLS_URL pins
@@ -97,15 +91,53 @@ esac
 SHIP_CMDLINE_TOOLS_URL="${SHIP_CMDLINE_TOOLS_URL:-${CMDLINE_TOOLS_URL/commandlinetools-linux-/commandlinetools-$CMDLINE_TOOLS_OS-}}"
 
 # --- fetch the official SDK (build-tools + platform-tools) -------------------
-log "Setting up host Android SDK (build-tools $BUILD_TOOLS_VERSION)"
 HOST_SDK="$ROOTDIR/android-sdk"
+SDKMANAGER="$HOST_SDK/cmdline-tools/bin/sdkmanager"
 rm -rf "$HOST_SDK"; mkdir -p "$HOST_SDK"
-( cd "$HOST_SDK"
-  fetch_unpack "$CMDLINE_TOOLS_URL" "$PWD/commandlinetools.zip"
-  # Bounded "y" stream, not `yes`: under pipefail `yes` takes SIGPIPE (141) when
-  # sdkmanager closes stdin, aborting the script.
-  printf 'y\n%.0s' {1..100} | cmdline-tools/bin/sdkmanager --sdk_root=. --licenses
-  cmdline-tools/bin/sdkmanager --sdk_root=. "build-tools;$BUILD_TOOLS_VERSION" "platform-tools" )
+fetch_unpack "$CMDLINE_TOOLS_URL" "$HOST_SDK/commandlinetools.zip" "$HOST_SDK"
+# Bounded "y" stream, not `yes`: under pipefail `yes` takes SIGPIPE (141) when
+# sdkmanager closes stdin, aborting the script.
+printf 'y\n%.0s' {1..100} | "$SDKMANAGER" --sdk_root="$HOST_SDK" --licenses
+
+# platform-tools: Google keeps every released revision's zip, while sdkmanager
+# only offers the latest. Revisions that never shipped (or a tag without the
+# template) get the latest.
+PT_URL=""
+for os_name in $PT_OS; do
+  url="https://dl.google.com/android/repository/platform-tools_r${PLATFORM_TOOLS_VERSION}-${os_name}.zip"
+  if [ -n "$PLATFORM_TOOLS_VERSION" ] \
+     && aria2c --dry-run=true --console-log-level=error --max-tries=3 "$url" >/dev/null 2>&1; then
+    PT_URL="$url"; break
+  fi
+done
+if [ -n "$PT_URL" ]; then
+  PT_LATEST=""; PT_DESC="$PLATFORM_TOOLS_VERSION"
+else
+  log "No official platform-tools ${PLATFORM_TOOLS_VERSION:-(unknown)} for $PT_OS; using the latest"
+  PT_LATEST=platform-tools; PT_DESC=latest
+fi
+
+# build-tools: sdkmanager lists them all. Take the newest stable one of the
+# platform-tools major (same AOSP generation as the aapt2/aidl/dexdump built
+# here), else the newest stable overall.
+if [ -z "$BUILD_TOOLS_VERSION" ]; then
+  BT_AVAIL="$("$SDKMANAGER" --sdk_root="$HOST_SDK" --list 2>/dev/null \
+    | sed -n 's/^ *build-tools;\([0-9][0-9.]*\) .*/\1/p' | sort -uV)"
+  BUILD_TOOLS_VERSION="$(printf '%s\n' "$BT_AVAIL" | grep "^${PLATFORM_TOOLS_VERSION%%.*}\." | tail -n1 || true)"
+  [ -n "$BUILD_TOOLS_VERSION" ] || BUILD_TOOLS_VERSION="$(printf '%s\n' "$BT_AVAIL" | tail -n1)"
+fi
+[ -n "$BUILD_TOOLS_VERSION" ] || { echo "no build-tools revision to install" >&2; exit 1; }
+
+log "Setting up the official SDK: build-tools $BUILD_TOOLS_VERSION, platform-tools $PT_DESC"
+# A download cut short leaves sdkmanager an unreadable zip ("unknown archive");
+# try again a few times.
+for n in 1 2 3 4; do
+  "$SDKMANAGER" --sdk_root="$HOST_SDK" "build-tools;$BUILD_TOOLS_VERSION" $PT_LATEST && break
+  [ "$n" = 4 ] && exit 1
+  log "sdkmanager failed; retry $n/3"
+  sleep $((n * 15))
+done
+[ -n "$PT_LATEST" ] || fetch_unpack "$PT_URL" "$HOST_SDK/platform-tools.zip" "$HOST_SDK"
 
 # --- splice our ELF host tools over the official ones -----------------------
 log "Splicing custom host tools into the SDK"
@@ -121,17 +153,61 @@ splice() {
 }
 BT="$HOST_SDK/build-tools/$BUILD_TOOLS_VERSION"
 splice "$BT"
-splice "$HOST_SDK/platform-tools"
+# Every build-tools release has all the build-tools we build, so the rest are
+# platform-tools: install them even where the (latest) zip no longer has them.
+for f in "$BUILT_BIN"/*; do
+  bname="$(basename "$f")"
+  [ -f "$f" ] && [ ! -e "$BT/$bname" ] || continue
+  echo "Installing $bname"
+  cp "$f" "$HOST_SDK/platform-tools/$bname"
+done
 
 # --- prune host-only / renderscript leftovers -------------------------------
 rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
 rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscript*
 
 # --- drop now-useless DLLs (windows base) -----------------------------------
-# AdbWin*Api (we use libusb), libwinpthread-1 (static), RenderScript libs (pruned above).
+# AdbWin*Api (linked into adb/fastboot), libwinpthread-1 (static), RenderScript.
 rm -f "$HOST_SDK/platform-tools/AdbWinApi.dll" "$HOST_SDK/platform-tools/AdbWinUsbApi.dll"
 rm -f "$BT/libbcc.dll" "$BT/libbcinfo.dll" "$BT/libclang_android.dll" "$BT/libLLVM_android.dll"
 find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true
+
+# --- official binaries we did not rebuild -----------------------------------
+# Anything native still at the top of either package is Google's own build
+# (x86-64, and missing the lib64 pruned above), so it would not run on most
+# targets. Ship ours or nothing: drop it, and say so.
+drop_unreplaced() {
+  find "$1" -maxdepth 1 -type f | while IFS= read -r file; do
+    [ -f "$BUILT_BIN/$(basename "$file")" ] && continue
+    if file "$file" | grep -qE 'ELF|Mach-O|PE32'; then
+      echo "Dropping $(basename "$file"): official build, not rebuilt for $TARGET"
+      rm -f "$file"
+    fi
+  done
+}
+drop_unreplaced "$BT"
+drop_unreplaced "$HOST_SDK/platform-tools"
+
+# --- windows: every DLL a binary imports must be Windows' own or shipped ----
+# The tools are meant to need no mingw runtime DLLs (libc++, libunwind,
+# winpthread are linked statically); one that slips through as an import makes
+# the .exe fail to start, so stop the build instead of shipping it.
+if [ "$PLATFORM" = windows ]; then
+  objdump=/opt/llvm-mingw/bin/llvm-objdump
+  missing=$(find "$HOST_SDK" -type f \( -iname '*.exe' -o -iname '*.dll' \) | while IFS= read -r bin; do
+    "$objdump" -p "$bin" 2>/dev/null | awk '/DLL Name:/ {print tolower($3)}' | while read -r dll; do
+      case $dll in
+        api-ms-win-*|ext-ms-*|kernel32.dll|kernelbase.dll|ntdll.dll|ucrtbase.dll|msvcrt.dll|advapi32.dll|user32.dll|gdi32.dll|shell32.dll|ole32.dll|oleaut32.dll|ws2_32.dll|wsock32.dll|mswsock.dll|setupapi.dll|cfgmgr32.dll|winusb.dll|userenv.dll|iphlpapi.dll|bcrypt.dll|bcryptprimitives.dll|crypt32.dll|secur32.dll|shlwapi.dll|psapi.dll|dbghelp.dll|imagehlp.dll|version.dll|wlanapi.dll|dnsapi.dll|rpcrt4.dll|netapi32.dll|powrprof.dll|winmm.dll|comdlg32.dll|normaliz.dll|synchronization.dll|uuid.dll|windowscodecs.dll|opengl32.dll) ;;
+        *) find "$(dirname "$bin")" -maxdepth 1 -iname "$dll" | grep -q . || echo "$(basename "$bin") needs $dll" ;;
+      esac
+    done
+  done)
+  if [ -n "$missing" ]; then
+    echo "Windows binaries import DLLs the package does not ship:" >&2
+    echo "$missing" >&2
+    exit 1
+  fi
+fi
 
 # --- convert the bash launcher scripts to POSIX sh --------------------------
 # Unix-host SDKs ship bash launchers; windows ships .bat, so skip there.
@@ -156,6 +232,10 @@ if [ "$SHIP_CMDLINE_TOOLS_URL" != "$CMDLINE_TOOLS_URL" ]; then
 fi
 
 # --- archive ----------------------------------------------------------------
+# Ad-hoc (re)sign what strip broke; Apple Silicon kills unsigned binaries.
+if [ "$PLATFORM" = macos ]; then
+  "$(dirname -- "$0")/macos-sign.sh" "$ROOTDIR/android-sdk"
+fi
 mkdir -p "$DEST"
 if [ "$PLATFORM" = windows ]; then
   ARCHIVE="$DEST/android-sdk-$TARGET.7z"

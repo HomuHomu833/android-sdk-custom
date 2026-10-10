@@ -19,7 +19,7 @@ Runtime also requires Termux + Termux:API (the `termux-usb` binary on `PATH`).
 
 Sourced from https://github.com/nohajc/vendor-adb-patched (tag 35.0.2):
 - `libtermuxadb/` — Rust staticlib exposing the `termuxadb_*` C shims (built by
-  scripts/build.sh, linked by the adb/fastboot CMake files).
+  scripts/build.sh, linked into adb/fastboot by builder/overlay/termux.bp).
 - `termux_adb.h` / `termux_fastboot.h` — C++ wrappers (namespace `termuxadb`)
   over those shims, applied to the adb/fastboot USB enumeration paths by
   scripts/patch-source.sh. Ported to the 36.x sources this repo builds.
