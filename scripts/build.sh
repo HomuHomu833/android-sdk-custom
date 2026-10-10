@@ -77,6 +77,17 @@ case "$PLATFORM" in
     case "$TARGET" in powerpc64le-*-gnu*) export ZIG_TARGET="$TARGET.2.32" ;; esac
     # overlay the musl libc source fixes onto zig's bundled musl (lib is a+w)
     [ -d "$ROOTDIR/patches/musl/zig" ] && cp -R "$ROOTDIR/patches/musl/zig/." /opt/zig/ || true
+    # hexagon: in a static executable, thread-locals compiled with a dynamic
+    # TLS model crash, and zig builds libc++abi as PIC. Its exception state
+    # (__cxa_get_globals) is one, so every throw, std::uncaught_exceptions()
+    # and std::cerr write (unitbuf) died. Give libc++abi's thread-locals the
+    # initial-exec model there, which is what a static link resolves them to.
+    for f in /opt/zig/lib/libcxxabi/src/cxa_exception_storage.cpp /opt/zig/lib/libcxxabi/src/cxa_thread_atexit.cpp; do
+      [ -f "$f" ] && ! grep -q _SDK_TLS_IE "$f" || continue
+      sed -i -e 's/^\(\s*\)static thread_local __cxa_eh_globals eh_globals;/\1_SDK_TLS_IE static thread_local __cxa_eh_globals eh_globals;/' \
+             -e 's/^\(\s*\)__thread \(DtorList\* dtors = nullptr;\|bool dtors_alive = false;\)/\1_SDK_TLS_IE __thread \2/' \
+             -e '0,/^#include/s//#if defined(__hexagon__)\n#define _SDK_TLS_IE __attribute__((tls_model("initial-exec")))\n#else\n#define _SDK_TLS_IE\n#endif\n#include/' "$f"
+    done
     CROSS_CC="$TC/bin/cc"; CROSS_CXX="$TC/bin/c++"; CROSS_LD="$TC/bin/ld"
     CROSS_AR="$TC/bin/ar"; CROSS_RANLIB="$TC/bin/ranlib"
     CROSS_STRIP="$TC/bin/strip"; CROSS_OBJCOPY="$TC/bin/objcopy"

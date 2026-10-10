@@ -108,6 +108,14 @@ f=src/boringssl/src/crypto/fipsmodule/rand/urandom.c
 sed -i 's/^#define YYSTYPE PERMSTYPE$/#define YYSTYPE perm::parser::semantic_type/' \
   src/aidl/permission/lexer.ll
 
+# aidl's import-dir check compares the input file's base directory as given
+# (aidl/) with the -I dirs, which Options canonicalizes with '\' on Windows
+# (aidl\). Compare them with the separators unified there.
+f=src/aidl/aidl.cpp
+if grep -q '^\s*return basedir == i;$' "$f" 2>/dev/null; then
+  sed -i 's/^\(\s*\)return basedir == i;$/#ifdef _WIN32\n\1std::string a(basedir), b(i);\n\1std::replace(a.begin(), a.end(), '"'\/'"', '"'\\\\\\\\'"');\n\1std::replace(b.begin(), b.end(), '"'\/'"', '"'\\\\\\\\'"');\n\1return a == b;\n#else\n&\n#endif/' "$f"
+fi
+
 # diagnose_usb.cpp (platform-tools 32.0.0 and earlier) calls GNU
 # group_member(), which musl lacks; use patches/sources/diagnose_usb_in_group.inc.
 f=src/core/diagnose_usb/diagnose_usb.cpp
