@@ -934,6 +934,13 @@ def dexfile():
         t = t.replace('const size_t size = container->End() - base;\n',
                       'const size_t size = container->End() - base;\n'
                       '  SdkSwapDexToHostIfNeeded(base, size);\n', 1)
+    elif re.search(r'DexFileLoader::OpenCommon\(std::shared_ptr<DexFileContainer> container,\n\s*const uint8_t\* base,\n\s*size_t size,', t):
+        # 34.0.3 - 34.0.5: the container overload takes base/size directly and
+        # the legacy (base, size, data_base, ...) one is left unused; hook the
+        # one the loader actually calls.
+        t, n = re.subn(r'(DexFileLoader::OpenCommon\(std::shared_ptr<DexFileContainer> container,\n\s*const uint8_t\* base,\n\s*size_t size,[^{]*\{\n)',
+                       r'\1  SdkSwapDexToHostIfNeeded(base, size);\n', t, count=1)
+        need(n == 1, 'dex: hooked into OpenCommon')
     else:
         t, n = re.subn(r'(DexFileLoader::OpenCommon\(const uint8_t\* base,\n\s*size_t size,[^{]*\{\n)',
                        r'\1  SdkSwapDexToHostIfNeeded(base, size);\n', t, count=1)
