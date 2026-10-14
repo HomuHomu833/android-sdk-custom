@@ -332,6 +332,21 @@ sed -i -e 's@^#if defined(__x86_64__)$@#if defined(__x86_64__) \&\& !defined(__a
     src/abseil-cpp/absl/base/internal/unscaledcycleclock.h \
     src/abseil-cpp/absl/base/internal/unscaledcycleclock.cc
 
+# sqlite3.c (34.0.5 and older at least) takes any __ppc__ for big-endian; clang
+# defines __ppc__ on ppc64le too, so the page format came out byte-swapped:
+# every on-disk or in-memory table read back as "malformed". Pin the byte
+# order from the compiler's own __BYTE_ORDER__ ahead of that guess.
+if [ -f src/sqlite/dist/sqlite3.c ] && ! grep -q 'SDK: byte order from __BYTE_ORDER__' src/sqlite/dist/sqlite3.c; then
+  sed -i '1i /* SDK: byte order from __BYTE_ORDER__ */\
+#if !defined(SQLITE_BYTEORDER) \&\& defined(__BYTE_ORDER__)\
+# if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__\
+#  define SQLITE_BYTEORDER 1234\
+# elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__\
+#  define SQLITE_BYTEORDER 4321\
+# endif\
+#endif' src/sqlite/dist/sqlite3.c
+fi
+
 # zlib deflate.c (29.0.5 and older) emits x86 crc32 asm for __amd64__, which
 # arm64ec defines. The SIMD path never runs there (simd_stub.c fixes
 # x86_cpu_enable_simd at 0); it only has to compile.
