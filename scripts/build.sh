@@ -284,6 +284,11 @@ case "$PLATFORM" in
       aarch64-*|arm64ec-*) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic -lwinpthread" ;;
       *) CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive" ;;
     esac
+    # Reserve an 8 MiB main-thread stack, as Linux gives, instead of Windows'
+    # 1 MiB. dmtracedump keeps two or three TraceData structs on the stack
+    # (32768-entry arrays each), which is over 1 MiB with 64-bit pointers: the
+    # x86_64 build overflowed on every trace. Official only shipped it 32-bit.
+    CROSS_LDFLAGS="$CROSS_LDFLAGS -Wl,--stack,8388608"
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
