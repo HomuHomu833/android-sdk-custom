@@ -287,6 +287,12 @@ case "$PLATFORM" in
     ;;
   *) echo "Unknown/unsupported PLATFORM='$PLATFORM'" >&2; exit 1 ;;
 esac
+# zig cc turns UBSan on for unoptimized code, and some upstream modules build
+# at -O0 (dmtracedump), so they trapped where the official tools run fine
+# ("left shift of negative value" in read2LE). Keep it off, as bionic does.
+case "$PLATFORM" in
+  linux|bsd) CROSS_CFLAGS="$CROSS_CFLAGS -fno-sanitize=undefined" ;;
+esac
 export CROSS_CC CROSS_CXX CROSS_LD CROSS_AR CROSS_RANLIB CROSS_STRIP CROSS_OBJCOPY CROSS_LDFLAGS
 
 ADBMDNS_RUST_TARGET=""
