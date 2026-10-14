@@ -161,6 +161,9 @@ case "$PLATFORM" in
     mkdir -p "$BUILD_DIR"
     "$CROSS_CC" -c "$ROOTDIR/patches/misc/bionic_tls_align.S" -o "$BUILD_DIR/bionic_tls_align.o"
     EXE_LDFLAGS_EXTRA="$BUILD_DIR/bionic_tls_align.o"
+    log "Building bionic madvise wrap for older kernel compatibility"
+    "$CROSS_CC" -O2 -c "$ROOTDIR/patches/misc/bionic_wipeonfork_compat.c" -o "$BUILD_DIR/bionic_wipeonfork_compat.o"
+    EXE_LDFLAGS_EXTRA="$EXE_LDFLAGS_EXTRA $BUILD_DIR/bionic_wipeonfork_compat.o -Wl,--wrap=madvise"
     # termux-usb shim: built into bionic adb/fastboot, inert until LIBUSB_TERMUX_IMPL=1.
     case "$TARGET" in
       aarch64-linux-android)    RUST_TARGET=aarch64-linux-android ;;
