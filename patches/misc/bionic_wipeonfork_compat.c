@@ -14,8 +14,11 @@ static int nregions;
 static void wipe_child(void) {
   for (int i = 0; i < nregions; i++) memset(regions[i].p, 0, regions[i].n);
 }
+// Register unconditionally: bionic's arc4random calls madvise lazily, after
+// constructors have run, so no range is recorded yet at this point (and with
+// the old "if (nregions)" guard the child was never wiped).
 static void wipeonfork_compat_init(void) {
-  if (nregions) pthread_atfork(NULL, NULL, wipe_child);
+  pthread_atfork(NULL, NULL, wipe_child);
 }
 __attribute__((section(".init_array"), used))
 static void (*wipeonfork_compat_init_entry)(void) = wipeonfork_compat_init;
