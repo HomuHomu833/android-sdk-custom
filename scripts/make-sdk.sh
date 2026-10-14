@@ -3,7 +3,9 @@
 # and the newest build-tools of its major, then archive (.7z on windows).
 # Env: TARGET, PLATFORM, BUILT_BIN, PLATFORM_TOOLS_VERSION, BUILD_TOOLS_VERSION,
 # CMDLINE_TOOLS_URL, ROOTDIR, DEST.
-set -euo pipefail
+set -Eeuo pipefail
+# set -e exits without a word; say which command stopped the run.
+trap 'echo "make-sdk.sh:$LINENO: \"$BASH_COMMAND\" exited $?" >&2' ERR
 
 ROOTDIR="${ROOTDIR:-$PWD}"
 : "${TARGET:?set TARGET}"
