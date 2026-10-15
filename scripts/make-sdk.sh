@@ -196,8 +196,15 @@ drop_unreplaced "$HOST_SDK/platform-tools"
 # the .exe fail to start, so stop the build instead of shipping it.
 if [ "$PLATFORM" = windows ]; then
   objdump=/opt/llvm-mingw/bin/llvm-objdump
+  # llvm-objdump fails on some files in the package; under pipefail that
+  # failed the whole check silently whenever such a file was listed last
+  # (which made 64-bit Windows packaging fail at random). Name it, go on.
   missing=$(find "$HOST_SDK" -type f \( -iname '*.exe' -o -iname '*.dll' \) | while IFS= read -r bin; do
-    "$objdump" -p "$bin" 2>/dev/null | awk '/DLL Name:/ {print tolower($3)}' | while read -r dll; do
+    if ! headers=$("$objdump" -p "$bin" 2>&1); then
+      echo "warning: llvm-objdump cannot read ${bin#"$HOST_SDK"/}: $(printf '%s\n' "$headers" | tail -n1)" >&2
+      continue
+    fi
+    printf '%s\n' "$headers" | awk '/DLL Name:/ {print tolower($3)}' | while read -r dll; do
       case $dll in
         api-ms-win-*|ext-ms-*|kernel32.dll|kernelbase.dll|ntdll.dll|ucrtbase.dll|msvcrt.dll|advapi32.dll|user32.dll|gdi32.dll|shell32.dll|ole32.dll|oleaut32.dll|ws2_32.dll|wsock32.dll|mswsock.dll|setupapi.dll|cfgmgr32.dll|winusb.dll|userenv.dll|iphlpapi.dll|bcrypt.dll|bcryptprimitives.dll|crypt32.dll|secur32.dll|shlwapi.dll|psapi.dll|dbghelp.dll|imagehlp.dll|version.dll|wlanapi.dll|dnsapi.dll|rpcrt4.dll|netapi32.dll|powrprof.dll|winmm.dll|comdlg32.dll|normaliz.dll|synchronization.dll|uuid.dll|windowscodecs.dll|opengl32.dll) ;;
         *) find "$(dirname "$bin")" -maxdepth 1 -iname "$dll" | grep -q . || echo "$(basename "$bin") needs $dll" ;;
