@@ -1,17 +1,19 @@
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-build
-pack
+# fetch-source.sh: the release manifest and the AOSP checkouts
+.manifest
 /src
-# termux-adb: cargo build artifacts + per-build crate cache
+# build.sh: generated projects + build trees, deps, NDK, staged tools
+/build
+/extrabuild
+/out
+/android-ndk-*
+/ndk.zip
+# make-sdk.sh: the spliced SDK and its archive
+/android-sdk
+/android-sdk-*.tar.xz
+/android-sdk-*.7z
+# termux-adb / adb mDNS: cargo build artifacts + per-build crate cache
 patches/termux/libtermuxadb/target
 .cargo
+__pycache__/
 # remove git history
 git_remove_history.sh

@@ -1,0 +1,67 @@
+// development/host/windows
+
+// Google ships AdbWinApi/AdbWinUsbApi as prebuilt DLLs (an MSVC/ATL project).
+// Build that source into this module, which replaces the prebuilt one, so
+// adb and fastboot link it: AdbWinApi by default, libusb with ADB_LIBUSB=1.
+// Fixups: patch-source.sh, patches/compat/adbwinapi, patches/sources.
+cc_library_static {
+    name: "AdbWinApi",
+    host_supported: true,
+    device_supported: false,
+    enabled: false,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
+    // What usb/api/SOURCES and usb/winusb/SOURCES build, less the two
+    // DllMain files that adbwinapi_static.cpp replaces.
+    srcs: [
+        "development/host/windows/usb/api/adb_api.cpp",
+        "development/host/windows/usb/api/adb_endpoint_object.cpp",
+        "development/host/windows/usb/api/adb_legacy_endpoint_object.cpp",
+        "development/host/windows/usb/api/adb_helper_routines.cpp",
+        "development/host/windows/usb/api/adb_interface.cpp",
+        "development/host/windows/usb/api/adb_legacy_interface.cpp",
+        "development/host/windows/usb/api/adb_interface_enum.cpp",
+        "development/host/windows/usb/api/adb_io_completion.cpp",
+        "development/host/windows/usb/api/adb_legacy_io_completion.cpp",
+        "development/host/windows/usb/api/adb_object_handle.cpp",
+        "development/host/windows/usb/winusb/adb_winusb_endpoint_object.cpp",
+        "development/host/windows/usb/winusb/adb_winusb_interface.cpp",
+        "development/host/windows/usb/winusb/adb_winusb_io_completion.cpp",
+        ":sdk_adbwinapi_static",
+    ],
+    local_include_dirs: [
+        "patches/compat/adbwinapi",
+        "development/host/windows/usb/api",
+        "development/host/windows/usb/winusb",
+    ],
+    export_include_dirs: ["development/host/windows/usb/api"],
+    cflags: [
+        // their SOURCES' C_DEFINES
+        "-DUNICODE",
+        "-D_UNICODE",
+        "-DWIN32",
+        "-D_WINDOWS",
+        // allocation failures are caught as exceptions
+        "-fexceptions",
+        "-Wno-unknown-pragmas",
+    ],
+    host_ldlibs: [
+        "-lsetupapi",
+        "-lwinusb",
+        "-ladvapi32",
+        "-lole32",
+    ],
+}
+
+// Its WinUSB half, which the above already contains.
+cc_library_headers {
+    name: "AdbWinUsbApi",
+}
+
+filegroup {
+    name: "sdk_adbwinapi_static",
+    srcs: ["patches/sources/adbwinapi_static.cpp"],
+}

@@ -1,0 +1,9 @@
+// external/protobuf
+
+// aprotoc sets rtti only from platform-tools 29.0.5. Before that, protobuf's
+// DynamicCastToGenerated() (whose RTTI test is inverted) falls to dynamic_cast
+// under -fno-rtti, which clang refuses.
+amend {
+    name: "aprotoc",
+    rtti: true,
+}

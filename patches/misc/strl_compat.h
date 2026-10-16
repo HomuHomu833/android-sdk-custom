@@ -1,11 +1,6 @@
-/* strlcpy/strlcat compatibility shim.
- *
- * glibc declares strlcpy/strlcat only from 2.38, but AOSP host code (e.g. liblog's
- * logd_reader.cpp) uses them unconditionally (bionic/musl always provide them).
- * Rather than raise the binaries' runtime glibc floor, force-include this on gnu
- * builds to supply the BSD functions when the libc doesn't. Gated on __GLIBC__ +
- * version, so on glibc >= 2.38 (and musl/bionic, where it isn't included) it's a
- * no-op. */
+/* glibc declares strlcpy/strlcat only from 2.38, but AOSP host code (liblog)
+ * uses them unconditionally. Force-included on glibc builds (build.sh) to
+ * supply them below 2.38 without raising the runtime glibc floor. */
 #ifndef ANDROID_SDK_STRL_COMPAT_H
 #define ANDROID_SDK_STRL_COMPAT_H
 
@@ -63,11 +58,9 @@ size_t strlcat(char *dst, const char *src, size_t dsize) {
 #endif /* !ANDROID_SDK_STRL_COMPAT_IMPLEMENTATION */
 #endif /* glibc < 2.38 */
 
-/* qsort_r: GNU extension not universally available (absent on old glibc sysroots
- * regardless of arch). Include <stdlib.h> first so any real extern declaration
- * is locked in before the #define below shadows it — no static-follows-non-static
- * conflict. Single-threaded callers (e.g. zstd dictBuilder/cover.c) are
- * unaffected by the lack of thread safety. */
+/* qsort_r: a GNU extension old glibc sysroots lack. <stdlib.h> comes first so
+ * a real declaration precedes the #define below. Its callers (zstd's
+ * dictBuilder) are single-threaded. */
 #include <stdlib.h>
 static void *_qsort_r_ctx_;
 static int (*_qsort_r_fn_)(const void *, const void *, void *);

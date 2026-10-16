@@ -1,13 +1,7 @@
-# Prebuilt build image for the android-sdk-custom builds: bakes the build tools
-# and toolchains so CI only pulls. All five platforms: linux/bsd (zig), bionic
-# (NDK clang, pulled at run time), windows (llvm-mingw), macos (osxcross).
-#
-# Build scripts are bind-mounted from the checkout at run time, not copied in.
-#
-#   docker run --rm -v "$PWD:/work" -w /work \
-#     -e PLATFORM=linux -e TARGET=x86_64-linux-musl -e TAG=android-17.0.0_r1 \
-#     ghcr.io/<owner>/sdk-builder \
-#     bash -c 'scripts/fetch-source.sh && scripts/build.sh'
+# CI's build image: the toolchains for every platform (zig for linux/bsd,
+# llvm-mingw, osxcross; the NDK is fetched at run time). Scripts come from the
+# bind-mounted checkout: docker run -v "$PWD:/work" -w /work -e PLATFORM=...
+# -e TARGET=... -e TAG=... <image> bash -c 'scripts/fetch-source.sh && ...'
 FROM ubuntu:24.04
 
 ARG ZIG_VERSION=0.18.0-dev.2+faa537cf9
@@ -16,17 +10,13 @@ ARG REPO_OWNER=HomuHomu833
 ARG MACOS_SDK_VERSION=26.1
 
 ENV DEBIAN_FRONTEND=noninteractive
-# - build-essential/clang/lld: host compiler for the native protoc the cross
-#   build runs at codegen.
-# - go/bison/flex/m4: needed by selinux, e2fsprogs, aidl, soong tooling.
-# - autoconf/automake/libtool/autoconf-archive/pkg-config: autotools deps for the
-#   bundled zlib/bzip2 and sources that regenerate configure.
-# - jq: fetch-source.sh reads repos.json. file/zip/unzip/xz: splice + archive.
-# - openjdk-21-jre-headless: sdkmanager needs a JRE to fetch the official SDK.
+# python3: builder and genrules; clang/lld: the host aprotoc and cargo;
+# bison/flex/m4: aidl; patch: patch-source.sh; autotools and the -dev libs
+# (zlib1g-dev too): osxcross; file/unzip/xz/p7zip: make-sdk.sh; JRE: sdkmanager.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates aria2 xz-utils unzip zip p7zip-full git make cmake ninja-build \
-        build-essential clang lld file tree jq openjdk-21-jre-headless \
-        golang-go bison flex m4 python3 \
+        build-essential clang lld file tree patch openjdk-21-jre-headless \
+        bison flex m4 python3 \
         autoconf automake libtool autoconf-archive pkg-config \
         zlib1g-dev libssl-dev libxml2-dev liblzma-dev libbz2-dev uuid-dev cpio bzip2 \
     && rm -rf /var/lib/apt/lists/*
@@ -64,7 +54,7 @@ RUN arch="$(uname -m)"; \
         && rm /tmp/zig.tar.xz \
         && mv "/opt/zig-${zig_arch}-linux-${ZIG_VERSION}" /opt/zig \
         && chmod -R a+w /opt/zig/lib; \
-    fi   # build.sh overlays patches/zig here at run time (non-root)
+    fi   # build.sh overlays patches/musl/zig here at run time (non-root)
 
 # zig-as-llvm: thin cc/c++/ar/strip/... wrappers around zig (keyed off
 # $ZIG_TARGET); they `exec zig`, so zig must be on PATH (below).
@@ -89,7 +79,7 @@ RUN arch="$(uname -m)"; \
         *) echo "WARNING: llvm-mingw does not support host arch '$arch'; Windows cross-builds will be unavailable" ;; \
     esac
 # Not on PATH: build.sh calls it by absolute path, so its windows clang doesn't
-# shadow the host clang used for native protoc.
+# shadow the host clang used for the native aprotoc.
 
 # osxcross: macOS cross toolchain (cctools-port + clang wrappers) with the macOS
 # SDK baked into /opt/osxcross/SDK; zig segfaults building Darwin binaries.
@@ -105,15 +95,9 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && cd / \
     && rm -rf /tmp/osxcross
 
-# Rust: builds libtermuxadb.a (bionic USB shim) and libzeroconf.a (adbmdns mDNS
-# bridge) at run time. Both are staticlibs, so a target only needs its rust-std.
-# 1.85+ required (adbmdns is edition 2024). Installed read-only under /opt/rust
-# from the dist tarballs; build.sh uses a writable CARGO_HOME.
-#
-# std targets cover every adbmdns triple (android/linux/macOS/windows). BSD and
-# the no-std exotic arches use the openscreen fallback. std fetch is best-effort:
-# a missing tarball is skipped and build.sh falls back to openscreen, so a 404
-# never fails the image build.
+# Rust 1.85+ (adbmdns is edition 2024) for libtermuxadb.a and the adbmdns
+# bridge, with a rust-std per target that has one. A missing rust-std is
+# skipped (build.sh falls back to openscreen), so a 404 can't fail the image.
 ARG RUST_VERSION=1.85.0
 RUN set -eu; \
     base="https://static.rust-lang.org/dist"; \

@@ -1,8 +1,6 @@
-// termux-fastboot USB shim (bionic) — wrapper over libtermuxadb's C API (fastboot
-// variant: fastboot_start). Gating is in the Rust shim (LIBUSB_TERMUX_IMPL, off by
-// default → termuxadb_* delegate to libc); usb_linux.cpp uses enabled() to pick
-// the termux /dev/bus/usb walk over the stock sysfs scan. Wrappers are unix_*
-// (not open/close) to dodge bionic's fortify macros.
+// Termux USB shim for bionic fastboot over libtermuxadb (fastboot_start). Off
+// unless LIBUSB_TERMUX_IMPL is set; usb_linux.cpp picks the /dev/bus/usb walk
+// via enabled(). unix_* names dodge bionic's fortify macros.
 #pragma once
 
 #include <dirent.h>

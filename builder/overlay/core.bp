@@ -1,0 +1,41 @@
+// fastboot reaches USB through libusb on the BSDs (which upstream does not
+// build for), with the backend in patches/sources/fastboot_usb_libusb.cpp. It
+// includes <libusb.h> directly. Windows keeps upstream's usb_windows.cpp over
+// AdbWinApi (adbwinapi.bp).
+amend {
+    name: "libfastboot",
+    target: {
+        bsd: {
+            srcs: [":sdk_fastboot_usb_libusb"],
+            static_libs: ["libusb"],
+            include_dirs: ["external/libusb/include/libusb"],
+        },
+    },
+}
+
+// fastboot is a static_libs user of libfastboot; libusb must reach its link.
+amend {
+    name: "fastboot",
+    target: {
+        bsd: {
+            static_libs: ["libusb"],
+        },
+    },
+}
+
+filegroup {
+    name: "sdk_fastboot_usb_libusb",
+    srcs: ["patches/sources/fastboot_usb_libusb.cpp"],
+}
+
+// libcutils compiles its own strlcpy() for glibc. build.sh force-includes
+// patches/misc/strl_compat.h there, which already supplies it (a static inline
+// below glibc 2.38, glibc's own from then on), and the two definitions clash.
+amend {
+    name: "libcutils",
+    target: {
+        linux_glibc: {
+            exclude_srcs: ["strlcpy.c"],
+        },
+    },
+}

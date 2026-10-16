@@ -1,0 +1,70 @@
+// Performance settings the third-party projects' own release builds use, where
+// they beat Soong's global -O2 (global.bp). Those settling for -O2 or less
+// (e2fsprogs, f2fs-tools, pcre2, expat, libusb, selinux, protobuf, abseil,
+// sqlite, lzma, mDNSResponder's -Os) stay as Android.bp has them.
+
+// -O3: zstd's lib/libzstd.mk, lz4's lib/Makefile, zopfli's Makefile, and the
+// Release build type brotli's, fmt's and zstd's CMakeLists default to and
+// BoringSSL's BUILDING.md prescribes.
+amend {
+    name: "libzstd",
+    cflags: ["-O3"],
+    // Upstream's x86-64 Huffman decoder, which AOSP turns off. It gates itself
+    // (x86-64 Linux/macOS/Windows with BMI2 dispatch; empty elsewhere), and
+    // releases before zstd 1.5.1 have no such file, hence the glob.
+    arch: {
+        x86_64: {
+            srcs: ["lib/decompress/*_amd64.S"],
+            cflags: ["-UZSTD_DISABLE_ASM"],
+        },
+    },
+}
+
+amend {
+    name: "liblz4",
+    cflags: ["-O3"],
+}
+
+amend {
+    name: "libbrotli",
+    cflags: ["-O3"],
+}
+
+amend {
+    name: "fmtlib",
+    cflags: ["-O3"],
+}
+
+amend {
+    name: "libzopfli",
+    cflags: ["-O3"],
+}
+
+amend {
+    name: "boringssl_flags",
+    cflags: ["-O3"],
+}
+
+// libpng's SSE2+ filters, on by default upstream; AOSP enables them only for
+// Android devices, having seen crashes on Windows hosts, which stay without.
+// PNG_INTEL_SSE turns them on only when the target has SSE2.
+amend {
+    name: "libpng-defaults",
+    target: {
+        linux_x86: {
+            cflags: ["-DPNG_INTEL_SSE"],
+        },
+        linux_x86_64: {
+            cflags: ["-DPNG_INTEL_SSE"],
+        },
+        darwin_x86_64: {
+            cflags: ["-DPNG_INTEL_SSE"],
+        },
+        bsd_x86: {
+            cflags: ["-DPNG_INTEL_SSE"],
+        },
+        bsd_x86_64: {
+            cflags: ["-DPNG_INTEL_SSE"],
+        },
+    },
+}

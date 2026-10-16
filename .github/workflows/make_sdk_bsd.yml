@@ -1,16 +1,16 @@
 name: Make SDK (BSD)
-run-name: Make SDK ${{ inputs.version }}
+run-name: Make SDK ${{ inputs.tag }}
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Platform Tools Version"
-        required: true
-        default: "37.0.0"
       tag:
-        description: "Android Source Tag"
+        description: "AOSP source tag (android-* or platform-tools-*)"
         required: true
         default: "android-17.0.0_r1"
+      only:
+        description: "Only these targets (JSON array), default all"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -22,8 +22,8 @@ jobs:
     secrets: inherit
     with:
       platform: bsd
-      version: ${{ inputs.version }}
       tag: ${{ inputs.tag }}
+      only: ${{ inputs.only }}
       # powerpc-netbsd-eabi, powerpc-freebsd-eabihf
       targets: >-
         ["aarch64-freebsd-none", "aarch64-netbsd-none", "aarch64-openbsd-none",

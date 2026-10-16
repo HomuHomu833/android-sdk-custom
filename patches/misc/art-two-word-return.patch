@@ -1,0 +1,33 @@
+art: pick TwoWordReturn by pointer width (__SIZEOF_POINTER__), not by CPU,
+so instruction_set.h compiles on every host CPU dexdump is built for; that
+also covers LLP64 Windows and x32.
+
+--- a/src/art/libartbase/arch/instruction_set.h
++++ b/src/art/libartbase/arch/instruction_set.h
+@@ -305,7 +305,7 @@
+ //            when the garbage collector can move objects concurrently. Ensure that required locks
+ //            are held when using!
+ 
+-#if defined(__i386__) || defined(__arm__)
++#if __SIZEOF_POINTER__ == 4
+ using TwoWordReturn = uint64_t;
+ 
+ // Encodes method_ptr==nullptr and code_ptr==nullptr
+@@ -321,7 +321,7 @@
+   return ((hi64 << 32) | lo32);
+ }
+ 
+-#elif defined(__x86_64__) || defined(__aarch64__) || defined(__riscv)
++#else
+ 
+ // Note: TwoWordReturn can't be constexpr for 64-bit targets. We'd need a constexpr constructor,
+ //       which would violate C-linkage in the entrypoint functions.
+@@ -345,8 +345,6 @@
+   ret.hi = hi;
+   return ret;
+ }
+-#else
+-#error "Unsupported architecture"
+ #endif
+ 
+ }  // namespace art
