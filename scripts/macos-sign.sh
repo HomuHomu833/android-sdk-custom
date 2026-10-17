@@ -36,7 +36,13 @@ fi
 
 signed=0 kept=0 failed=0
 while IFS= read -r -d '' f; do
-  file -b "$f" | grep -q '^Mach-O' || continue
+  # only linked images carry a code signature; object files (.o), dSYM
+  # companions and the like are not signable
+  case "$(file -b "$f")" in
+    Mach-O*object*|Mach-O*dSYM*|Mach-O*core*|Mach-O*preload*) continue ;;
+    Mach-O*) ;;
+    *) continue ;;
+  esac
   info="$("$RCS" print-signature-info "$f" 2>/dev/null || true)"
   # a signature block is a bare "signature:" key; unsigned files still print
   # "macho_signature_start_offset: null", so match the key on its own line
