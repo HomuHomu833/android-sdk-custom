@@ -24,7 +24,8 @@ jobs:
       platform: bsd
       tag: ${{ inputs.tag }}
       only: ${{ inputs.only }}
-      # powerpc-netbsd-eabi, powerpc-freebsd-eabihf
+      # powerpc-netbsd-eabi, powerpc-freebsd-eabihf (removed from .libc)
+      # sparc-netbsd-none, sparc64-netbsd-none (to be supported)
       targets: >-
         ["aarch64-freebsd-none", "aarch64-netbsd-none", "aarch64-openbsd-none",
          "aarch64_be-netbsd-none", "arm-freebsd-eabihf", "arm-netbsd-eabi",
@@ -32,8 +33,8 @@ jobs:
          "mips-netbsd-eabi", "mips-netbsd-eabihf", "mipsel-netbsd-eabi",
          "mipsel-netbsd-eabihf", "mips64el-openbsd-none", "mips64-openbsd-none",
          "powerpc-netbsd-eabihf", "powerpc64-freebsd-none", "powerpc64-openbsd-none",
-         "powerpc64le-freebsd-none", "riscv64-freebsd-none", "x86-freebsd-none",
-         "x86-netbsd-none", "x86_64-freebsd-none", "x86_64-netbsd-none",
-         "arm-openbsd-eabi", "powerpc-openbsd-eabihf", "riscv64-openbsd-none",
-         "x86-openbsd-none", "x86_64-openbsd-none", "riscv32-netbsd-none",
-         "riscv64-netbsd-none"]
+         "powerpc64le-freebsd-none", "riscv64-freebsd-none", "sparc64-openbsd-none",
+         "x86-freebsd-none", "x86-netbsd-none", "x86_64-freebsd-none",
+         "x86_64-netbsd-none", "arm-openbsd-eabi", "powerpc-openbsd-eabihf",
+         "riscv64-openbsd-none", "x86-openbsd-none", "x86_64-openbsd-none",
+         "riscv32-netbsd-none", "riscv64-netbsd-none"]
