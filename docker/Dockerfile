@@ -4,8 +4,8 @@
 # -e TARGET=... -e TAG=... <image> bash -c 'scripts/fetch-source.sh && ...'
 FROM ubuntu:24.04
 
-ARG ZIG_VERSION=0.18.0-dev.2+faa537cf9
-ARG LLVM_MINGW_VERSION=20260922
+ARG ZIG_VERSION=0.18.0-dev.349+d924f83bf
+ARG LLVM_MINGW_VERSION=20261006
 ARG REPO_OWNER=HomuHomu833
 ARG MACOS_SDK_VERSION=26.1
 
