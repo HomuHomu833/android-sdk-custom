@@ -164,9 +164,11 @@ for f in "$BUILT_BIN"/*; do
   cp "$f" "$HOST_SDK/platform-tools/$bname"
 done
 
-# --- prune host-only / renderscript leftovers -------------------------------
-rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64"
-rm -rf "$BT"/*-ld "$BT"/lld* "$BT"/llvm-rs-cc* "$BT"/bcc_compat* "$BT"/renderscript*
+# --- prune host-only leftovers ----------------------------------------------
+# lld-bin holds the real linker behind the lld wrapper (dropped below). The
+# renderscript/ dirs are only headers and device libraries, and AGP checks
+# that they exist, so they stay.
+rm -rf "$BT/lib64" "$HOST_SDK/platform-tools/lib64" "$BT/lld-bin"
 
 # --- drop now-useless DLLs (windows base) -----------------------------------
 # AdbWin*Api (linked into adb/fastboot), libwinpthread-1 (static), RenderScript.
@@ -177,18 +179,34 @@ find "$HOST_SDK" -name 'libwinpthread-1.dll' -delete 2>/dev/null || true
 # --- official binaries we did not rebuild -----------------------------------
 # Anything native still at the top of either package is Google's own build
 # (x86-64, and missing the lib64 pruned above), so it would not run on most
-# targets. Ship ours or nothing: drop it, and say so.
+# targets. Ship ours or nothing, and say so.
+# build-tools: AGP checks that every tool it knows of is present (BuildToolInfo)
+# and otherwise reports the build-tools as corrupted, so leave a text
+# placeholder in place, as Google did for the retired *-ld linkers.
+# platform-tools: nothing checks, so drop.
 drop_unreplaced() {
   find "$1" -maxdepth 1 -type f | while IFS= read -r file; do
     [ -f "$BUILT_BIN/$(basename "$file")" ] && continue
     if file "$file" | grep -qE 'ELF|Mach-O|PE32'; then
-      echo "Dropping $(basename "$file"): official build, not rebuilt for $TARGET"
-      rm -f "$file"
+      if [ "$2" = placeholder ]; then
+        echo "Replacing $(basename "$file") with a placeholder: official build, not rebuilt for $TARGET"
+        printf '%s\n' "This placeholder substitutes for an official $(basename "$file") that was not rebuilt for $TARGET." \
+          "It keeps Android Gradle Plugin's build-tools integrity check passing; the tool itself is unavailable." > "$file"
+      else
+        echo "Dropping $(basename "$file"): official build, not rebuilt for $TARGET"
+        rm -f "$file"
+      fi
     fi
   done
 }
-drop_unreplaced "$BT"
+drop_unreplaced "$BT" placeholder
 drop_unreplaced "$HOST_SDK/platform-tools"
+# lld is a shell wrapper around the lld-bin pruned above.
+if [ -f "$BT/lld" ] && ! file "$BT/lld" | grep -qE 'ELF|Mach-O|PE32' && grep -q 'lld-bin/lld' "$BT/lld"; then
+  echo "Replacing lld with a placeholder: wraps lld-bin, not rebuilt for $TARGET"
+  printf '%s\n' "This placeholder substitutes for an official lld that was not rebuilt for $TARGET." \
+    "It keeps Android Gradle Plugin's build-tools integrity check passing; the tool itself is unavailable." > "$BT/lld"
+fi
 
 # --- windows: every DLL a binary imports must be Windows' own or shipped ----
 # The tools are meant to need no mingw runtime DLLs (libc++, libunwind,
@@ -200,6 +218,8 @@ if [ "$PLATFORM" = windows ]; then
   # failed the whole check silently whenever such a file was listed last
   # (which made 64-bit Windows packaging fail at random). Name it, go on.
   missing=$(find "$HOST_SDK" -type f \( -iname '*.exe' -o -iname '*.dll' \) | while IFS= read -r bin; do
+    # placeholders (Google's *-ld.exe, ours above) are text, not PE
+    file "$bin" | grep -q PE32 || continue
     if ! headers=$("$objdump" -p "$bin" 2>&1); then
       echo "warning: llvm-objdump cannot read ${bin#"$HOST_SDK"/}: $(printf '%s\n' "$headers" | tail -n1)" >&2
       continue
