@@ -1012,6 +1012,13 @@ sed -i -e 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(
   -e 's/(defined(__aarch64__) || defined(__mips__) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
   src/art/libartbase/base/mem_map.h
 
+# ART fd_file.h uses std::vector but gets <vector> only by way of other
+# headers, which newer libc++ (zig 0.18) no longer pulls in.
+f=src/art/libartbase/base/unix_file/fd_file.h
+if [ -f "$f" ] && grep -q 'std::vector' "$f" && ! grep -q '^#include <vector>' "$f"; then
+  sed -i '0,/^#include /s//#include <vector>\n&/' "$f"
+fi
+
 # ART globals.h (page-size-agnostic releases): kMaxPageSize is 16K, and
 # MemMap::Init() CHECKs the running page size against it, so dexdump aborts on
 # 64K-page hosts (ppc64le and some arm64 distributions, qemu-hexagon). Off
