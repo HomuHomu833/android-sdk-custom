@@ -125,7 +125,7 @@ def soong_target(platform, triple):
 # Soong's arch names; anything else (mips, powerpc, ...) is passed through so
 # overlays can still key on it, but no upstream arch struct will match.
 SOONG_ARCHES = {"arm", "arm64", "riscv64", "x86", "x86_64"}
-LP64_ARCHES = {"arm64", "x86_64", "riscv64", "mips64", "powerpc64", "s390x", "loongarch64"}
+LP64_ARCHES = {"arm64", "x86_64", "riscv64", "mips64", "powerpc64", "s390x", "loongarch64", "sparc64"}
 
 # Properties tagged `variant_prepend` in cc/compiler.go, linker.go, library.go:
 # arch/target values for these go in front of the base value, not after it.

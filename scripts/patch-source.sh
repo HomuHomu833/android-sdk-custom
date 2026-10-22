@@ -65,7 +65,7 @@ if [ ! -f src/boringssl/src/include/openssl/target.h ]; then
     -e 's/^#elif defined\(__AARCH64EL__\) \|\| defined\(_M_ARM64\)$/#elif defined(__AARCH64EL__) || defined(__AARCH64EB__) || defined(_M_ARM64)/' \
     -e 's/^#elif defined\(__ARMEL__\) \|\| defined\(_M_ARM\)$/#elif defined(__ARMEL__) || defined(__ARMEB__) || defined(_M_ARM)/' \
     -e 's/^#elif defined\(__MIPSEL__\) && (!?)defined\(__LP64__\)$/#elif (defined(__MIPSEL__) || defined(__MIPSEB__)) \&\& \1defined(__LP64__)/' \
-    -e 's/^#error "Unknown target CPU"$/#if defined(__loongarch64) || defined(__s390x__) || defined(__powerpc64__) || (defined(__riscv) \&\& __riscv_xlen == 64)\n#define OPENSSL_64_BIT\n#elif defined(__powerpc__) || defined(__hexagon__) || (defined(__riscv) \&\& __riscv_xlen == 32)\n#define OPENSSL_32_BIT\n#else\n#error "Unknown target CPU"\n#endif/' \
+    -e 's/^#error "Unknown target CPU"$/#if defined(__loongarch64) || defined(__s390x__) || defined(__powerpc64__) || (defined(__sparc__) \&\& defined(__arch64__)) || (defined(__riscv) \&\& __riscv_xlen == 64)\n#define OPENSSL_64_BIT\n#elif defined(__powerpc__) || defined(__hexagon__) || (defined(__riscv) \&\& __riscv_xlen == 32)\n#define OPENSSL_32_BIT\n#else\n#error "Unknown target CPU"\n#endif/' \
     src/boringssl/src/include/openssl/base.h
   # Some also have a ppc64le branch keyed on _LITTLE_ENDIAN, which FreeBSD
   # defines on big-endian too, and whose CPU detection calls Linux's
@@ -442,7 +442,7 @@ s/.*/#if defined(__arm__) \&\& !defined(__aarch64__)\
 #endif/
 }' src/art/libartbase/base/utils.cc
 sed -i '/FlushCpuCaches/,/}/ {
-  /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/i #if !defined(__s390x__) && !defined(__ppc__) && !defined(__hexagon__) && !defined(__riscv)
+  /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/i #if !defined(__s390x__) && !defined(__ppc__) && !defined(__hexagon__) && !defined(__riscv) && !defined(__sparc__)
   /^[[:space:]]*__builtin___clear_cache[[:space:]]*(/a #endif
 }' src/art/libartbase/base/utils.cc
 
@@ -521,9 +521,9 @@ if '#ifndef __hexagon__' not in src:
     open(path, 'w').write(src)
 PYEOF
 
-# adb sysdeps/errno.cpp: guard out the ERRNO_VALUE static_asserts on MIPS (its
+# adb sysdeps/errno.cpp: guard out the ERRNO_VALUE static_asserts on MIPS and SPARC (their
 # errno numbers differ from the ADB wire values); the runtime switch still works.
-sed -i 's@#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")@#if !defined(__mips__)\n#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")\n#else\n#define ERRNO_VALUE(error_name, wire_value) /* mips errno numbers differ from ADB wire values */\n#endif@' \
+sed -i 's@#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")@#if !defined(__mips__) && !defined(__sparc__)\n#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")\n#else\n#define ERRNO_VALUE(error_name, wire_value) /* mips/sparc errno numbers differ from ADB wire values */\n#endif@' \
     $ADB/sysdeps/errno.cpp
 
 # --- bionic below API 29 ------------------------------------------------------
@@ -1012,11 +1012,71 @@ sed -i -e 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(
   -e 's/(defined(__aarch64__) || defined(__mips__) || defined(__APPLE__))$/(!defined(__x86_64__) || defined(__APPLE__))/' \
   src/art/libartbase/base/mem_map.h
 
+# androidfw CursorWindow: its Parcel (libbinder) half is compiled on every
+# linux host but used by no SDK tool; lld drops it with --gc-sections. zig's own
+# ELF linker (sparc64, which lld cannot link) does not, and fails on the
+# undefined Parcel symbols. Leave it out of the tools build.
+[ -f src/base/libs/androidfw/CursorWindow.cpp ] && \
+  sed -i 's/^#ifdef __linux__$/#if defined(__linux__) \&\& !defined(STATIC_ANDROIDFW_FOR_TOOLS)/' \
+    src/base/libs/androidfw/CursorWindow.cpp
+
 # ART fd_file.h uses std::vector but gets <vector> only by way of other
 # headers, which newer libc++ (zig 0.18) no longer pulls in.
 f=src/art/libartbase/base/unix_file/fd_file.h
 if [ -f "$f" ] && grep -q 'std::vector' "$f" && ! grep -q '^#include <vector>' "$f"; then
   sed -i '0,/^#include /s//#include <vector>\n&/' "$f"
+fi
+
+# protobuf weak descriptor defaults iterate a custom section through the
+# linker's __start_/__stop_pb_defaults symbols, which zig's own ELF linker
+# (sparc64) does not provide. Only protoc's --descriptor_implicit_weak_messages
+# needs them; keep sparc on the plain path.
+f=src/protobuf/src/google/protobuf/port_def.inc
+[ -f "$f" ] && sed -i 's/^    !defined(__EMSCRIPTEN__)$/    !defined(__EMSCRIPTEN__) \&\& !defined(__sparc__)/' "$f"
+
+# adb: sysdeps/env.cpp is built into both libadb_host (via libadb_srcs) and
+# libadb_sysdeps, and adb/fastdeploy link both. lld only takes the first copy;
+# zig's Elf2 (sparc64) loads every archive member and fails on the duplicate
+# definitions. Build it once: libadb_host takes it from libadb_sysdeps.
+# Applied for Elf2 targets only, so lld targets keep their link lines.
+case "$TARGET" in sparc64-*) dedup_elf2=1 ;; *) dedup_elf2= ;; esac
+if [ -n "$dedup_elf2" ] && [ -f "$ADB/Android.bp" ] && grep -q '^    name: "libadb_sysdeps",$' "$ADB/Android.bp"; then
+  sed -i '/^    name: "libadb_host",$/,/^}$/{
+    s/^    srcs: libadb_srcs + \[$/    exclude_srcs: ["sysdeps\/env.cpp"],\n&/
+    s/^        "libadb_crypto",$/&\n        "libadb_sysdeps",/
+  }' "$ADB/Android.bp"
+fi
+
+# protobuf: libprotobuf-cpp-full inherits every libprotobuf-cpp-lite source
+# through its defaults, so a binary with both (aapt2: full, adb protos: lite)
+# has any_lite.o & co. twice, which Elf2 rejects (see adb above). Elf2 targets:
+# full leaves those sources out and links libprotobuf-cpp-lite for them.
+if [ -n "$dedup_elf2" ] && [ -f src/protobuf/Android.bp ]; then
+python3 - src/protobuf/Android.bp << 'PYEOF'
+import re, sys
+p = sys.argv[1]
+s = open(p).read()
+def block(name):
+    m = re.search(r'\n(cc_\w+) \{\n    name: "%s",\n.*?\n\}\n' % re.escape(name), s, re.S)
+    return m
+lite = block("libprotobuf-cpp-lite-tlsagnostic-defaults")
+full = block("libprotobuf-cpp-full-defaults")
+if not lite or not full or 'defaults: ["libprotobuf-cpp-lite-defaults"],' not in full.group(0):
+    raise SystemExit(0)  # other layouts (older releases) list sources directly
+srcs = re.search(r'\n    srcs: \[\n(.*?)\n    \],', lite.group(0), re.S)
+if not srcs:
+    raise SystemExit(0)
+fb = full.group(0)
+fb = fb.replace('    defaults: ["libprotobuf-cpp-lite-defaults"],\n',
+                '    defaults: ["libprotobuf-cpp-lite-defaults"],\n'
+                '    // SDK: lite sources come from libprotobuf-cpp-lite (Elf2 rejects duplicates)\n'
+                '    exclude_srcs: [\n' + srcs.group(1) + '\n    ],\n', 1)
+fb = fb.replace('    static_libs: [\n', '    static_libs: [\n        "libprotobuf-cpp-lite",\n', 1)
+fb = fb.replace('    export_static_lib_headers: [\n', '    export_static_lib_headers: [\n        "libprotobuf-cpp-lite",\n', 1)
+s = s.replace(full.group(0), fb)
+open(p, "w").write(s)
+print("protobuf: full links lite instead of rebuilding its sources")
+PYEOF
 fi
 
 # ART globals.h (page-size-agnostic releases): kMaxPageSize is 16K, and
