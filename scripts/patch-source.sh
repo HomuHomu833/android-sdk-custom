@@ -1054,6 +1054,13 @@ if [ -n "$dedup_elf2" ] && [ -f "$ADB/Android.bp" ] && grep -q '^    name: "liba
   }' "$ADB/Android.bp"
 fi
 
+# zstd and lz4 each bundle xxhash.c, with the same public XXH_* symbols; adb
+# links both, which Elf2 rejects (see adb above). Elf2 targets: prefix zstd's
+# copy (xxhash's own XXH_NAMESPACE), unless this zstd already does.
+if [ -n "$dedup_elf2" ] && [ -f src/zstd/Android.bp ] && ! grep -rq 'define XXH_NAMESPACE ZSTD_' src/zstd/lib 2>/dev/null; then
+  sed -i '/^    name: "libzstd",$/,/^}$/s/^    cflags: \["-Wall", "-Werror"\],$/    cflags: ["-Wall", "-Werror", "-DXXH_NAMESPACE=ZSTD_"],/' src/zstd/Android.bp
+fi
+
 # protobuf: libprotobuf-cpp-full inherits every libprotobuf-cpp-lite source
 # through its defaults, so a binary with both (aapt2: full, adb protos: lite)
 # has any_lite.o & co. twice, which Elf2 rejects (see adb above). Elf2 targets:
@@ -1068,15 +1075,18 @@ def block(name):
     return m
 # the lite sources sit in -tlsagnostic-defaults (newer) or -lite-defaults (older)
 lite = block("libprotobuf-cpp-lite-tlsagnostic-defaults") or block("libprotobuf-cpp-lite-defaults")
-full = block("libprotobuf-cpp-full-defaults")
-if not lite or not full or 'defaults: ["libprotobuf-cpp-lite-defaults"],' not in full.group(0):
+fdef = block("libprotobuf-cpp-full-defaults")
+# Edit the libprotobuf-cpp-full module only: libprotoc shares the defaults but
+# is built with RTTI, so it must keep its own copy of the lite sources.
+full = block("libprotobuf-cpp-full")
+if not lite or not fdef or not full or 'defaults: ["libprotobuf-cpp-lite-defaults"],' not in fdef.group(0):
     raise SystemExit(0)  # other layouts (older releases) list sources directly
 srcs = re.search(r'\n    srcs: \[\n(.*?)\n    \],', lite.group(0), re.S)
 if not srcs:
     raise SystemExit(0)
 fb = full.group(0)
-fb = fb.replace('    defaults: ["libprotobuf-cpp-lite-defaults"],\n',
-                '    defaults: ["libprotobuf-cpp-lite-defaults"],\n'
+fb = fb.replace('    name: "libprotobuf-cpp-full",\n',
+                '    name: "libprotobuf-cpp-full",\n'
                 '    // SDK: lite sources come from libprotobuf-cpp-lite (Elf2 rejects duplicates)\n'
                 '    exclude_srcs: [\n' + srcs.group(1) + '\n    ],\n', 1)
 for key in ("static_libs", "export_static_lib_headers"):
