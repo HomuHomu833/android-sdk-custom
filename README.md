@@ -33,7 +33,7 @@ This project is inspired by [lzhiyong's Android SDK Tools](https://github.com/lz
 - **PowerPC**: `powerpc`, `powerpc64`, `powerpc64le`
 - **MIPS**: `mips`, `mipsel`, `mips64`, `mips64el`
 - **Thumb**: `thumb`, `thumbeb`
-- **Other**: `loongarch64`, `s390x`, `hexagon`
+- **Other**: `loongarch64`, `s390x`, `sparc64` ,`hexagon`
 
 ---
 
