@@ -68,6 +68,9 @@ CROSS_CMAKE_EXTRA=()   # extra -D flags a platform may need (e.g. macOS sysroot)
 SOONG_VARS=()          # --var flags for the builder's select()s
 EXE_LDFLAGS_EXTRA=""   # appended to CMAKE_EXE_LINKER_FLAGS only (not shared libs)
 CROSS_ASMFLAGS=""      # CMAKE_ASM_FLAGS (the C flags force-include C headers)
+CROSS_CXXFLAGS_EXTRA=""  # appended to CMAKE_CXX_FLAGS only
+# zig (linux/bsd): see patches/misc/libcxx_transitive.h.
+case "$PLATFORM" in linux|bsd) CROSS_CXXFLAGS_EXTRA="-include $ROOTDIR/patches/misc/libcxx_transitive.h" ;; esac
 case "$PLATFORM" in
   linux)
     TC=/opt/zig-as-llvm
@@ -419,7 +422,7 @@ cmake -GNinja \
   -DCMAKE_RANLIB="$CROSS_RANLIB" \
   -DCMAKE_STRIP="$CROSS_STRIP" \
   -DCMAKE_C_FLAGS="$CROSS_CFLAGS" \
-  -DCMAKE_CXX_FLAGS="$CROSS_CFLAGS" \
+  -DCMAKE_CXX_FLAGS="$CROSS_CFLAGS $CROSS_CXXFLAGS_EXTRA" \
   -DCMAKE_ASM_FLAGS="$CROSS_ASMFLAGS" \
   -DCMAKE_EXE_LINKER_FLAGS="$CROSS_LDFLAGS $EXE_LDFLAGS_EXTRA" \
   -DCMAKE_SHARED_LINKER_FLAGS="$CROSS_LDFLAGS" \

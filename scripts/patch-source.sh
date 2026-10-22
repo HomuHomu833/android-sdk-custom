@@ -523,7 +523,7 @@ PYEOF
 
 # adb sysdeps/errno.cpp: guard out the ERRNO_VALUE static_asserts on MIPS and SPARC (their
 # errno numbers differ from the ADB wire values); the runtime switch still works.
-sed -i 's@#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")@#if !defined(__mips__) && !defined(__sparc__)\n#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")\n#else\n#define ERRNO_VALUE(error_name, wire_value) /* mips/sparc errno numbers differ from ADB wire values */\n#endif@' \
+sed -i 's@#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")@#if !defined(__mips__) \&\& !defined(__sparc__)\n#define ERRNO_VALUE(error_name, wire_value) static_assert((error_name) == (wire_value), "")\n#else\n#define ERRNO_VALUE(error_name, wire_value) /* mips/sparc errno numbers differ from ADB wire values */\n#endif@' \
     $ADB/sysdeps/errno.cpp
 
 # --- bionic below API 29 ------------------------------------------------------
@@ -1016,9 +1016,16 @@ sed -i -e 's/(defined(__aarch64__) || defined(__riscv) || defined(__APPLE__))$/(
 # linux host but used by no SDK tool; lld drops it with --gc-sections. zig's own
 # ELF linker (sparc64, which lld cannot link) does not, and fails on the
 # undefined Parcel symbols. Leave it out of the tools build.
-[ -f src/base/libs/androidfw/CursorWindow.cpp ] && \
-  sed -i 's/^#ifdef __linux__$/#if defined(__linux__) \&\& !defined(STATIC_ANDROIDFW_FOR_TOOLS)/' \
-    src/base/libs/androidfw/CursorWindow.cpp
+# Newer releases wrap that half in #ifdef __linux__; older ones (34.0.0 and
+# before) leave it unguarded, so wrap createFromParcel..writeToParcel there.
+f=src/base/libs/androidfw/CursorWindow.cpp
+if [ -f "$f" ]; then
+  sed -i 's/^#ifdef __linux__$/#if defined(__linux__) \&\& !defined(STATIC_ANDROIDFW_FOR_TOOLS)/' "$f"
+  if ! grep -q 'STATIC_ANDROIDFW_FOR_TOOLS' "$f" && grep -q '^status_t CursorWindow::createFromParcel(' "$f"; then
+    sed -i -e 's/^status_t CursorWindow::createFromParcel(/#if !defined(STATIC_ANDROIDFW_FOR_TOOLS)\n&/' \
+           -e '/^status_t CursorWindow::writeToParcel(/,/^}$/s/^}$/}\n#endif/' "$f"
+  fi
+fi
 
 # ART fd_file.h uses std::vector but gets <vector> only by way of other
 # headers, which newer libc++ (zig 0.18) no longer pulls in.
@@ -1059,7 +1066,8 @@ s = open(p).read()
 def block(name):
     m = re.search(r'\n(cc_\w+) \{\n    name: "%s",\n.*?\n\}\n' % re.escape(name), s, re.S)
     return m
-lite = block("libprotobuf-cpp-lite-tlsagnostic-defaults")
+# the lite sources sit in -tlsagnostic-defaults (newer) or -lite-defaults (older)
+lite = block("libprotobuf-cpp-lite-tlsagnostic-defaults") or block("libprotobuf-cpp-lite-defaults")
 full = block("libprotobuf-cpp-full-defaults")
 if not lite or not full or 'defaults: ["libprotobuf-cpp-lite-defaults"],' not in full.group(0):
     raise SystemExit(0)  # other layouts (older releases) list sources directly
@@ -1071,12 +1079,22 @@ fb = fb.replace('    defaults: ["libprotobuf-cpp-lite-defaults"],\n',
                 '    defaults: ["libprotobuf-cpp-lite-defaults"],\n'
                 '    // SDK: lite sources come from libprotobuf-cpp-lite (Elf2 rejects duplicates)\n'
                 '    exclude_srcs: [\n' + srcs.group(1) + '\n    ],\n', 1)
-fb = fb.replace('    static_libs: [\n', '    static_libs: [\n        "libprotobuf-cpp-lite",\n', 1)
-fb = fb.replace('    export_static_lib_headers: [\n', '    export_static_lib_headers: [\n        "libprotobuf-cpp-lite",\n', 1)
+for key in ("static_libs", "export_static_lib_headers"):
+    if '\n    %s: [\n' % key in fb:
+        fb = fb.replace('\n    %s: [\n' % key, '\n    %s: [\n        "libprotobuf-cpp-lite",\n' % key, 1)
+    else:
+        fb = fb.replace('    exclude_srcs: [\n', '    %s: ["libprotobuf-cpp-lite"],\n    exclude_srcs: [\n' % key, 1)
 s = s.replace(full.group(0), fb)
 open(p, "w").write(s)
 print("protobuf: full links lite instead of rebuilding its sources")
 PYEOF
+fi
+
+# aapt2 BigBuffer.h (34.0.x and older) uses std::back_inserter without
+# <iterator>, which newer libc++ (zig 0.18) no longer pulls in.
+f=src/base/tools/aapt2/util/BigBuffer.h
+if [ -f "$f" ] && grep -q 'std::back_inserter' "$f" && ! grep -q '^#include <iterator>' "$f"; then
+  sed -i '0,/^#include /s//#include <iterator>\n&/' "$f"
 fi
 
 # ART globals.h (page-size-agnostic releases): kMaxPageSize is 16K, and
