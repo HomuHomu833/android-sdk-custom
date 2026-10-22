@@ -188,7 +188,7 @@ drop_unreplaced() {
   find "$1" -maxdepth 1 -type f | while IFS= read -r file; do
     [ -f "$BUILT_BIN/$(basename "$file")" ] && continue
     if file "$file" | grep -qE 'ELF|Mach-O|PE32'; then
-      if [ "$2" = placeholder ]; then
+      if [ "${2:-}" = placeholder ]; then
         echo "Replacing $(basename "$file") with a placeholder: official build, not rebuilt for $TARGET"
         printf '%s\n' "This placeholder substitutes for an official $(basename "$file") that was not rebuilt for $TARGET." \
           "It keeps Android Gradle Plugin's build-tools integrity check passing; the tool itself is unavailable." > "$file"
