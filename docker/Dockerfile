@@ -95,6 +95,37 @@ RUN git clone https://github.com/tpoechtrager/osxcross /tmp/osxcross \
     && cd / \
     && rm -rf /tmp/osxcross
 
+# osxcross runs the image's clang, and upstream clang only enables the arm64e
+# pointer authentication ABI from 21. Older ones compile -arch arm64e as plain
+# arm64 code in a binary marked arm64e, so dyld maps the arm64e system libraries
+# and the first callback they authenticate (qsort, pthread_create, call_once)
+# faults. Install clang 21 and put scripts in place of the arm64e wrappers that
+# hand it to the real ones; the wrapper reads its target from its own name.
+ARG ARM64E_CLANG_VERSION=21
+RUN . /etc/os-release \
+    && mkdir -p /etc/apt/keyrings \
+    && fetch --dir=/etc/apt/keyrings -o llvm-arm64e.asc "https://apt.llvm.org/llvm-snapshot.gpg.key" \
+    && echo "deb [signed-by=/etc/apt/keyrings/llvm-arm64e.asc] http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${ARM64E_CLANG_VERSION} main" \
+        > /etc/apt/sources.list.d/llvm-arm64e.list \
+    && apt-get update && apt-get install -y --no-install-recommends "clang-${ARM64E_CLANG_VERSION}" \
+    && rm -rf /var/lib/apt/lists/* \
+    && pac="/usr/lib/llvm-${ARM64E_CLANG_VERSION}/bin" \
+    && real="$(readlink -f "$(ls /opt/osxcross/bin/arm64e-apple-darwin*-clang | head -n1)")" \
+    && mkdir -p /opt/osxcross/libexec/arm64e \
+    && for f in /opt/osxcross/bin/arm64e-apple-darwin*-* /opt/osxcross/bin/oa64e-*; do \
+           [ -L "$f" ] && [ "$(readlink -f "$f")" = "$real" ] || continue; \
+           n="$(basename "$f")"; \
+           case "$n" in *-clang|*-clang++|*-clang++-*|*-cc|*-c++) ;; *) continue ;; esac; \
+           ln -s "$real" "/opt/osxcross/libexec/arm64e/$n"; \
+           rm "$f"; \
+           printf '#!/bin/sh\nexec /opt/osxcross/libexec/arm64e/%s -foc-compiler-path=%s "$@"\n' "$n" "$pac" > "$f"; \
+           chmod +x "$f"; \
+       done \
+    && ls /opt/osxcross/libexec/arm64e \
+    && /opt/osxcross/bin/arm64e-apple-darwin*-clang --version | head -n1 | grep -q " 21\." \
+    && printf 'void g(void (*)(void *));\nstatic void cb(void *p) { (void)p; }\nvoid f(void) { g(cb); }\n' \
+        | /opt/osxcross/bin/arm64e-apple-darwin*-clang -x c -S -O2 -o - - | grep -q paciza
+
 # Rust 1.85+ (adbmdns is edition 2024) for libtermuxadb.a and the adbmdns
 # bridge, with a rust-std per target that has one. A missing rust-std is
 # skipped (build.sh falls back to openscreen), so a 404 can't fail the image.
