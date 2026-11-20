@@ -259,6 +259,12 @@ if [ "$SHIP_CMDLINE_TOOLS_URL" != "$CMDLINE_TOOLS_URL" ]; then
   ( cd "$HOST_SDK"
     fetch_unpack "$SHIP_CMDLINE_TOOLS_URL" "$PWD/cmdline-tools.zip" )
 fi
+# sdkmanager and apkanalyzer locate the SDK root only from cmdline-tools/latest/.
+if [ -d "$HOST_SDK/cmdline-tools/bin" ]; then
+  mv "$HOST_SDK/cmdline-tools" "$HOST_SDK/cmdline-tools.l"
+  mkdir -p "$HOST_SDK/cmdline-tools"
+  mv "$HOST_SDK/cmdline-tools.l" "$HOST_SDK/cmdline-tools/latest"
+fi
 
 # --- archive ----------------------------------------------------------------
 # Ad-hoc (re)sign what strip broke; Apple Silicon kills unsigned binaries.
