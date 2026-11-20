@@ -223,8 +223,9 @@ case "$PLATFORM" in
     case "$TARGET" in
       *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
       # NetBSD's i386 libc (gcc-built, dynamic) assumes 16-byte stacks; LLVM gives 4
-      # there, and SSE code in libc (arc4random) faults on it.
-      x86-netbsd-*) CROSS_CFLAGS="$CROSS_CFLAGS -mstack-alignment=16" ;;
+      # there, and SSE code in libc (arc4random) faults on it. Realign on entry too,
+      # zig's startup code does not hand main a 16-byte stack.
+      x86-netbsd-*) CROSS_CFLAGS="$CROSS_CFLAGS -mstack-alignment=16 -mstackrealign" ;;
     esac
     ;;
   macos)
