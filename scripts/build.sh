@@ -125,8 +125,10 @@ case "$PLATFORM" in
         CROSS_CFLAGS="$CROSS_CFLAGS -include $ROOTDIR/patches/misc/force-int-ll64.h" ;;
     esac
     # x32: force local-exec TLS (lld can't relax R_X86_64_GOTTPOFF here; static so it fits).
+    # hexagon: a dynamic-model thread_local calls __tls_get_addr through a PLT slot
+    # nothing fills in a static executable, so abseil's hash seed jumped to 0.
     case "$TARGET" in
-      *x32) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
+      *x32|hexagon-*) CROSS_CFLAGS="$CROSS_CFLAGS -ftls-model=local-exec" ;;
     esac
     ;;
   bionic)
