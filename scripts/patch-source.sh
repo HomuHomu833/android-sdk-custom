@@ -85,6 +85,15 @@ sed "s#/crypto/rand/getrandom_fillin.h#/${fillin}#" patches/misc/boringssl-getra
 apply "$ROOTDIR/.getrandom.patch"
 rm -f "$ROOTDIR/.getrandom.patch"
 
+# BoringSSL on hexagon: clang miscompiles the C crypto from -O1 up (cmake-custom's
+# OpenSSL failed TLS with "bad record mac" until built at -O0). crypto/internal.h
+# is private to BoringSSL's own sources, so this leaves adb and friends optimized.
+f=src/boringssl/src/crypto/internal.h
+if [ -f "$f" ] && ! grep -q 'hexagon: clang miscompiles' "$f"; then
+  sed -i '0,/^#include/s//\/\/ hexagon: clang miscompiles this code from -O1 up\n#if defined(__hexagon__) \&\& defined(__clang__)\n#pragma clang optimize off\n#endif\n#include/' "$f"
+  grep -q 'pragma clang optimize off' "$f"
+fi
+
 # BoringSSL HRSS (hrss.c, hrss.cc from 16) and protobuf's utf8_range: their
 # NEON paths mix GNU vector syntax with NEON intrinsics, whose lane order
 # disagrees on big-endian ARM; take the portable C paths there. (Older HRSS
