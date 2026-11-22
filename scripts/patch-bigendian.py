@@ -1000,6 +1000,81 @@ def dexdump():
     write(path, t)
 
 
+BN_LE_BYTE = r"""
+// Byte i of a little-endian word array, on any host (patch-bigendian.py).
+#define SDK_BN_LE_BYTE(w, i) \
+  ((uint8_t)((w)[(i) / sizeof(BN_ULONG)] >> (8 * ((i) % sizeof(BN_ULONG)))))
+"""
+
+
+def boringssl_bn():
+    """BoringSSL reads and writes BIGNUM words as raw bytes, as it supports
+    only little-endian hosts. On big-endian every encode fails or comes out
+    scrambled (adb keygen: "Failed to write key"). Go word by word instead."""
+    for rel in ('crypto/fipsmodule/bn/bytes.cc.inc', 'crypto/fipsmodule/bn/bytes.c.inc',
+                'crypto/fipsmodule/bn/bytes.c', 'crypto/bn/bytes.cc', 'crypto/bn/bytes.c'):
+        path = os.path.join(SRC, 'boringssl/src', rel)
+        if os.path.exists(path):
+            break
+    else:
+        need(False, 'boringssl: bn bytes source found')
+    t = read(path)
+    if 'SDK_BN_LE_BYTE' in t:
+        return
+    t = re.sub(r'const uint8_t \*bytes = \(const uint8_t \*\)([^;]+);', r'const BN_ULONG *bytes_w = \1;', t)
+    t = t.replace('static int fits_in_bytes(const uint8_t *bytes,', 'static int fits_in_bytes(const BN_ULONG *bytes_w,')
+    t = t.replace('fits_in_bytes(bytes,', 'fits_in_bytes(bytes_w,')
+    t = re.sub(r'\bbytes\[([^\]]+)\]', r'SDK_BN_LE_BYTE(bytes_w, \1)', t)
+    t = t.replace('CONSTTIME_DECLASSIFY(bytes + num, tot_bytes - num);', 'CONSTTIME_DECLASSIFY(bytes_w, tot_bytes);')
+    t = t.replace('(void)bytes;', '(void)bytes_w;')
+    t = t.replace('OPENSSL_memcpy(out, bytes, num_bytes);',
+                  'for (size_t i = 0; i < num_bytes; i++) {\n    out[i] = SDK_BN_LE_BYTE(bytes_w, i);\n  }')
+    t = t.replace('OPENSSL_memcpy(ret->d, in, len);',
+                  'OPENSSL_memset(ret->d, 0, num_words * sizeof(BN_ULONG));\n'
+                  '  for (size_t i = 0; i < len; i++) {\n'
+                  '    ret->d[i / BN_BYTES] |= (BN_ULONG)in[i] << (8 * (i % BN_BYTES));\n  }')
+    need('(const uint8_t *)' not in t, 'boringssl: bn byte views')
+    need('memcpy(ret->d' not in t and 'memcpy(out, bytes' not in t, 'boringssl: bn memcpy')
+    write(path, after_includes(t, BN_LE_BYTE))
+
+
+def boringssl_loads():
+    """crypto/internal.h's CRYPTO_load_*/CRYPTO_store_* helpers memcpy and then
+    swap as if the host were little-endian. Big-endian builds get byte-wise
+    versions; little-endian builds keep the originals."""
+    path = os.path.join(SRC, 'boringssl/src/crypto/internal.h')
+    if not os.path.exists(path):
+        return
+    t = read(path)
+    if 'SDK: portable byte order' in t:
+        return
+    head = re.compile(r'^static inline (\w+) (CRYPTO_(load|store)_\w+_(le|be))\(([^)]*)\) \{\n', re.M)
+    out, pos, n = [], 0, 0
+    for m in head.finditer(t):
+        end = t.index('\n}\n', m.end()) + 3
+        ret, name, kind, order, args = m.groups()
+        idx = 'i' if order == 'le' else 'sizeof(v) - 1 - i'
+        src = args.split()[-1].lstrip('*')
+        if kind == 'load':
+            body = ('  const uint8_t *p = (const uint8_t *)' + src + ';\n  %s v = 0;\n'
+                    '  for (size_t i = 0; i < sizeof(v); i++) {\n'
+                    '    v |= (%s)p[%s] << (8 * i);\n  }\n  return v;\n' % (ret, ret, idx))
+        else:
+            body = ('  uint8_t *p = (uint8_t *)out;\n'
+                    '  for (size_t i = 0; i < sizeof(v); i++) {\n'
+                    '    p[%s] = (uint8_t)(v >> (8 * i));\n  }\n' % idx)
+        new = m.group(0) + body + '}\n'
+        out.append(t[pos:m.start()])
+        out.append('// SDK: portable byte order\n#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__\n'
+                   + new + '#else\n' + t[m.start():end] + '#endif\n')
+        pos, n = end, n + 1
+    if n == 0:
+        return
+    out.append(t[pos:])
+    write(path, ''.join(out))
+    DONE.append('boringssl: %d load/store helpers' % n)
+
+
 ziparchive()
 byteorder()
 resourcetypes()
@@ -1017,4 +1092,6 @@ helpers()
 writers()
 dexfile()
 dexdump()
+boringssl_bn()
+boringssl_loads()
 print('patch-bigendian.py: ' + ('; '.join(DONE) if DONE else 'already applied'))
