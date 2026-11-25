@@ -1263,6 +1263,53 @@ sed -i -e '/^typedef HRESULT(WINAPI\* SetThreadDescription)(HANDLE hThread, PCWS
   -e 's/reinterpret_cast<SetThreadDescription>(/reinterpret_cast<HRESULT(WINAPI *)(HANDLE, PCWSTR)>(/' \
   $ADB/sysdeps_win32.cpp
 
+# adb sysdeps_win32.cpp: _win32_lock is a namespace-scope reference set by a
+# dynamic initializer, so _fh_alloc can run from another file's static
+# initializer before it is set (29.0.2 to 29.0.6 crash on a null SRWLOCK).
+sed -i 's/^static  *std::mutex& *_win32_lock = \*new std::mutex();$/static std::mutex\& win32_lock_() { static auto\& m = *new std::mutex(); return m; }\n#define _win32_lock win32_lock_()/' \
+  $ADB/sysdeps_win32.cpp
+
+# e2fsprogs getsize.c (34.0.0): sizes a file through windows_io, whose
+# OPEN_EXISTING turns a missing image into EXT2_ET_BAD_DEVICE_NAME, so mke2fs
+# never gets the ENOENT that makes it create one. Open it as 34.0.1 does.
+python3 - src/e2fsprogs/lib/ext2fs/getsize.c <<'PY'
+import sys
+p = sys.argv[1]
+try:
+    s = open(p).read()
+except FileNotFoundError:
+    sys.exit()
+old = """	io_channel data_io = 0;
+	int retval;
+
+	retval = windows_io_manager->open(file, 0, &data_io);
+	if (retval)
+		return retval;
+
+	dev = windows_get_handle(data_io);
+	if (dev == INVALID_HANDLE_VALUE)
+		return EBADF;
+"""
+if old in s:
+    s = s.replace(old, """	int fd = ext2fs_open_file(file, O_RDONLY, 0);
+	if (fd < 0)
+		return errno;
+	dev = (HANDLE)_get_osfhandle(fd);
+""").replace("	windows_io_manager->close(data_io);\n", "	close(fd);\n")
+    open(p, "w").write(s)
+PY
+
+# ART globals_unix.cc (30.0.4 and older): a static constructor exits unless
+# libartbase.so is already loaded, which never holds for these static links
+# (whether the object gets pulled in depends on the target). 30.0.5 guards it
+# with ART_STATIC_LIBARTBASE; skip it off Android.
+f=src/art/libartbase/base/globals_unix.cc
+if [ -f "$f" ] && ! grep -q ART_STATIC_LIBARTBASE "$f"; then
+  sed -i -e '0,/^#ifdef __APPLE__$/s//#ifdef __ANDROID__\n&/' \
+    -e 's/^} g_check_loaded_build;$/&\n#endif/' "$f"
+  grep -q '^#ifdef __ANDROID__$' "$f"
+fi
+
 # Older libcutils declares and defines its own gettid() unless glibc is 2.32+.
 # glibc has had one since 2.30, and zig's glibc headers declare it (noexcept)
 # whatever the target version. So leave it to glibc from 2.30, and below that
