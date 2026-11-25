@@ -1269,6 +1269,12 @@ sed -i -e '/^typedef HRESULT(WINAPI\* SetThreadDescription)(HANDLE hThread, PCWS
 sed -i 's/^static  *std::mutex& *_win32_lock = \*new std::mutex();$/static std::mutex\& win32_lock_() { static auto\& m = *new std::mutex(); return m; }\n#define _win32_lock win32_lock_()/' \
   $ADB/sysdeps_win32.cpp
 
+# Same file, same cause: fdevent's socketpair can run from a static
+# initializer before _sysdeps_init has called WSAStartup. _init_winsock is a
+# call_once, so call it from the functions that open sockets.
+sed -i -E '/^(static int _network_server|int network_loopback_client|int network_connect)\(.*\{$/a\    _init_winsock();' \
+  $ADB/sysdeps_win32.cpp
+
 # e2fsprogs getsize.c (34.0.0): sizes a file through windows_io, whose
 # OPEN_EXISTING turns a missing image into EXT2_ET_BAD_DEVICE_NAME, so mke2fs
 # never gets the ENOENT that makes it create one. Open it as 34.0.1 does.
