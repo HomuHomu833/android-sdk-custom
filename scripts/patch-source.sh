@@ -1327,6 +1327,15 @@ sed -i 's/^    size_t iov_len;$/    unsigned int iov_len;/' $ADB/sysdeps/uio.h
   sed -i '/^__inline [_a-z]* get[e]\{0,1\}[ug]id(void){return [01];}$/d' \
     src/e2fsprogs/include/mingw/unistd.h
 
+# Older e2fsprogs unix_io opens the image without O_BINARY; on Windows that is
+# text mode, where 0x1a ends a read early (mke2fs: "short read while setting
+# bad block inode"). windows_io.c in newer releases already adds it.
+f=src/e2fsprogs/lib/ext2fs/unix_io.c
+if [ -f "$f" ] && ! sed -n '/^int ext2fs_open_file(/,/^}/p' "$f" | grep -q O_BINARY; then
+  sed -i '/^int ext2fs_open_file(/,/^{$/ s/^{$/{\n#ifdef O_BINARY\n\tflags |= O_BINARY;\n#endif/' "$f"
+  sed -n '/^int ext2fs_open_file(/,/^}/p' "$f" | grep -q O_BINARY
+fi
+
 # Older libutils LruCache.h derives its functors from std::unary_function,
 # which C++17 removed and newer libc++ drops; nothing uses the base.
 sed -i 's/ : public std::unary_function<KeyedEntry\*, hash_t> {$/ {/' \
