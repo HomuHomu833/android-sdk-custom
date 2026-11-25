@@ -1275,6 +1275,21 @@ sed -i 's/^static  *std::mutex& *_win32_lock = \*new std::mutex();$/static std::
 sed -i -E '/^(static int _network_server|int network_loopback_client|int network_connect)\(.*\{$/a\    _init_winsock();' \
   $ADB/sysdeps_win32.cpp
 
+# aidl main.cpp: libc++'s Windows __locale_t owns a std::string, and the
+# static "C" locale can be torn down before ios_base::Init flushes the wide
+# streams at exit; setlocale() then gets a freed name and libc++ throws
+# bad_alloc from a destructor (aidl 32.0.0-33.0.2 on arm64). Its output is
+# written by then, so flush and leave without static destructors.
+f=src/aidl/main.cpp
+if [ -f "$f" ] && grep -q 'int ret = aidl_entry(options, io_delegate);' "$f" && ! grep -q '_exit(ret)' "$f"; then
+  sed -i '/int ret = aidl_entry(options, io_delegate);/a\
+#ifdef _WIN32\
+  fflush(nullptr);\
+  _exit(ret);\
+#endif' "$f"
+  grep -q '^#include <stdio.h>' "$f" || sed -i '0,/^#include /s//#include <stdio.h>\n#include <stdlib.h>\n&/' "$f"
+fi
+
 # e2fsprogs getsize.c (34.0.0): sizes a file through windows_io, whose
 # OPEN_EXISTING turns a missing image into EXT2_ET_BAD_DEVICE_NAME, so mke2fs
 # never gets the ENOENT that makes it create one. Open it as 34.0.1 does.
